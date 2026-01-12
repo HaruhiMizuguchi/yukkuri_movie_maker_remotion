@@ -3,8 +3,8 @@
 **このシステムを最速で動かすための最短手順です。**
 
 ## 前提条件
-- Node.js（LTS）がインストール済み
-- パッケージマネージャ（推奨: `pnpm`）が利用可能
+- Node.js（LTS）がインストール済み（`node` / `npm` が使える状態）
+- パッケージマネージャ（推奨: `pnpm`。無ければ `npm` でも可）が利用可能
 - FFmpeg がインストール済み（Remotionの出力・素材整形で利用）
 - PostgreSQL が利用可能（無料。ローカル単体運用を想定）
 - Google Gemini API キーを取得済み
@@ -27,6 +27,9 @@ cd yukkuri_movie_maker_remotion
 ```bash
 # 依存関係のインストール（推奨: pnpm）
 pnpm install
+
+# pnpm が無い場合（npm）
+# npm install
 ```
 
 ### ステップ 3: 環境変数の設定

@@ -9,7 +9,7 @@
 
 > 本ドキュメントは TypeScript（Node.js）版を前提にしています。`.env` は Web GUI / API / Worker / CLI で共通利用します。
 
-`env_template.txt` というファイルが同梱されている場合は、それをコピーして `.env` にリネームしても構いません。
+`env.example` というファイルが同梱されている場合は、それをコピーして `.env` にリネームしても構いません。
 
 ### .env ファイルの記述例
 
@@ -80,8 +80,8 @@ STABILITY_API_KEY=your_stability_api_key_here
 設定が正しく行われているか確認するために、以下のコマンドを実行してみましょう。
 
 ```bash
-# 設定読み込みのテスト（想定）
-pnpm cli config:test
+# CLI（現時点は雛形）
+pnpm cli
 ```
 
 エラーが表示されなければ、設定は完了です。

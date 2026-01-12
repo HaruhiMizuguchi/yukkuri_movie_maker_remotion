@@ -59,5 +59,13 @@ $OutputEncoding = [System.Console]::OutputEncoding = [System.Text.Encoding]::UTF
 
 ## それでも解決しない場合
 
+## 7. "node / npm / pnpm が見つかりません"（CommandNotFoundException）
+
+**原因**: Node.js が未インストール、またはPathが通っていません。
+
+**対処法**:
+- Node.js（LTS）をインストールしてください（インストール後に新しいターミナルを開き直してください）。
+- `pnpm` は任意ですが、使う場合は `corepack enable` → `corepack prepare pnpm@9.15.0 --activate` を試してください。
+
 - エラーメッセージをコピーして、Web検索してみてください。
 - プロジェクトの `docs` フォルダにある詳細な開発ドキュメントも参考にしてください。

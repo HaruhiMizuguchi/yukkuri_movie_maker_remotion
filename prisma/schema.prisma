@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  theme     String?
+  status    JobStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs Job[]
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  projectId   String
+  status      JobStatus @default(PENDING)
+  mode        String   @default("full") // e.g. full / scriptOnly / renderOnly
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+  steps   WorkflowStep[]
+  files   ProjectFile[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model WorkflowStep {
+  id          String    @id @default(uuid())
+  jobId       String
+  stepName    String
+  status      StepStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  outputJson  Json?
+  error       String?
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@unique([jobId, stepName])
+}
+
+model ProjectFile {
+  id           String   @id @default(uuid())
+  jobId        String
+  stepName     String?
+  fileType     String   // audio/video/image/script/subtitle/metadata
+  fileCategory String   // input/output/intermediate/final
+  relativePath String
+  fileSizeBytes BigInt?
+  createdAt    DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+

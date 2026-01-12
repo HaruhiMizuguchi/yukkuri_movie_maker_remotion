@@ -105,7 +105,7 @@ fallback_provider: "openai"  # Geminiが使えない場合のみ
 
 ```bash
 # 使用量レポートの確認（実装予定）
-pnpm cli cost:report --month 2025-01
+pnpm cli
 ```
 
 ### 4.2 アラート設定

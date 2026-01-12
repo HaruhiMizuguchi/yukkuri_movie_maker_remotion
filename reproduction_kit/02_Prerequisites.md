@@ -18,9 +18,15 @@
 - **用途**: Web GUI / API / Worker / RemotionレンダリングをすべてTypeScriptで実装・実行します。
 - **確認方法**: ターミナルで `node --version` を実行
 
+> 補足: Node.js をインストールすると通常 `npm` も利用可能になります（`npm --version` で確認）。
+
 ### パッケージマネージャ（推奨: pnpm）
 - **用途**: モノレポ運用（Web/Worker/共有パッケージ）で依存管理を簡単にします。
 - **確認方法**: `pnpm --version`
+
+> pnpm は、Node.js同梱の `corepack` で有効化できます（Windows/PowerShell例）:
+> - `corepack enable`
+> - `corepack prepare pnpm@9.15.0 --activate`
 
 ### FFmpeg (必須)
 動画の合成や変換に使用する非常に重要なツールです。**素材整形・音声ミックス・最終エンコード**に加えて、Remotionの出力も内部的にFFmpegに依存するケースがあるため、基本的に必須と考えてください。必ずインストールし、パスを通してください。

@@ -19,7 +19,7 @@ pnpm dev
 ローカルで同じワークフローを実行します。Web GUIと同じ「プロジェクト/ジョブ定義」を使い回せる想定です。
 
 ```bash
-pnpm cli run --dev-mode
+pnpm cli
 ```
 
 ### 3) API（外部連携向け / 優先度低）

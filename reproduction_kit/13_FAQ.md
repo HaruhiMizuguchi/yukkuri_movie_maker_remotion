@@ -81,7 +81,7 @@ Web GUI / CLI / API / Worker で共通利用します。
 
 **A**: 
 ```bash
-pnpm cli config:test
+pnpm cli
 ```
 を実行してください。エラーが出なければ正しく設定されています。
 
