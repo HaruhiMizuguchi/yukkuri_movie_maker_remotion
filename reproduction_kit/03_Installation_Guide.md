@@ -8,61 +8,46 @@
 Gitを使用している場合はクローンし、そうでない場合はZIPファイルをダウンロードして解凍してください。
 
 ```bash
-# Gitを使用する場合の例
-git clone https://github.com/your-repo/auto_yukkuri_movie_maker.git
-cd auto_yukkuri_movie_maker
+# Gitを使用する場合の例（URLは適宜置き換えてください）
+git clone [repository-url]
+cd yukkuri_movie_maker_remotion
 ```
 
-## 手順 2: 仮想環境の作成 (推奨)
+## 手順 2: 依存関係のインストール
 
-Pythonのライブラリが他のプロジェクトと競合しないように、仮想環境を作成することをお勧めします。
-
-**Windows:**
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-**macOS / Linux:**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-仮想環境が有効になると、ターミナルの行頭に `(venv)` と表示されます。
-
-## 手順 3: 依存ライブラリのインストール
-
-`requirements.txt` に記載されている必要なライブラリを一括でインストールします。
+このプロジェクトはTypeScript（Node.js）で実装する前提です。パッケージマネージャは `pnpm` を推奨します（`npm` でも可）。
 
 ```bash
-pip install -r requirements.txt
+pnpm install
 ```
 
-開発用の追加ツール（テストツールなど）もインストールしたい場合は、以下も実行してください：
+> 補足: 将来的にWeb/Worker/共有パッケージを分けるため、モノレポ運用（workspaces）を想定します。
 
-```bash
-pip install -r requirements-dev.txt
+## 手順 3: PostgreSQL の準備（ローカル）
+
+DBは無料で、後々別マシンへ分離しやすい **PostgreSQL** を標準とします。
+
+- PostgreSQLをインストールし、ローカルで起動できるようにしてください。
+- DB名は任意ですが、例として `yukkuri_movie_maker` を使います。
+
+## 手順 4: 環境変数（.env）の作成
+
+プロジェクトルートに `.env` を作成し、最低限以下を設定します（値は環境に合わせて変更）。
+
+```ini
+GOOGLE_API_KEY=your_google_gemini_api_key_here
+AIVIS_SPEECH_BASE_URL=http://127.0.0.1:10101
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/yukkuri_movie_maker?schema=public
+ENVIRONMENT=development
+DEBUG=true
 ```
 
-## 手順 4: ディレクトリ構造の初期化
+## 手順 5: ディレクトリ構造の初期化（必要に応じて）
 
-動画生成に必要なフォルダ（一時ファイル置き場や成果物置き場）を作成します。
-以下のコマンドを実行してください。
+基本的には起動時に自動作成される想定ですが、必要なら作成してください。
 
-**Windows (PowerShell):**
 ```powershell
-mkdir -p temp,projects,assets,config
-mkdir -p assets/characters/reimu,assets/characters/marisa,assets/characters/common
-mkdir -p assets/audio/bgm,assets/audio/sound_effects,assets/audio/jingles
-```
-
-**macOS / Linux:**
-```bash
-mkdir -p {temp,projects,assets,config}
-mkdir -p assets/{characters,audio,fonts,templates}
-mkdir -p assets/characters/{reimu,marisa,common}
-mkdir -p assets/audio/{bgm,sound_effects,jingles}
+mkdir projects,outputs,logs,assets,config -ErrorAction SilentlyContinue
 ```
 
 これでインストールの基本作業は完了です。次は設定ファイルの作成に進みます。

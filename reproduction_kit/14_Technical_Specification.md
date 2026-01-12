@@ -7,65 +7,55 @@
 ### 1.1 全体構成
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  CLI Interface                       │
-│              (src/cli/main_cli.py)                   │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│              Workflow Engine                         │
-│          (src/core/workflow_engine.py)               │
-│  - ステップ管理                                        │
-│  - 並列処理制御                                        │
-│  - エラーハンドリング                                  │
-└──────────────────┬──────────────────────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-┌───────▼────────┐   ┌────────▼────────┐
-│  Data Layer    │   │  Module Layer   │
-│                │   │                 │
-│ - Database     │   │ - Theme         │
-│ - File System  │   │ - Script        │
-│ - Repository   │   │ - TTS           │
-│                │   │ - Video         │
-└────────────────┘   └─────────┬───────┘
-                               │
-                     ┌─────────▼─────────┐
-                     │   API Layer       │
-                     │                   │
-                     │ - LLM Client      │
-                     │ - TTS Client      │
-                     │ - Image Gen       │
-                     └───────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                     Web GUI (優先)                        │
+│                      (apps/web)                           │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+┌───────────────────────────▼──────────────────────────────┐
+│                         HTTP API                          │
+│                        (apps/api)                         │
+│  - ジョブ投入/進捗/成果物                                 │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+┌───────────────────────────▼──────────────────────────────┐
+│                          Worker                           │
+│                        (apps/worker)                      │
+│  - ワークフロー実行（packages/core）                      │
+│  - 外部API呼び出し（LLM/TTS/画像生成）                    │
+│  - FFmpeg（素材整形/音声ミックス/エンコード）             │
+│  - Remotion（動画レンダリング）                           │
+└───────────────────────────┬──────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+┌─────────────▼─────────────┐  ┌─────────▼───────────────┐
+│ PostgreSQL (メタデータ/状態) │  │ File System（大容量ファイル）│
+└───────────────────────────┘  └─────────────────────────┘
 ```
 
 ### 1.2 レイヤー構成
 
-#### CLI Layer (`src/cli/`)
-- ユーザーインターフェース
-- コマンドライン引数の解析
-- 進捗表示
+#### Web/UI Layer (`apps/web/`)
+- ローカルWeb GUI（優先入口）
+- プロジェクト作成・設定編集・実行・進捗・成果物閲覧
 
-#### Core Layer (`src/core/`)
-- **WorkflowEngine**: ワークフロー実行制御
-- **ProjectManager**: プロジェクト管理
-- **DatabaseManager**: データベース操作
-- **ErrorHandler**: エラーハンドリング
+#### API Layer (`apps/api/`)
+- APIエンドポイント（ジョブ投入/状態取得/成果物管理）
+- 認証（将来）・入力バリデーション
 
-#### Module Layer (`src/modules/`)
-- 各処理ステップの実装
-- ビジネスロジック
+#### Worker Layer (`apps/worker/`)
+- ジョブ処理（バックグラウンド）
+- ステップ実行、並列制御、リトライ
 
-#### API Layer (`src/api/`)
-- 外部APIとの通信
-- レート制限対応
-- リトライ処理
+#### Core/Shared (`packages/*`)
+- `packages/core`: ワークフロー中核（ステップ定義/再開/成果物）
+- `packages/remotion`: Remotionコンポジション（動画の見た目・字幕・テンプレ）
+- `packages/shared`: 型/ユーティリティ
 
-#### Data Layer (`src/dao/`, `src/utils/`)
-- データアクセス
-- ファイル操作
-- 設定管理
+#### Data Layer
+- PostgreSQL（メタデータ/状態）
+- File System（音声・画像・動画・ログ）
 
 ---
 
@@ -76,10 +66,11 @@
 **原則**: メタデータはDB、大容量ファイルはファイルシステム
 
 #### データベース管理（SQLite）
+#### データベース管理（PostgreSQL）
 - プロジェクト基本情報
-- ワークフロー実行状況
-- ステップ間のデータ受け渡し
-- API使用履歴
+- ワークフロー実行状況（ジョブ/ステップ）
+- ステップ間のデータ受け渡し（メタデータ）
+- API使用履歴（任意）
 
 #### ファイルシステム管理
 - 音声ファイル（WAV、MP3）
@@ -138,26 +129,24 @@ CREATE TABLE project_files (
 
 ### 3.1 ステップ実行フロー
 
-```python
-class WorkflowEngine:
-    def execute_workflow(self, project_id: str):
-        """ワークフロー全体を実行"""
-        steps = self._load_workflow_definition()
-        
-        for step in steps:
-            # ステップ状態確認
-            if self._is_step_completed(project_id, step.name):
-                continue  # スキップ
-            
-            # 入力データ取得
-            input_data = self._get_step_input(project_id, step)
-            
-            # ステップ実行
-            try:
-                output_data = step.execute(input_data)
-                self._save_step_output(project_id, step.name, output_data)
-            except Exception as e:
-                self._handle_error(project_id, step.name, e)
+```ts
+// 概念例（TypeScript）
+export async function runWorkflow(jobId: string) {
+  const steps = await loadWorkflowDefinition();
+
+  for (const step of steps) {
+    if (await isStepCompleted(jobId, step.name)) continue;
+
+    const input = await getStepInput(jobId, step);
+    try {
+      const output = await step.run({ jobId, input });
+      await saveStepOutput(jobId, step.name, output);
+    } catch (err) {
+      await handleError(jobId, step.name, err);
+      throw err;
+    }
+  }
+}
 ```
 
 ### 3.2 エラーハンドリング
@@ -168,15 +157,11 @@ class WorkflowEngine:
 3. **User Intervention Required**: 手動対応が必要
 
 #### リトライ戦略
-```python
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type(RecoverableError)
-)
-def call_api():
-    # API呼び出し
-    pass
+```ts
+// 概念例: リトライ可能なエラーだけ指数バックオフで再試行
+await retry(async () => {
+  return await callExternalApi();
+}, { retries: 3, minTimeout: 4000, maxTimeout: 10000 });
 ```
 
 ---
@@ -232,24 +217,16 @@ class LLMClient:
 
 ### 5.1 FFmpeg統合
 
-**使用ライブラリ**: `ffmpeg-python`
+**主な利用方法**: FFmpegを外部プロセスとして実行（Nodeから呼び出し）
 
 **主要処理**:
 1. **動画合成**: 背景 + 立ち絵 + 字幕
 2. **音声合成**: 音声 + BGM + 効果音
 3. **エンコード**: 最終動画の品質最適化
 
-```python
-import ffmpeg
-
-# 動画合成の例
-(
-    ffmpeg
-    .input('background.mp4')
-    .overlay(ffmpeg.input('character.mp4'))
-    .output('composed.mp4', vcodec='libx264', acodec='aac')
-    .run()
-)
+```bash
+# 例: 音声の結合（概念）
+ffmpeg -i a.wav -i b.wav -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1" out.wav
 ```
 
 ### 5.2 字幕処理
@@ -349,21 +326,19 @@ class BaseModule(ABC):
 
 ## 10. 依存関係
 
-### 10.1 主要ライブラリ
+### 10.1 主要ライブラリ（想定）
 
-| ライブラリ | 用途 | バージョン |
-|-----------|------|-----------|
-| pydantic | データ検証 | ≥2.0.0 |
-| pyyaml | 設定ファイル | ≥6.0 |
-| ffmpeg-python | 動画処理 | ≥0.2.0 |
-| opencv-python | 画像処理 | ≥4.8.0 |
-| pillow | 画像操作 | ≥9.0.0 |
-| requests | HTTP通信 | ≥2.28.0 |
-| sqlalchemy | ORM | ≥2.0.0 |
+| ライブラリ | 用途 |
+|-----------|------|
+| remotion | 動画レンダリング（React） |
+| prisma | DB/マイグレーション |
+| zod | 入力/設定の検証 |
+| pino | ログ |
+| undici/axios | HTTP通信 |
 
 ### 10.2 システム要件
 
-- **Python**: 3.8以上（3.11推奨）
+- **Node.js**: LTS（推奨: 20以上）
 - **FFmpeg**: 4.0以上
 - **メモリ**: 8GB以上推奨
 - **ストレージ**: 10GB以上の空き容量

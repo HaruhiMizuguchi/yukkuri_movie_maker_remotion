@@ -27,11 +27,12 @@
 
 このシステムを再現するために使用されている主要な技術です。
 
-- **プログラミング言語**: Python 3.11+
-- **データベース**: SQLite (プロジェクト管理、データ保存)
-- **動画処理**: FFmpeg (映像と音声の合成、エンコード)
-- **画像処理**: Pillow, OpenCV
-- **音声処理**: PyDub
+- **プログラミング言語**: TypeScript（Node.js）
+- **動画編集/レンダリング**: Remotion（React）
+- **データベース**: PostgreSQL（無料・将来別マシン展開しやすい。ローカル単体運用ではSQLite構成も可能）
+- **動画処理**: FFmpeg（素材整形・音声ミックス・最終エンコード。※Remotionの出力も内部的にFFmpegに依存するケースがあります）
+- **Web GUI**: ローカルで動くWebアプリ（将来的に別マシン/サーバーへ分離可能な構成を想定）
+- **実行形態**: Web GUI（優先） / CLI / API
 - **AI/API**:
   - **LLM**: Google Gemini API (推奨), OpenAI API, Anthropic API
   - **TTS**: AIVIS Speech （ローカルサーバー、推奨）, Azure Speech Services

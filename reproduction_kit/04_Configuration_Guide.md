@@ -4,8 +4,10 @@
 
 ## 1. 環境変数ファイル (.env) の作成
 
-プロジェクトのルートディレクトリ（`auto_yukkuri_movie_maker`フォルダの直下）に、`.env` という名前のファイルを作成します。
+プロジェクトのルートディレクトリ（`yukkuri_movie_maker_remotion`フォルダの直下）に、`.env` という名前のファイルを作成します。
 このファイルにはAPIキーなどの機密情報を記述します。
+
+> 本ドキュメントは TypeScript（Node.js）版を前提にしています。`.env` は Web GUI / API / Worker / CLI で共通利用します。
 
 `env_template.txt` というファイルが同梱されている場合は、それをコピーして `.env` にリネームしても構いません。
 
@@ -35,6 +37,12 @@ GOOGLE_API_KEY=your_google_gemini_api_key_here
 AIVIS_SPEECH_BASE_URL=http://127.0.0.1:10101
 
 # ===========================================
+# Database (推奨: PostgreSQL)
+# ===========================================
+# 例: postgresql://USER:PASSWORD@HOST:PORT/DB?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/yukkuri_movie_maker?schema=public
+
+# ===========================================
 # その他のAPI (オプション)
 # ===========================================
 # OpenAIを使用する場合
@@ -50,6 +58,8 @@ STABILITY_API_KEY=your_stability_api_key_here
 
 `config` フォルダ内には、アプリケーションの挙動を制御するYAMLファイルがあります。
 初期状態ではデフォルト設定が使われますが、必要に応じて変更できます。
+
+> 補足: 設定は「環境変数（秘密情報）+ YAML（挙動）」の2層を推奨します。将来的にWeb GUI上で編集できるようにする場合でも、YAML/JSONにシリアライズ可能な形を維持します。
 
 ### 主な設定ファイル
 
@@ -70,8 +80,8 @@ STABILITY_API_KEY=your_stability_api_key_here
 設定が正しく行われているか確認するために、以下のコマンドを実行してみましょう。
 
 ```bash
-# 設定読み込みのテスト
-python -m src.utils.config_loader --test
+# 設定読み込みのテスト（想定）
+pnpm cli config:test
 ```
 
 エラーが表示されなければ、設定は完了です。

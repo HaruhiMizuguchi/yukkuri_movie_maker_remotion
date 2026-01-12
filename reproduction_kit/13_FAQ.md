@@ -14,7 +14,7 @@
 ### Q2: プログラミングの知識がなくても使えますか？
 
 **A**: 基本的な使用には最小限のコマンドライン操作のみが必要です。
-ただし、カスタマイズや拡張には Python の知識が必要になります。
+ただし、カスタマイズや拡張には TypeScript の知識があると便利です。
 
 ### Q3: Windows/Mac/Linux のどれで動きますか？
 
@@ -43,11 +43,11 @@
 
 詳細は [06_Troubleshooting.md](06_Troubleshooting.md) を参照してください。
 
-### Q6: Pythonのバージョンはどれを使えばいいですか？
+### Q6: Node.jsのバージョンはどれを使えばいいですか？
 
-**A**: Python 3.8以上が必要です。**Python 3.11**を推奨します。
+**A**: TypeScript（Node.js）版を前提とします。Node.jsは **LTS（推奨: 20以上）** を使用してください。
 ```bash
-python --version
+node --version
 ```
 で確認できます。
 
@@ -55,14 +55,11 @@ python --version
 
 **A**: 以下を試してください：
 ```bash
-# pipを最新版にアップグレード
-pip install --upgrade pip
-
-# 再度インストール
-pip install -r requirements.txt
+# pnpmで依存関係を再インストール
+pnpm install
 ```
 
-それでも解決しない場合は、仮想環境を作り直してください。
+それでも解決しない場合は、`node_modules` を削除してから再インストールしてください。
 
 ---
 
@@ -77,14 +74,14 @@ pip install -r requirements.txt
 
 ### Q9: `.env` ファイルはどこに置けばいいですか？
 
-**A**: プロジェクトのルートディレクトリ（`auto_yukkuri_movie_maker` フォルダ直下）に配置してください。
-`main.py` と同じ階層です。
+**A**: プロジェクトのルートディレクトリ（`yukkuri_movie_maker_remotion` フォルダ直下）に配置してください。
+Web GUI / CLI / API / Worker で共通利用します。
 
 ### Q10: APIキーが正しく設定されているか確認する方法は？
 
 **A**: 
 ```bash
-python -m src.utils.config_loader --test
+pnpm cli config:test
 ```
 を実行してください。エラーが出なければ正しく設定されています。
 
@@ -142,7 +139,7 @@ python -m src.utils.config_loader --test
 
 **A**: 依存関係がインストールされていません。
 ```bash
-pip install -r requirements.txt
+pnpm install
 ```
 を実行してください。
 

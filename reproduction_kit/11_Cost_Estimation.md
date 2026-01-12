@@ -42,7 +42,7 @@
 
 #### 開発モードの活用
 ```bash
-python src/main.py --dev-mode
+pnpm dev
 ```
 
 開発モードでは以下の制限が適用されます：
@@ -105,7 +105,7 @@ fallback_provider: "openai"  # Geminiが使えない場合のみ
 
 ```bash
 # 使用量レポートの確認（実装予定）
-python src/utils/cost_reporter.py --month 2025-01
+pnpm cli cost:report --month 2025-01
 ```
 
 ### 4.2 アラート設定

@@ -7,28 +7,28 @@
 ### 1.1 開発用ツールのインストール
 
 ```bash
-# 開発用依存関係のインストール
-pip install -r requirements-dev.txt
+# 依存関係のインストール
+pnpm install
 ```
 
-`requirements-dev.txt` には以下が含まれます：
-- **pytest**: テストフレームワーク
-- **pytest-cov**: カバレッジ測定
-- **black**: コードフォーマッター
-- **flake8**: リンター
-- **mypy**: 型チェッカー
+（想定）主要な開発ツール:
+- **TypeScript**: 型チェック
+- **ESLint**: リント
+- **Prettier**: フォーマット
+- **Vitest**: テスト
+- **Prisma**: DBスキーマ/マイグレーション
 
 ### 1.2 コード品質ツールの使用
 
 ```bash
-# コードフォーマット
-black src/
+# フォーマット
+pnpm format
 
-# リント（コード品質チェック）
-flake8 src/
+# リント
+pnpm lint
 
 # 型チェック
-mypy src/
+pnpm typecheck
 ```
 
 ---
@@ -38,36 +38,23 @@ mypy src/
 ### 2.1 主要ディレクトリ
 
 ```
-src/
-├── core/           # システムの中核機能
-│   ├── project_manager.py      # プロジェクト管理
-│   ├── workflow_engine.py      # ワークフロー実行エンジン
-│   ├── database_manager.py     # データベース管理
-│   └── error_handler.py        # エラーハンドリング
-│
-├── modules/        # 各処理ステップの実装
-│   ├── theme_selector.py       # ステップ1: テーマ選定
-│   ├── script_generator.py     # ステップ2: 台本生成
-│   ├── tts_processor.py        # ステップ4: 音声生成
-│   └── ...
-│
-├── api/            # 外部API通信クライアント
-│   ├── llm_client.py           # LLM API
-│   ├── tts_client.py           # TTS API
-│   └── image_gen_client.py     # 画像生成API
-│
-└── utils/          # ユーティリティ関数
-    ├── config_loader.py        # 設定読み込み
-    ├── logger.py               # ロギング
-    └── file_manager.py         # ファイル操作
+apps/
+├── web/            # Web GUI（優先入口）
+├── api/            # HTTP API（ジョブ投入/進捗/成果物）
+└── worker/         # バックグラウンド処理（AI/FFmpeg/Remotion）
+
+packages/
+├── core/           # ワークフロー中核（ステップ管理/再開/状態）
+├── remotion/       # Remotionコンポジション（動画の見た目とタイムライン）
+└── shared/         # 型/ユーティリティ（Script/Timeline/Subtitle等）
 ```
 
 ### 2.2 データフロー
 
-1. **ワークフローエンジン** (`workflow_engine.py`) が各ステップを順次実行
-2. 各ステップは **モジュール** (`modules/`) として実装
-3. モジュールは **APIクライアント** (`api/`) を使用して外部サービスと通信
-4. 結果は **データベース** と **ファイルシステム** に保存
+1. **Web GUI** または **CLI/API** からジョブを作成
+2. **Worker** がジョブを取得し、**packages/core** のワークフローを実行
+3. 外部サービス（LLM/TTS/画像生成）を呼び出し、FFmpeg/Remotionで素材生成・レンダリング
+4. 結果は **PostgreSQL（メタデータ/状態）** と **ファイルシステム（大容量ファイル）** に保存
 
 ---
 
@@ -77,37 +64,29 @@ src/
 
 ```bash
 # 全テストを実行
-pytest
+pnpm test
 
 # カバレッジ付きで実行
-pytest --cov=src --cov-report=html
+pnpm test -- --coverage
 
-# 特定のテストファイルのみ実行
-pytest tests/unit/test_theme_selector.py
+# 特定のテストのみ実行（例）
+pnpm test -- -t "theme"
 ```
 
 ### 3.2 テストの書き方
 
 新しい機能を追加する際は、必ずテストを先に書きます（TDD）。
 
-**例: 新しいモジュールのテスト**
-```python
-# tests/unit/test_new_module.py
-import pytest
-from src.modules.new_module import NewModule
+**例: 新しいステップのテスト（概念）**
+```ts
+import { describe, it, expect } from "vitest";
 
-def test_new_module_basic_functionality():
-    """基本機能のテスト"""
-    module = NewModule()
-    result = module.process(input_data="test")
-    assert result is not None
-    assert result["status"] == "success"
-
-def test_new_module_error_handling():
-    """エラーハンドリングのテスト"""
-    module = NewModule()
-    with pytest.raises(ValueError):
-        module.process(input_data=None)
+describe("myNewStep", () => {
+  it("basic functionality", async () => {
+    const result = await myNewStep({ input: "test" });
+    expect(result.status).toBe("success");
+  });
+});
 ```
 
 ---
@@ -116,43 +95,21 @@ def test_new_module_error_handling():
 
 ### 4.1 モジュールの作成
 
-`src/modules/` に新しいファイルを作成します。
+（想定）`packages/core/src/steps/` に新しいステップを追加します。
 
-```python
-# src/modules/my_new_step.py
-from typing import Dict, Any
-from src.core.base_module import BaseModule
-
-class MyNewStep(BaseModule):
-    """新しい処理ステップ"""
-    
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
-        self.step_name = "my_new_step"
-    
-    def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        メイン処理
-        
-        Args:
-            input_data: 前のステップからの入力データ
-        
-        Returns:
-            処理結果
-        """
-        # 処理ロジックをここに実装
-        result = self._process(input_data)
-        return result
-    
-    def _process(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """実際の処理"""
-        # TODO: 実装
-        return {"status": "success", "data": data}
+```ts
+export const myNewStep: WorkflowStep = {
+  name: "my_new_step",
+  async run(ctx) {
+    // TODO: 実装
+    return { status: "success", data: ctx.input };
+  },
+};
 ```
 
 ### 4.2 ワークフローへの登録
 
-`docs/flow_definition.yaml` に新しいステップを追加します。
+設定（YAML/JSON）にステップを追加し、Workerがそれを読み込んで実行する想定です。
 
 ```yaml
 workflows:
@@ -185,41 +142,35 @@ workflows:
 
 システムは詳細なログを出力します。
 
-```python
-from src.utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-def my_function():
-    logger.info("処理を開始します")
-    logger.debug(f"デバッグ情報: {data}")
-    logger.error("エラーが発生しました", exc_info=True)
+```ts
+logger.info("処理を開始します");
+logger.debug({ data }, "デバッグ情報");
+logger.error({ err }, "エラーが発生しました");
 ```
 
 ログファイルは `logs/` フォルダに保存されます。
 
 ### 5.2 ブレークポイントの使用
 
-```python
-# コード内にブレークポイントを設定
-import pdb; pdb.set_trace()
-
-# または Python 3.7+
-breakpoint()
+```ts
+// Node.js / TypeScript では、以下のいずれかでデバッグします
+// - debugger; を仕込んでVS Code等でアタッチ
+// - もしくは --inspect / --inspect-brk で起動
+debugger;
 ```
 
 ### 5.3 開発モードでの実行
 
 ```bash
 # 詳細なログ出力
-python src/main.py --dev-mode --log-level DEBUG
+pnpm dev
 ```
 
 ---
 
 ## 6. データベーススキーマ
 
-### 6.1 主要テーブル
+### 6.1 主要テーブル（概念）
 
 #### projects テーブル
 ```sql
@@ -247,26 +198,8 @@ CREATE TABLE workflow_steps (
 );
 ```
 
-### 6.2 データベース操作
-
-```python
-from src.core.project_repository import ProjectRepository
-
-repo = ProjectRepository()
-
-# プロジェクト作成
-project_id = repo.create_project(theme="テストテーマ")
-
-# ステップ結果の保存
-repo.save_step_result(
-    project_id=project_id,
-    step_name="theme_selection",
-    output_data={"theme": "テストテーマ"}
-)
-
-# ステップ結果の取得
-result = repo.get_step_output(project_id, "theme_selection")
-```
+### 6.2 DB操作（想定）
+Prisma等のORMで `projects` / `workflow_steps` 等を管理します。
 
 ---
 
@@ -300,11 +233,8 @@ result = repo.get_step_output(project_id, "theme_selection")
 ### 8.1 プロファイリング
 
 ```bash
-# 処理時間の計測
-python -m cProfile -o profile.stats src/main.py
-
-# 結果の確認
-python -m pstats profile.stats
+# 例: Nodeのプロファイリング（概念）
+node --prof apps/worker/dist/index.js
 ```
 
 ### 8.2 並列処理

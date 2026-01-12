@@ -3,8 +3,10 @@
 **このシステムを最速で動かすための最短手順です。**
 
 ## 前提条件
-- Python 3.8+ がインストール済み
-- FFmpeg がインストール済み
+- Node.js（LTS）がインストール済み
+- パッケージマネージャ（推奨: `pnpm`）が利用可能
+- FFmpeg がインストール済み（Remotionの出力・素材整形で利用）
+- PostgreSQL が利用可能（無料。ローカル単体運用を想定）
 - Google Gemini API キーを取得済み
 - AIVIS Speech をダウンロード済み（ローカルサーバーとして起動可能）
 
@@ -16,24 +18,15 @@
 ```bash
 # Gitでクローンする場合
 git clone [repository-url]
-cd auto_yukkuri_movie_maker
+cd yukkuri_movie_maker_remotion
 
 # またはZIPをダウンロードして解凍
 ```
 
 ### ステップ 2: 依存関係のインストール
 ```bash
-# 仮想環境の作成（推奨）
-python -m venv venv
-
-# 仮想環境の有効化
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# 依存関係のインストール
-pip install -r requirements.txt
+# 依存関係のインストール（推奨: pnpm）
+pnpm install
 ```
 
 ### ステップ 3: 環境変数の設定
@@ -44,22 +37,22 @@ pip install -r requirements.txt
 GOOGLE_API_KEY=your_google_gemini_api_key_here
 AIVIS_SPEECH_BASE_URL=http://127.0.0.1:10101
 
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/yukkuri_movie_maker?schema=public
+
 ENVIRONMENT=development
 DEBUG=true
 ```
 
 ### ステップ 4: ディレクトリの作成
 ```bash
-# Windows (PowerShell):
-mkdir -p temp,projects,assets,config
-
-# Mac/Linux:
-mkdir -p {temp,projects,assets,config}
+# 初回は起動時に自動作成される想定ですが、必要なら作成してください
+mkdir -p projects outputs logs assets config
 ```
 
 ### ステップ 5: 実行！
 ```bash
-python src/main.py --dev-mode
+# まずは Web GUI（優先）で実行
+pnpm dev
 ```
 
 これで動画生成が開始されます！
