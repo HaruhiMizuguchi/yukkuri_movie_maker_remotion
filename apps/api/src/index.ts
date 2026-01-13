@@ -41,13 +41,18 @@ app.post("/api/jobs", async (req, reply) => {
   return reply.code(201).send({ projectId: project.id, jobId: job.id });
 });
 
-app.get("/api/jobs/:jobId", async (req) => {
+app.get("/api/jobs/:jobId", async (req, reply) => {
   const params = z.object({ jobId: z.string().uuid() }).parse(req.params);
   const job = await prisma.job.findUnique({
     where: { id: params.jobId },
     include: { steps: true, files: true, project: true },
   });
-  return job ?? { error: "not_found" };
+
+  if (!job) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+
+  return job;
 });
 
 async function main() {
@@ -61,4 +66,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

@@ -2,7 +2,7 @@ import "dotenv/config";
 import PgBoss from "pg-boss";
 import { PrismaClient, JobStatus, StepStatus } from "@prisma/client";
 import { z } from "zod";
-import { runWorkflow } from "@ymm/core";
+import { runWorkflow, WORKFLOW_STEPS } from "@ymm/core";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -13,15 +13,7 @@ const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
 
 async function ensureSteps(jobId: string) {
-  const stepNames = [
-    "theme_selection",
-    "script_generation",
-    "tts_generation",
-    "asset_generation",
-    "subtitle_generation",
-    "remotion_render",
-    "final_encoding",
-  ];
+  const stepNames = WORKFLOW_STEPS.map((step) => step.name);
 
   for (const stepName of stepNames) {
     await prisma.workflowStep.upsert({
@@ -35,7 +27,8 @@ async function ensureSteps(jobId: string) {
 async function main() {
   await boss.start();
 
-  await boss.work("yukkuri.render", async (payload) => {
+  await boss.work("yukkuri.render", async (job) => {
+    const payload = (job as { data?: unknown }).data ?? job;
     const jobId = z.object({ jobId: z.string().uuid() }).parse(payload).jobId;
 
     await ensureSteps(jobId);
@@ -59,4 +52,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
