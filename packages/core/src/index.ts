@@ -34,14 +34,24 @@ export async function runWorkflow(ctx: WorkflowContext): Promise<void> {
       create: { jobId: ctx.jobId, stepName: step.name, status: "RUNNING", startedAt },
     });
 
-    // TODO: plug in step implementation here.
-    const completedAt = new Date();
-    const status = step.implemented ? "COMPLETED" : "SKIPPED";
-    const outputJson = step.implemented ? { ok: true } : SKIPPED_OUTPUT;
+    try {
+      // TODO: plug in step implementation here.
+      const completedAt = new Date();
+      const status = step.implemented ? "COMPLETED" : "SKIPPED";
+      const outputJson = step.implemented ? { ok: true } : SKIPPED_OUTPUT;
 
-    await ctx.prisma.workflowStep.update({
-      where: { jobId_stepName: { jobId: ctx.jobId, stepName: step.name } },
-      data: { status, completedAt, outputJson },
-    });
+      await ctx.prisma.workflowStep.update({
+        where: { jobId_stepName: { jobId: ctx.jobId, stepName: step.name } },
+        data: { status, completedAt, outputJson, error: null },
+      });
+    } catch (err) {
+      const completedAt = new Date();
+      const message = err instanceof Error ? err.message : String(err);
+      await ctx.prisma.workflowStep.update({
+        where: { jobId_stepName: { jobId: ctx.jobId, stepName: step.name } },
+        data: { status: "FAILED", completedAt, error: message },
+      });
+      throw err;
+    }
   }
 }

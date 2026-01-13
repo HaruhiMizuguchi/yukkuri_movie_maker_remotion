@@ -46,9 +46,16 @@ ENVIRONMENT=development
 DEBUG=true
 ```
 
-### ステップ 4: ディレクトリの作成
+### ステップ 4: ディレクトリの作成（任意）
+リポジトリには `projects/`, `outputs/`, `logs/`, `assets/`, `config/` が含まれていますが、必要なら作成してください。
+
+```powershell
+# PowerShell (Windows)
+mkdir projects,outputs,logs,assets,config -ErrorAction SilentlyContinue
+```
+
 ```bash
-# 初回は起動時に自動作成される想定ですが、必要なら作成してください
+# macOS/Linux
 mkdir -p projects outputs logs assets config
 ```
 
@@ -58,7 +65,7 @@ mkdir -p projects outputs logs assets config
 pnpm dev
 ```
 
-これで動画生成が開始されます！
+これでジョブ作成とステップ記録が動作する状態になります（現時点の雛形では生成処理は未実装です）。
 
 ---
 

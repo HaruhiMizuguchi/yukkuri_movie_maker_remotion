@@ -30,9 +30,9 @@ pnpm cli
 curl -X POST http://localhost:3001/api/jobs -H "Content-Type: application/json" -d "{\"mode\":\"full\"}"
 ```
 
-## 開発モードでの実行（推奨）
+## 開発モードでの実行（将来拡張）
 
-開発中やテスト動作確認の際は、`--dev-mode`（または環境変数）で実行することをお勧めします。
+現時点の雛形では `--dev-mode` は未実装です。以下は将来の拡張案として記載しています。
 
 **開発モードの特徴（想定）:**
 - 詳細なログが表示されます。
@@ -41,22 +41,26 @@ curl -X POST http://localhost:3001/api/jobs -H "Content-Type: application/json" 
 
 ## 生成プロセスの流れ
 
-コマンドを実行すると、以下の順序で処理が進みます。コンソールに現在のステップが表示されます。
+現時点の雛形では `packages/core/src/index.ts` の `WORKFLOW_STEPS` を順に記録し、各ステップは未実装のため `SKIPPED` になります。
 
-1. **Theme Selection**: 動画のテーマを決定します（例：「宇宙の不思議について」）。
-2. **Script Generation**: 霊夢と魔理沙の台本を生成します。
-3. **Title Generation**: 動画のタイトルを決定します。
-4. **TTS Processing**: 台本を音声データに変換します。
-5. **Character Animation**: 音声に合わせて立ち絵動画を作成します。
-6. **Background Generation**: 背景画像を生成し、動画化します。
-7. **Subtitle Generation**: 字幕データを作成します。
-8. **Video Composition**: 全ての素材を合成します。
-9. **Audio Enhancement**: BGMや効果音を追加します。
-10. **Final Encoding**: 完成した動画ファイルを出力します。
+1. **theme_selection**: 動画のテーマを決定します。
+2. **script_generation**: 台本を生成します。
+3. **title_generation**: 動画のタイトルを決定します。
+4. **tts_generation**: 台本を音声データに変換します。
+5. **character_synthesis**: 立ち絵/キャラクターを合成します。
+6. **background_generation**: 背景画像を生成します。
+7. **background_animation**: 背景に簡易アニメーションを適用します。
+8. **subtitle_generation**: 字幕データを作成します。
+9. **video_composition**: すべての素材を合成します。
+10. **audio_enhancement**: BGMや効果音を追加します。
+11. **illustration_insertion**: イラスト素材を挿入します。
+12. **final_encoding**: 完成した動画ファイルを出力します。
+13. **youtube_upload**: YouTube へアップロードします（任意）。
 
 ## 成果物の確認
 
-生成された動画や中間ファイルは `outputs` フォルダ（または `projects` フォルダ内の各プロジェクトフォルダ）に保存されます。
+現時点の雛形では実際の生成処理は行われないため、`outputs` や `projects` に成果物は作成されません（ディレクトリのみ）。
+実装が進むと、生成された動画や中間ファイルが `outputs` フォルダ（または `projects` フォルダ内の各プロジェクトフォルダ）に保存される想定です。
 
 - **完成動画**: `outputs/final_video.mp4` (設定により異なります)
 - **台本**: `projects/[プロジェクトID]/script.json`
