@@ -1,0 +1,9 @@
+# エンコード設定
+encoding:
+  resolution: "1920x1080" # 1280x720, 1920x1080, 3840x2160
+  fps: 30
+  video_codec: "libx264"
+  video_bitrate: "5000k"
+  audio_codec: "aac"
+  audio_bitrate: "192k"
+  preset: "medium" # ultrafast, fast, medium, slow, veryslow
