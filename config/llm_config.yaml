@@ -1,0 +1,22 @@
+# 使用するLLMプロバイダー
+primary_provider: "google" # google, openai, anthropic
+
+# モデル設定
+models:
+  google:
+    model_name: "gemini-2.0-flash-preview-image-generation"
+    temperature: 0.7
+    max_tokens: 2000
+
+  openai:
+    model_name: "gpt-4"
+    temperature: 0.7
+    max_tokens: 2000
+
+# プロンプトテンプレート
+prompts:
+  theme_selection: |
+    あなたはYouTubeの企画担当者です。
+    以下の条件で動画のテーマを提案してください：
+    - ジャンル: {genre}
+    - ターゲット: {target_audience}
