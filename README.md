@@ -48,6 +48,22 @@ pnpm db:push
 pnpm dev
 ```
 
+## 環境変数と設定テンプレート
+### 必須の環境変数
+- `DATABASE_URL`: PostgreSQL接続文字列
+
+### 任意の環境変数
+- `API_PORT`: APIサーバーのポート（省略時 3001）
+- `ENVIRONMENT`: `development` / `production`
+- `DEBUG`: `true` / `false`
+- `GOOGLE_API_KEY`: Gemini APIキー（LLM利用時）
+- `AIVIS_SPEECH_BASE_URL`: AIVIS SpeechサーバーURL
+- `OPENAI_API_KEY`: OpenAI APIキー（任意）
+- `STABILITY_API_KEY`: 画像生成APIキー（任意）
+
+### YAML設定テンプレート
+`config/` 配下にYAMLテンプレートを用意しています。用途は `config/README.md` を参照してください。
+
 ## 構成
 - `apps/web`: Web GUI（Vite + React）
 - `apps/api`: API（Fastify）
