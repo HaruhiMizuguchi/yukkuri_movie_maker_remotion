@@ -45,7 +45,7 @@
    - APIキー設定（Gemini/OpenAI など）
    - TTSサーバー設定
    - 出力解像度/品質プリセット
-   - 保存先（projects/outputs）の運用設定
+   - 保存先（outputs）の運用設定
 
 ## 画面間の主な導線
 
