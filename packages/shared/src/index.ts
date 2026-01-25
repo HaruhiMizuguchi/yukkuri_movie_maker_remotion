@@ -62,3 +62,62 @@ export const ArtifactMetadataSchema = z.discriminatedUnion("type", [
 
 export type ArtifactMetadata = z.infer<typeof ArtifactMetadataSchema>;
 
+// Workflow/job lifecycle status shared across packages.
+export const JobStatusSchema = z.enum([
+  "PENDING",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export type JobStatus = z.infer<typeof JobStatusSchema>;
+
+// Input payload for a single workflow step execution.
+export const WorkflowStepInputSchema = z.object({
+  jobId: z.string(),
+  projectId: z.string().optional(),
+  stepName: z.string(),
+  mode: z.string().optional(),
+  artifacts: z.array(ArtifactMetadataSchema).optional(),
+  payload: z.record(z.unknown()).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type WorkflowStepInput = z.infer<typeof WorkflowStepInputSchema>;
+
+// Output payload produced by a single workflow step execution.
+export const WorkflowStepOutputSchema = z.object({
+  stepName: z.string(),
+  ok: z.boolean(),
+  skipped: z.boolean().optional(),
+  reason: z.string().optional(),
+  artifacts: z.array(ArtifactMetadataSchema).optional(),
+  output: z.record(z.unknown()).optional(),
+  warnings: z.array(z.string()).optional(),
+});
+
+export type WorkflowStepOutput = z.infer<typeof WorkflowStepOutputSchema>;
+
+// Input payload for a workflow run request.
+export const WorkflowInputSchema = z.object({
+  jobId: z.string(),
+  projectId: z.string().optional(),
+  mode: z.string().optional(),
+  initialArtifacts: z.array(ArtifactMetadataSchema).optional(),
+  parameters: z.record(z.unknown()).optional(),
+});
+
+export type WorkflowInput = z.infer<typeof WorkflowInputSchema>;
+
+// Output payload describing the result of a workflow run.
+export const WorkflowOutputSchema = z.object({
+  jobId: z.string(),
+  status: JobStatusSchema,
+  steps: z.array(WorkflowStepOutputSchema).optional(),
+  artifacts: z.array(ArtifactMetadataSchema).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export type WorkflowOutput = z.infer<typeof WorkflowOutputSchema>;
+
