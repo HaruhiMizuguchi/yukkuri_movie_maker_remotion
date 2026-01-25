@@ -62,6 +62,7 @@ export const ArtifactMetadataSchema = z.discriminatedUnion("type", [
 
 export type ArtifactMetadata = z.infer<typeof ArtifactMetadataSchema>;
 
+// Workflow/job lifecycle status shared across packages.
 export const JobStatusSchema = z.enum([
   "PENDING",
   "RUNNING",
@@ -72,6 +73,7 @@ export const JobStatusSchema = z.enum([
 
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 
+// Input payload for a single workflow step execution.
 export const WorkflowStepInputSchema = z.object({
   jobId: z.string(),
   projectId: z.string().optional(),
@@ -84,6 +86,7 @@ export const WorkflowStepInputSchema = z.object({
 
 export type WorkflowStepInput = z.infer<typeof WorkflowStepInputSchema>;
 
+// Output payload produced by a single workflow step execution.
 export const WorkflowStepOutputSchema = z.object({
   stepName: z.string(),
   ok: z.boolean(),
@@ -96,6 +99,7 @@ export const WorkflowStepOutputSchema = z.object({
 
 export type WorkflowStepOutput = z.infer<typeof WorkflowStepOutputSchema>;
 
+// Input payload for a workflow run request.
 export const WorkflowInputSchema = z.object({
   jobId: z.string(),
   projectId: z.string().optional(),
@@ -106,6 +110,7 @@ export const WorkflowInputSchema = z.object({
 
 export type WorkflowInput = z.infer<typeof WorkflowInputSchema>;
 
+// Output payload describing the result of a workflow run.
 export const WorkflowOutputSchema = z.object({
   jobId: z.string(),
   status: JobStatusSchema,
