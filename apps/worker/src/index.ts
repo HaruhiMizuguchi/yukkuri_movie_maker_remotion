@@ -13,9 +13,7 @@ const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
 
 async function ensureSteps(jobId: string) {
-  const stepNames = WORKFLOW_STEPS.map((step) => step.name);
-
-  for (const stepName of stepNames) {
+  for (const stepName of WORKFLOW_STEPS) {
     await prisma.workflowStep.upsert({
       where: { jobId_stepName: { jobId, stepName } },
       update: {},
