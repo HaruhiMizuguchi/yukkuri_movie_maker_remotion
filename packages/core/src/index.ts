@@ -33,6 +33,8 @@ export type WorkflowStepImplementations = Partial<
 
 export const SKIPPED_OUTPUT = { skipped: true, reason: "not_implemented" } as const;
 
+export { registerProjectFiles } from "./projectFile";
+
 export async function runWorkflow(
   ctx: WorkflowContext,
   implementations: WorkflowStepImplementations = {}
