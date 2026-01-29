@@ -55,15 +55,19 @@ output/
 | tts_generation | `audio.wav`, `timestamps.json` | `output/tts_generation/run-.../` |
 | subtitle_generation | `subtitles.ass` or `subtitles.json` | `output/subtitle_generation/run-.../` |
 | video_composition | `preview.mp4`, `composition.json` | `output/video_composition/run-.../` |
-| final_encoding | `final.mp4` | `final/run-.../final.mp4` |
+| final_encoding | `final.mp4` | `output/final_encoding/run-.../final.mp4` |
 
-## 4. intermediate/ の使い方
+## 4. final/ の使い方
+
+- `final/` は **公開・納品用に確定した成果物**をまとめる場所です。
+- `output/final_encoding/` の最新成果物をコピー（またはシンボリックリンク）して運用します。
+
+## 5. intermediate/ の使い方
 
 - 大きな中間ファイル（画像連番、Remotion 生成 JSON など）は `intermediate/` に保存します。
 - 破棄/再生成を前提とするため、運用で容量が増えすぎる場合は削除対象です。
 
-## 5. logs/ と tmp/
+## 6. logs/ と tmp/
 
 - `logs/` は `workflow.log` や `step-<name>.log` を想定します。
 - `tmp/` はジョブ実行時の一時作業ディレクトリとして利用します。
-
