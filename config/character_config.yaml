@@ -1,0 +1,12 @@
+characters:
+  reimu:
+    name: "reimu"
+    display_name: "霊夢"
+    voice_id: "reimu_voice_001"
+    position: "left" # left, center, right
+
+  marisa:
+    name: "marisa"
+    display_name: "魔理沙"
+    voice_id: "marisa_voice_001"
+    position: "right" # left, center, right

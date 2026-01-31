@@ -1,0 +1,12 @@
+characters:
+  reimu:
+    voice_id: "reimu_voice_001"
+    pitch: 1.0
+    speed: 1.0
+    volume: 1.0
+
+  marisa:
+    voice_id: "marisa_voice_001"
+    pitch: 0.9
+    speed: 1.1
+    volume: 1.0

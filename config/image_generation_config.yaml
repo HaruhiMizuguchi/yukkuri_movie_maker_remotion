@@ -1,0 +1,12 @@
+# 使用する画像生成プロバイダー
+primary_provider: "google" # google, openai, stability
+
+# 画像設定
+image_settings:
+  resolution: "1920x1080"
+  quality: "high"
+  style: "anime" # anime, realistic, artistic
+
+# 開発時制限
+development:
+  max_images_per_day: 20
