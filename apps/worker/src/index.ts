@@ -3,6 +3,7 @@ import PgBoss from "pg-boss";
 import { PrismaClient, JobStatus, StepStatus } from "@prisma/client";
 import { z } from "zod";
 import { runWorkflow, WORKFLOW_STEPS } from "@ymm/core";
+import { parseWorkflowPayload } from "./workflowPayload";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -27,13 +28,13 @@ async function main() {
 
   await boss.work("yukkuri.render", async (job) => {
     const payload = (job as { data?: unknown }).data ?? job;
-    const jobId = z.object({ jobId: z.string().uuid() }).parse(payload).jobId;
+    const { jobId, runOptions } = parseWorkflowPayload(payload);
 
     await ensureSteps(jobId);
     await prisma.job.update({ where: { id: jobId }, data: { status: JobStatus.RUNNING } });
 
     try {
-      await runWorkflow({ jobId, prisma });
+      await runWorkflow({ jobId, prisma }, {}, runOptions);
       await prisma.job.update({ where: { id: jobId }, data: { status: JobStatus.COMPLETED } });
     } catch (err: any) {
       await prisma.job.update({
