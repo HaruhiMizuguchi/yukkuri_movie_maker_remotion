@@ -11,6 +11,7 @@
 - **Node.js LTS**（インストールすると `node`/`npm` が使えるようになります）
 - **PostgreSQL**（無料）
 - **FFmpeg**
+- **AivisSpeech**（音声合成エンジン。ローカルで起動しておく必要があります）
 - （任意）**pnpm**（推奨。Nodeに同梱の `corepack` で有効化できます）
 
 ## セットアップ（最短）
@@ -42,7 +43,16 @@ pnpm install
 pnpm db:push
 ```
 
-5) 開発起動（Web GUI + API + Worker）
+5) AivisSpeech を起動（音声合成に必要）
+
+```powershell
+# デフォルトのインストールパス
+& "C:\Users\1120h\AppData\Local\Programs\AivisSpeech\AivisSpeech.exe"
+```
+
+> **Note**: AivisSpeech が起動すると `http://127.0.0.1:10101` でAPIサーバーが立ち上がります。`.env` の `AIVIS_SPEECH_BASE_URL` がこのURLを指している必要があります。
+
+6) 開発起動（Web GUI + API + Worker）
 
 ```powershell
 pnpm dev
