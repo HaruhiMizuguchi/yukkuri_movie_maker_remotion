@@ -1,0 +1,9 @@
+[
+  {
+    "id": "asset-1",
+    "type": "image",
+    "name": "bg",
+    "relativePath": "input/assets/bg.png",
+    "createdAt": "2026-02-12T17:48:41.651Z"
+  }
+]

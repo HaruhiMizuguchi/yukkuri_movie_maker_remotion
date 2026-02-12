@@ -1,0 +1,7 @@
+{
+  "renderer": "ffmpeg",
+  "audioPath": "audio.wav",
+  "subtitlesPath": "subtitles.ass",
+  "backgroundImagePath": "background.png",
+  "characterImagePath": "character.png"
+}

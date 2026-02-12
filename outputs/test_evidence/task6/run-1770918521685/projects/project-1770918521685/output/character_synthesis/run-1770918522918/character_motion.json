@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-02-12T17:48:42.921Z",
+  "motion": [
+    {
+      "id": "motion-1",
+      "startMs": 0,
+      "endMs": 2100,
+      "mouth": "open",
+      "expression": "normal"
+    },
+    {
+      "id": "motion-2",
+      "startMs": 2100,
+      "endMs": 4095,
+      "mouth": "close",
+      "expression": "smile"
+    },
+    {
+      "id": "motion-3",
+      "startMs": 4095,
+      "endMs": 6090,
+      "mouth": "open",
+      "expression": "normal"
+    },
+    {
+      "id": "motion-4",
+      "startMs": 6090,
+      "endMs": 8190,
+      "mouth": "close",
+      "expression": "smile"
+    }
+  ]
+}

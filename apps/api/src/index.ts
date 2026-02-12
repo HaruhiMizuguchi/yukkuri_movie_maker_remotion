@@ -11,10 +11,12 @@ import {
   createTemplate,
   listProjectAssets,
   listTemplates,
+  readProjectOwner,
   readOrCreateTimeline,
   readProjectScript,
   readSettings,
   saveProjectAsset,
+  saveProjectOwner,
   saveProjectScript,
   saveTimeline,
   writeSettings,
@@ -40,6 +42,7 @@ const createProjectBodySchema = z.object({
   theme: z.string().optional(),
   mode: z.string().default("full"),
   templateId: z.string().optional(),
+  userId: z.string().optional(),
 });
 
 const createJobBodySchema = z.object({
@@ -91,7 +94,8 @@ app.get("/api/dashboard", async () => {
   };
 });
 
-app.get("/api/projects", async () => {
+app.get("/api/projects", async (req) => {
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -102,24 +106,35 @@ app.get("/api/projects", async () => {
     },
   });
 
-  return projects.map((project) => ({
-    id: project.id,
-    theme: project.theme,
-    status: project.status,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-    latestJob: project.jobs[0] ?? null,
-  }));
+  const withOwner = await Promise.all(
+    projects.map(async (project) => ({
+      id: project.id,
+      theme: project.theme,
+      status: project.status,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      latestJob: project.jobs[0] ?? null,
+      ownerId: await readProjectOwner(workspaceRoot, project.id),
+    }))
+  );
+
+  if (!requestUserId) {
+    return withOwner;
+  }
+  return withOwner.filter((project) => project.ownerId === requestUserId);
 });
 
 app.post("/api/projects", async (req, reply) => {
   const body = createProjectBodySchema.parse(req.body ?? {});
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
 
   const project = await prisma.project.create({
     data: {
       theme: body.theme ?? null,
     },
   });
+  const ownerId = body.userId ?? requestUserId ?? "default";
+  await saveProjectOwner(workspaceRoot, project.id, ownerId);
 
   if (body.templateId) {
     const templates = await listTemplates(workspaceRoot);
@@ -137,15 +152,25 @@ app.post("/api/projects", async (req, reply) => {
     }
   }
 
-  return reply.code(201).send({ projectId: project.id, theme: project.theme, mode: body.mode });
+  return reply.code(201).send({
+    projectId: project.id,
+    theme: project.theme,
+    mode: body.mode,
+    ownerId,
+  });
 });
 
 app.get("/api/projects/:projectId", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
   const project = await prisma.project.findUnique({ where: { id: projectId } });
 
   if (!project) {
     return reply.code(404).send({ error: "not_found" });
+  }
+  const ownerId = await readProjectOwner(workspaceRoot, project.id);
+  if (requestUserId && ownerId && requestUserId !== ownerId) {
+    return reply.code(403).send({ error: "forbidden" });
   }
 
   const jobs = await prisma.job.findMany({
@@ -161,6 +186,7 @@ app.get("/api/projects/:projectId", async (req, reply) => {
 
   return {
     project,
+    ownerId,
     jobs,
     script,
     timeline,
@@ -405,6 +431,14 @@ const readWorkflowLogs = async (projectId: string): Promise<string[]> => {
   } catch {
     return [];
   }
+};
+
+const getRequestUserId = (headerValue: unknown): string | null => {
+  if (typeof headerValue !== "string") {
+    return null;
+  }
+  const trimmed = headerValue.trim();
+  return trimmed.length > 0 ? trimmed : null;
 };
 
 async function main() {

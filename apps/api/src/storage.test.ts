@@ -6,10 +6,12 @@ import {
   createTemplate,
   listTemplates,
   listProjectAssets,
+  readProjectOwner,
   readOrCreateTimeline,
   readProjectScript,
   readSettings,
   saveProjectAsset,
+  saveProjectOwner,
   saveProjectScript,
   saveTimeline,
   writeSettings,
@@ -36,6 +38,8 @@ describe("api storage", () => {
 
     const script = await readProjectScript(workspaceRoot, "project-1");
     expect(script?.lines.length).toBe(2);
+    await saveProjectOwner(workspaceRoot, "project-1", "user-a");
+    await expect(readProjectOwner(workspaceRoot, "project-1")).resolves.toBe("user-a");
 
     const timeline = await readOrCreateTimeline(workspaceRoot, "project-1", script!);
     const moved = {

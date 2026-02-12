@@ -475,8 +475,9 @@ const loadJobDetails = async (ctx: WorkflowContext): Promise<JobDetails> => {
 };
 
 const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Script> => {
+  const effectiveFetch = fetchFn ?? fetch;
   const geminiApiKey = process.env.GOOGLE_API_KEY?.trim();
-  if (!geminiApiKey || !fetchFn) {
+  if (!geminiApiKey) {
     return buildFallbackScript(theme);
   }
 
@@ -487,7 +488,7 @@ const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Sc
       "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。" +
       "schema={title:string,theme:string,lines:[{speaker:string,text:string,emotion?:string}]}" +
       `テーマ: ${theme}`;
-    const response = await fetchFn(url, {
+    const response = await effectiveFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

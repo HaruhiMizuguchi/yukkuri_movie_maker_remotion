@@ -1,0 +1,14 @@
+{
+  "title": "テスト台本",
+  "theme": "検証",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "こんにちは"
+    },
+    {
+      "speaker": "marisa",
+      "text": "解説を始めるぜ"
+    }
+  ]
+}

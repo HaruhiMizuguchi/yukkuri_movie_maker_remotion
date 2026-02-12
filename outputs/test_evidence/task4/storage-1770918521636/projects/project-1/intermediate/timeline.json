@@ -1,0 +1,57 @@
+{
+  "playbackRange": {
+    "inMs": 1000,
+    "outMs": 7000
+  },
+  "tracks": [
+    {
+      "id": "track-audio",
+      "name": "音声",
+      "type": "audio",
+      "clips": [
+        {
+          "id": "audio-main",
+          "assetType": "audio",
+          "assetPath": "output/tts_generation/latest/audio.wav",
+          "startMs": 0,
+          "durationMs": 5000,
+          "inMs": 0,
+          "outMs": 5000,
+          "volume": 1
+        }
+      ]
+    },
+    {
+      "id": "track-subtitle",
+      "name": "字幕",
+      "type": "subtitle",
+      "clips": [
+        {
+          "id": "sub-1",
+          "assetType": "subtitle",
+          "assetPath": "output/subtitle_generation/latest/subtitles.json",
+          "startMs": 0,
+          "durationMs": 1200,
+          "text": "こんにちは",
+          "style": "reimu"
+        },
+        {
+          "id": "sub-2",
+          "assetType": "subtitle",
+          "assetPath": "output/subtitle_generation/latest/subtitles.json",
+          "startMs": 1200,
+          "durationMs": 1200,
+          "text": "解説を始めるぜ",
+          "style": "marisa"
+        }
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "id": "mk-start",
+      "timeMs": 0,
+      "label": "start"
+    }
+  ]
+}

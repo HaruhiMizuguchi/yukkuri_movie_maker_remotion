@@ -10,6 +10,7 @@
 - 2026-02-01: ワーカーのジョブペイロードに再実行/スキップ指定を追加
 - 2026-02-13: MVP縦串（script/tts/subtitle/video/final encoding）を最小実装し、成果物の保存とDB登録まで接続
 - 2026-02-13: Web GUI初期版の8画面とタイムライン編集（再生範囲/移動/リサイズ/同期）を実装
+- 2026-02-13: AI拡張ステップと運用性（リトライ/キャッシュ/監視ログ）および将来拡張（YouTube/APIテンプレ/ユーザー分離）を最小実装
 
 ---
 
@@ -84,21 +85,21 @@
 ---
 
 ## 6. AI連携の拡張
-- [ ] Theme Selection（トレンド取得/評価ロジック）
-- [ ] Title Generation（CTR最適化）
-- [ ] Background / Illustration Generation
-- [ ] Character Synthesis（口パク/表情）
+- [x] Theme Selection（トレンド取得/評価ロジック）
+- [x] Title Generation（CTR最適化）
+- [x] Background / Illustration Generation
+- [x] Character Synthesis（口パク/表情）
 
 ---
 
 ## 7. 運用性 / 安定性
-- [ ] ステップごとのリトライ方針
-- [ ] 生成物のキャッシュ/再利用
-- [ ] 監視ログ（失敗原因の集計）
+- [x] ステップごとのリトライ方針
+- [x] 生成物のキャッシュ/再利用
+- [x] 監視ログ（失敗原因の集計）
 
 ---
 
 ## 8. 将来拡張（任意）
-- [ ] YouTube Upload（API連携）
-- [ ] プロジェクトのテンプレ化
-- [ ] 複数ユーザー対応（将来）
+- [x] YouTube Upload（API連携）
+- [x] プロジェクトのテンプレ化
+- [x] 複数ユーザー対応（将来）

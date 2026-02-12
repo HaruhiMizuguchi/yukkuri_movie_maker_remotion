@@ -2,7 +2,7 @@ import "dotenv/config";
 import PgBoss from "pg-boss";
 import { PrismaClient, JobStatus, StepStatus } from "@prisma/client";
 import { z } from "zod";
-import { createDefaultWorkflowImplementations, runWorkflow, WORKFLOW_STEPS } from "@ymm/core";
+import { createProductionWorkflowImplementations, runWorkflow, WORKFLOW_STEPS } from "@ymm/core";
 import { parseWorkflowPayload } from "./workflowPayload";
 
 const envSchema = z.object({
@@ -12,7 +12,7 @@ const env = envSchema.parse(process.env);
 
 const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
-const implementations = createDefaultWorkflowImplementations();
+const implementations = createProductionWorkflowImplementations();
 
 async function ensureSteps(jobId: string) {
   for (const stepName of WORKFLOW_STEPS) {

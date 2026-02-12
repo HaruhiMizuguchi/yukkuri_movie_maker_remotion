@@ -163,6 +163,28 @@ export const saveProjectAsset = async (
   await writeJson(assetsPath, deduped);
 };
 
+export const saveProjectOwner = async (
+  workspaceRoot: string,
+  projectId: string,
+  ownerId: string
+): Promise<void> => {
+  const ownerPath = getProjectOwnerPath(workspaceRoot, projectId);
+  await fs.mkdir(path.dirname(ownerPath), { recursive: true });
+  await writeJson(ownerPath, { ownerId });
+};
+
+export const readProjectOwner = async (
+  workspaceRoot: string,
+  projectId: string
+): Promise<string | null> => {
+  const ownerPath = getProjectOwnerPath(workspaceRoot, projectId);
+  if (!(await fileExists(ownerPath))) {
+    return null;
+  }
+  const loaded = (await readJson(ownerPath)) as { ownerId?: string };
+  return loaded.ownerId ?? null;
+};
+
 const createTimelineFromScript = (script: Script): TimelineData => {
   let cursor = 0;
   const subtitleClips = script.lines.map((line, index) => {
@@ -241,6 +263,9 @@ const getTimelinePath = (workspaceRoot: string, projectId: string): string =>
 
 const getProjectAssetsPath = (workspaceRoot: string, projectId: string): string =>
   path.join(getProjectRoot(workspaceRoot, projectId), "input", "assets", "assets.json");
+
+const getProjectOwnerPath = (workspaceRoot: string, projectId: string): string =>
+  path.join(getProjectRoot(workspaceRoot, projectId), "input", "project_owner.json");
 
 const getSettingsPath = (workspaceRoot: string): string =>
   path.join(workspaceRoot, "outputs", "system", "settings.json");

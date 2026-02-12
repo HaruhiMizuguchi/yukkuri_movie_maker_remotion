@@ -38,6 +38,8 @@ export const MANUAL_SKIP_OUTPUT = { skipped: true, reason: "manual_skip" } as co
 export { registerProjectFiles } from "./projectFile";
 export { createDefaultWorkflowImplementations } from "./defaultWorkflow";
 export type { DefaultWorkflowOptions } from "./defaultWorkflow";
+export { createProductionWorkflowImplementations } from "./productionWorkflow";
+export type { ProductionWorkflowOptions } from "./productionWorkflow";
 export {
   moveClip,
   resizeClip,
