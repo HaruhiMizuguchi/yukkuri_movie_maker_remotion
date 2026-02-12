@@ -16,7 +16,14 @@ export type Script = z.infer<typeof ScriptSchema>;
 
 export const FileCategorySchema = z.enum(["input", "output", "intermediate", "final"]);
 
-export const ArtifactTypeSchema = z.enum(["audio", "subtitle", "image", "video"]);
+export const ArtifactTypeSchema = z.enum([
+  "audio",
+  "subtitle",
+  "image",
+  "video",
+  "script",
+  "metadata",
+]);
 
 const BaseArtifactMetadataSchema = z.object({
   type: ArtifactTypeSchema,
@@ -53,11 +60,24 @@ export const VideoMetadataSchema = BaseArtifactMetadataSchema.extend({
   frameRate: z.number().positive().optional(),
 });
 
+export const ScriptMetadataSchema = BaseArtifactMetadataSchema.extend({
+  type: z.literal("script"),
+  lineCount: z.number().int().nonnegative().optional(),
+  language: z.string().optional(),
+});
+
+export const GenericMetadataSchema = BaseArtifactMetadataSchema.extend({
+  type: z.literal("metadata"),
+  kind: z.string().optional(),
+});
+
 export const ArtifactMetadataSchema = z.discriminatedUnion("type", [
   AudioMetadataSchema,
   SubtitleMetadataSchema,
   ImageMetadataSchema,
   VideoMetadataSchema,
+  ScriptMetadataSchema,
+  GenericMetadataSchema,
 ]);
 
 export type ArtifactMetadata = z.infer<typeof ArtifactMetadataSchema>;

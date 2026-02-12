@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 export type WorkflowContext = {
   jobId: string;
   prisma: PrismaClient;
+  outputRoot?: string;
 };
 
 export const WORKFLOW_STEPS = [
@@ -35,6 +36,8 @@ export const SKIPPED_OUTPUT = { skipped: true, reason: "not_implemented" } as co
 export const MANUAL_SKIP_OUTPUT = { skipped: true, reason: "manual_skip" } as const;
 
 export { registerProjectFiles } from "./projectFile";
+export { createDefaultWorkflowImplementations } from "./defaultWorkflow";
+export type { DefaultWorkflowOptions } from "./defaultWorkflow";
 
 export type WorkflowRunMode = "full" | "resume";
 
