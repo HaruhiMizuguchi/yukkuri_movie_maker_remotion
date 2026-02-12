@@ -141,3 +141,57 @@ export const WorkflowOutputSchema = z.object({
 
 export type WorkflowOutput = z.infer<typeof WorkflowOutputSchema>;
 
+export const TimelineTrackTypeSchema = z.enum([
+  "audio",
+  "subtitle",
+  "image",
+  "video",
+  "character",
+  "bgm",
+]);
+
+export const TimelineClipSchema = z.object({
+  id: z.string(),
+  assetType: ArtifactTypeSchema,
+  assetPath: z.string(),
+  startMs: z.number().int().nonnegative(),
+  durationMs: z.number().int().positive(),
+  inMs: z.number().int().nonnegative().optional(),
+  outMs: z.number().int().nonnegative().optional(),
+  volume: z.number().min(0).max(2).optional(),
+  fadeInMs: z.number().int().nonnegative().optional(),
+  fadeOutMs: z.number().int().nonnegative().optional(),
+  text: z.string().optional(),
+  style: z.string().optional(),
+});
+
+export const TimelineTrackSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: TimelineTrackTypeSchema,
+  clips: z.array(TimelineClipSchema),
+});
+
+export const TimelineMarkerSchema = z.object({
+  id: z.string(),
+  timeMs: z.number().int().nonnegative(),
+  label: z.string(),
+});
+
+export const TimelinePlaybackRangeSchema = z.object({
+  inMs: z.number().int().nonnegative(),
+  outMs: z.number().int().nonnegative(),
+});
+
+export const TimelineDataSchema = z.object({
+  playbackRange: TimelinePlaybackRangeSchema,
+  tracks: z.array(TimelineTrackSchema),
+  markers: z.array(TimelineMarkerSchema),
+});
+
+export type TimelineClip = z.infer<typeof TimelineClipSchema>;
+export type TimelineTrack = z.infer<typeof TimelineTrackSchema>;
+export type TimelineMarker = z.infer<typeof TimelineMarkerSchema>;
+export type TimelinePlaybackRange = z.infer<typeof TimelinePlaybackRangeSchema>;
+export type TimelineData = z.infer<typeof TimelineDataSchema>;
+

@@ -12,3 +12,4 @@
 ## 知見・失敗事例メモ
 - Windows PowerShell では環境によって `cmd1 && cmd2` のような `&&` 連結が構文エラーになることがある。連続実行は `;` と `$LASTEXITCODE` で制御する。
 - `remotion` パッケージだけでは `remotion` CLI コマンドは使えない。CLI 実行には `@remotion/cli` か `@remotion/renderer` を別途導入する必要がある。
+- `pnpm add --filter ...` 実行時に `node_modules is present. Lockfile only installation` と表示された場合、実体の依存が展開されないことがある。続けて `pnpm install` を実行すると不足依存が解決される。

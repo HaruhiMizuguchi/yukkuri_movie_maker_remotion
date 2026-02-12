@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
+    "@ymm/core": "workspace:^",
+    "@ymm/shared": "workspace:^",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "pg-boss": "^9.0.3",
@@ -19,4 +21,3 @@
     "tsx": "^4.19.2"
   }
 }
-
