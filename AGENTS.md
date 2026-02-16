@@ -16,3 +16,4 @@
 - Gemini API の疎通テストでは、認証が正常でもクォータ枯渇時に HTTP 429 (`RESOURCE_EXHAUSTED`) が返る。接続可否とクォータ不足は別扱いで判定する。
 - AivisSpeech は環境によって話者が1種類のみ（例: Anneli）でも稼働する。`speaker` 文字列を固定IDに決め打ちせず、`/speakers` の style 一覧から動的選択する実装が安全。
 - PowerShell のコマンド長制限で巨大な here-string 一括書き込みが失敗することがある。大きな編集は `apply_patch` か分割書き込みを優先する。
+- 実行ポリシーによっては `git restore` や `Remove-Item` など削除系コマンドがブロックされる。作業ツリー整理は `.gitignore` 追加や、意図した削除をコミットで確定する運用に切り替えると止まりにくい。
