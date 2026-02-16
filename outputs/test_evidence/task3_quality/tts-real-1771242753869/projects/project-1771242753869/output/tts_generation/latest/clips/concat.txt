@@ -1,0 +1,2 @@
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/tts-real-1771242753869/projects/project-1771242753869/output/tts_generation/run-20260216-205233-875/clips/line-001.wav'
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/tts-real-1771242753869/projects/project-1771242753869/output/tts_generation/run-20260216-205233-875/clips/line-002.wav'

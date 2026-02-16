@@ -1,0 +1,26 @@
+[
+  {
+    "speaker": "reimu",
+    "text": "Aivis実接続で作る通し検証動画の全体像を短く整理していきます。",
+    "startMs": 0,
+    "endMs": 5523
+  },
+  {
+    "speaker": "marisa",
+    "text": "最初に結論から押さえると理解が早いぜ。",
+    "startMs": 5523,
+    "endMs": 8851
+  },
+  {
+    "speaker": "reimu",
+    "text": "背景と具体例を順番に見ていきましょう。",
+    "startMs": 8851,
+    "endMs": 11671
+  },
+  {
+    "speaker": "marisa",
+    "text": "最後に次のアクションを確認して締めるぜ。",
+    "startMs": 11671,
+    "endMs": 14667
+  }
+]

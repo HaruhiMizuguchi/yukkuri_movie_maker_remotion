@@ -1,0 +1,2 @@
+{"at":"2026-02-16T11:54:25.761Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:32.033Z","event":"completed","jobId":"job-task3-full-real","renderer":"ffmpeg","characterImagePath":"projects/project-1771242863439/input/assets/characters/main.png"}

@@ -1,0 +1,10 @@
+{
+  "runId": "full-run-1771242863439",
+  "projectId": "project-1771242863439",
+  "characterSource": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\test_evidence\\task3_quality\\video-1771213093985\\projects\\project-1771213093985\\input\\assets\\characters\\main.png",
+  "backgroundSource": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\test_evidence\\task6\\run-1770918656039\\projects\\project-1770918656039\\output\\background_generation\\latest\\background.png",
+  "finalPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\test_evidence\\task3_quality\\full-run-1771242863439\\projects\\project-1771242863439\\output\\final_encoding\\latest\\final.mp4",
+  "finalSizeBytes": 559950,
+  "compositionPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\test_evidence\\task3_quality\\full-run-1771242863439\\projects\\project-1771242863439\\output\\video_composition\\latest\\composition.json",
+  "timestampsPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\test_evidence\\task3_quality\\full-run-1771242863439\\projects\\project-1771242863439\\output\\tts_generation\\latest\\timestamps.json"
+}

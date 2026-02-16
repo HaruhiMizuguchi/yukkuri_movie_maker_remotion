@@ -1,0 +1,14 @@
+[
+  {
+    "speaker": "reimu",
+    "text": "字幕の1行目です。",
+    "startMs": 0,
+    "endMs": 1800
+  },
+  {
+    "speaker": "marisa",
+    "text": "字幕の2行目です。",
+    "startMs": 1800,
+    "endMs": 3600
+  }
+]

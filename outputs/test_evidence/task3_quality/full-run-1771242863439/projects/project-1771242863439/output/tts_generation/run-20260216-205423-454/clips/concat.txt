@@ -1,0 +1,4 @@
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/full-run-1771242863439/projects/project-1771242863439/output/tts_generation/run-20260216-205423-454/clips/line-001.wav'
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/full-run-1771242863439/projects/project-1771242863439/output/tts_generation/run-20260216-205423-454/clips/line-002.wav'
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/full-run-1771242863439/projects/project-1771242863439/output/tts_generation/run-20260216-205423-454/clips/line-003.wav'
+file 'C:/python_program/yukkuri_movie_maker_remotion/outputs/test_evidence/task3_quality/full-run-1771242863439/projects/project-1771242863439/output/tts_generation/run-20260216-205423-454/clips/line-004.wav'

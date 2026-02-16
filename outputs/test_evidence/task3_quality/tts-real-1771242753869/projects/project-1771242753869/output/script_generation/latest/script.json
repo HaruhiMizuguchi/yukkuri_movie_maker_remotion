@@ -1,0 +1,14 @@
+{
+  "title": "Aivis実接続",
+  "theme": "Aivis実接続",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "これはAivisSpeechの実接続テストです。"
+    },
+    {
+      "speaker": "marisa",
+      "text": "実際にAPIへ接続して音声を生成しています。"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+{"at":"2026-02-16T11:52:34.433Z","event":"start","jobId":"job-task3-quality"}
+{"at":"2026-02-16T11:52:35.050Z","event":"completed","jobId":"job-task3-quality","renderer":"ffmpeg","characterImagePath":"projects/project-1771242754319/input/assets/characters/main.png"}

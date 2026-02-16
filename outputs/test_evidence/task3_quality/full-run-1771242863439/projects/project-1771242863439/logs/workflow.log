@@ -1,0 +1,10 @@
+{"at":"2026-02-16T11:54:23.447Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:23.453Z","event":"completed","jobId":"job-task3-full-real","lineCount":4}
+{"at":"2026-02-16T11:54:23.454Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:25.744Z","event":"completed","jobId":"job-task3-full-real","provider":"aivis","usedStyleIds":[888753760,888753762,888753760,888753762]}
+{"at":"2026-02-16T11:54:25.746Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:25.760Z","event":"completed","jobId":"job-task3-full-real","lineCount":4}
+{"at":"2026-02-16T11:54:25.761Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:32.033Z","event":"completed","jobId":"job-task3-full-real","renderer":"ffmpeg","characterImagePath":"projects/project-1771242863439/input/assets/characters/main.png"}
+{"at":"2026-02-16T11:54:32.034Z","event":"start","jobId":"job-task3-full-real"}
+{"at":"2026-02-16T11:54:33.243Z","event":"completed","jobId":"job-task3-full-real","finalPath":"projects/project-1771242863439/output/final_encoding/run-20260216-205432-33/final.mp4"}
