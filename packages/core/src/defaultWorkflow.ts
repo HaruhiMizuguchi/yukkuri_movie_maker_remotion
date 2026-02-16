@@ -6,6 +6,12 @@ import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
+import {
+  type ScriptTimestamp,
+  synthesizeTask3Speech,
+  prepareTask3VisualAssets,
+  type Task3TtsProvider,
+} from "./task3Quality";
 
 type Logger = {
   info: (message: string, data?: Record<string, unknown>) => void;
@@ -20,19 +26,15 @@ export type DefaultWorkflowOptions = {
   disableRemotion?: boolean;
   fetchFn?: typeof fetch;
   logger?: Logger;
+  ttsProvider?: Task3TtsProvider;
+  aivisBaseUrl?: string;
+  allowMockTtsFallback?: boolean;
+  requireCharacterAsset?: boolean;
 };
 
 type JobDetails = {
   projectId: string;
   theme: string;
-};
-
-type ScriptTimestamp = {
-  index: number;
-  speaker: string;
-  text: string;
-  startMs: number;
-  endMs: number;
 };
 
 const ASS_HEADER = `[Script Info]
@@ -65,6 +67,7 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
+      await appendStepLog(projectRoot, "script_generation", { event: "start", jobId: ctx.jobId });
 
       const stepDir = await createStepRunDir(projectRoot, "script_generation", runId);
       const script = await generateScript(details.theme, options.fetchFn);
@@ -86,6 +89,11 @@ export function createDefaultWorkflowImplementations(
           },
         ],
       });
+      await appendStepLog(projectRoot, "script_generation", {
+        event: "completed",
+        jobId: ctx.jobId,
+        lineCount: script.lines.length,
+      });
 
       logger.info("script_generation completed", { scriptPath });
       return {
@@ -99,6 +107,7 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
+      await appendStepLog(projectRoot, "tts_generation", { event: "start", jobId: ctx.jobId });
 
       const scriptPath = path.join(
         projectRoot,
@@ -108,19 +117,28 @@ export function createDefaultWorkflowImplementations(
         "script.json"
       );
       const script = ScriptSchema.parse(await readJson(scriptPath));
-      const timestamps = createTimestamps(script);
 
       const stepDir = await createStepRunDir(projectRoot, "tts_generation", runId);
       const audioPath = path.join(stepDir.runDir, "audio.wav");
       const timestampsPath = path.join(stepDir.runDir, "timestamps.json");
-      await synthesizeToneAudio(audioPath, timestamps[timestamps.length - 1]?.endMs ?? 3000);
-      await writeJson(timestampsPath, timestamps);
+      const synthesisResult = await synthesizeTask3Speech({
+        script,
+        runDir: stepDir.runDir,
+        audioPath,
+        provider: options.ttsProvider ?? "aivis",
+        fetchFn: options.fetchFn ?? fetch,
+        aivisBaseUrl: options.aivisBaseUrl ?? process.env.AIVIS_SPEECH_BASE_URL,
+        allowMockFallback: options.allowMockTtsFallback ?? false,
+      });
+      await writeJson(timestampsPath, synthesisResult.timestamps);
       await syncLatest(stepDir);
 
       const [audioStat, timestampsStat] = await Promise.all([
         fs.stat(audioPath),
         fs.stat(timestampsPath),
       ]);
+      const durationMs =
+        synthesisResult.timestamps[synthesisResult.timestamps.length - 1]?.endMs ?? 0;
       await registerProjectFiles({
         prisma: ctx.prisma,
         jobId: ctx.jobId,
@@ -131,21 +149,36 @@ export function createDefaultWorkflowImplementations(
             relativePath: toRelativePath(outputRoot, audioPath),
             fileCategory: "output",
             fileSizeBytes: audioStat.size,
-            durationMs: timestamps[timestamps.length - 1]?.endMs ?? 0,
+            durationMs,
+            channels: 1,
+            sampleRateHz: 24000,
           },
           {
             type: "metadata",
             relativePath: toRelativePath(outputRoot, timestampsPath),
             fileCategory: "output",
             fileSizeBytes: timestampsStat.size,
+            kind: "timestamps",
           },
         ],
       });
+      await appendStepLog(projectRoot, "tts_generation", {
+        event: "completed",
+        jobId: ctx.jobId,
+        provider: synthesisResult.provider,
+        usedStyleIds: synthesisResult.usedStyleIds,
+      });
 
-      logger.info("tts_generation completed", { audioPath, timestampsPath });
+      logger.info("tts_generation completed", {
+        audioPath,
+        timestampsPath,
+        provider: synthesisResult.provider,
+      });
       return {
+        provider: synthesisResult.provider,
         audioPath: toRelativePath(outputRoot, audioPath),
         timestampsPath: toRelativePath(outputRoot, timestampsPath),
+        usedStyleIds: synthesisResult.usedStyleIds,
       };
     },
     subtitle_generation: async (ctx) => {
@@ -155,6 +188,7 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
+      await appendStepLog(projectRoot, "subtitle_generation", { event: "start", jobId: ctx.jobId });
 
       const scriptPath = path.join(
         projectRoot,
@@ -215,6 +249,11 @@ export function createDefaultWorkflowImplementations(
           },
         ],
       });
+      await appendStepLog(projectRoot, "subtitle_generation", {
+        event: "completed",
+        jobId: ctx.jobId,
+        lineCount: subtitleItems.length,
+      });
 
       logger.info("subtitle_generation completed", { subtitlesJsonPath, subtitlesAssPath });
       return {
@@ -226,9 +265,11 @@ export function createDefaultWorkflowImplementations(
       const logger = options.logger ?? defaultLogger;
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
+      const workspaceRoot = resolveWorkspaceRoot(options);
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
+      await appendStepLog(projectRoot, "video_composition", { event: "start", jobId: ctx.jobId });
 
       const audioPath = path.join(
         projectRoot,
@@ -256,8 +297,6 @@ export function createDefaultWorkflowImplementations(
       const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
       const subtitlesCopyPath = path.join(stepDir.runDir, "subtitles.ass");
-      const backgroundImagePath = path.join(stepDir.runDir, "background.png");
-      const characterImagePath = path.join(stepDir.runDir, "character.png");
       const compositionJsonPath = path.join(stepDir.runDir, "composition.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
@@ -265,18 +304,23 @@ export function createDefaultWorkflowImplementations(
         fs.copyFile(audioPath, audioCopyPath),
         fs.copyFile(subtitlesAssPath, subtitlesCopyPath),
       ]);
-      await createPlaceholderBackground(backgroundImagePath);
-      await createPlaceholderCharacter(characterImagePath);
+      const visualAssets = await prepareTask3VisualAssets({
+        projectRoot,
+        workspaceRoot,
+        outputRoot,
+        runDir: stepDir.runDir,
+        requireCharacterAsset: options.requireCharacterAsset ?? false,
+      });
 
       const remotionRendered =
         options.disableRemotion === true
           ? false
           : await tryRemotionRender({
-              workspaceRoot: resolveWorkspaceRoot(options),
+              workspaceRoot,
               outputPath: previewPath,
               audioPath: audioCopyPath,
-              backgroundImagePath,
-              characterImagePath,
+              backgroundImagePath: visualAssets.backgroundRenderPath,
+              characterImagePath: visualAssets.characterRenderPath,
               subtitleTracks,
               title: "ゆっくり解説MVP",
               theme: details.theme,
@@ -284,15 +328,20 @@ export function createDefaultWorkflowImplementations(
             });
 
       if (!remotionRendered) {
-        await composeVideoWithFfmpeg(stepDir.runDir);
+        await composeVideoWithFfmpeg({
+          runDir: stepDir.runDir,
+          backgroundPath: path.basename(visualAssets.backgroundRenderPath),
+          characterPath: path.basename(visualAssets.characterRenderPath),
+          subtitlesPath: path.basename(subtitlesCopyPath),
+        });
       }
 
       await writeJson(compositionJsonPath, {
         renderer: remotionRendered ? "remotion" : "ffmpeg",
-        audioPath: "audio.wav",
-        subtitlesPath: "subtitles.ass",
-        backgroundImagePath: "background.png",
-        characterImagePath: "character.png",
+        audioPath: toRelativePath(outputRoot, audioPath),
+        subtitlesPath: toRelativePath(outputRoot, subtitlesAssPath),
+        backgroundImagePath: visualAssets.backgroundSourceRelativePath,
+        characterImagePath: visualAssets.characterSourceRelativePath,
       });
       await syncLatest(stepDir);
 
@@ -322,6 +371,12 @@ export function createDefaultWorkflowImplementations(
           },
         ],
       });
+      await appendStepLog(projectRoot, "video_composition", {
+        event: "completed",
+        jobId: ctx.jobId,
+        renderer: remotionRendered ? "remotion" : "ffmpeg",
+        characterImagePath: visualAssets.characterSourceRelativePath,
+      });
 
       logger.info("video_composition completed", {
         previewPath,
@@ -330,6 +385,8 @@ export function createDefaultWorkflowImplementations(
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
         renderer: remotionRendered ? "remotion" : "ffmpeg",
+        characterImagePath: visualAssets.characterSourceRelativePath,
+        backgroundImagePath: visualAssets.backgroundSourceRelativePath,
       };
     },
     final_encoding: async (ctx) => {
@@ -339,6 +396,7 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
+      await appendStepLog(projectRoot, "final_encoding", { event: "start", jobId: ctx.jobId });
 
       const previewPath = path.join(
         projectRoot,
@@ -384,6 +442,11 @@ export function createDefaultWorkflowImplementations(
             frameRate: 30,
           },
         ],
+      });
+      await appendStepLog(projectRoot, "final_encoding", {
+        event: "completed",
+        jobId: ctx.jobId,
+        finalPath: toRelativePath(outputRoot, finalPath),
       });
 
       logger.info("final_encoding completed", { finalPath, finalCopyPath });
@@ -458,6 +521,20 @@ const writeJson = async (filePath: string, payload: unknown): Promise<void> => {
 const readJson = async (filePath: string): Promise<unknown> => {
   const text = await fs.readFile(filePath, "utf-8");
   return JSON.parse(text);
+};
+
+const appendStepLog = async (
+  projectRoot: string,
+  stepName: string,
+  payload: Record<string, unknown>
+): Promise<void> => {
+  const logsDir = path.join(projectRoot, "logs");
+  await fs.mkdir(logsDir, { recursive: true });
+  const line = `${JSON.stringify({ at: new Date().toISOString(), ...payload })}\n`;
+  await Promise.all([
+    fs.appendFile(path.join(logsDir, "workflow.log"), line, "utf-8"),
+    fs.appendFile(path.join(logsDir, `step-${stepName}.log`), line, "utf-8"),
+  ]);
 };
 
 const loadJobDetails = async (ctx: WorkflowContext): Promise<JobDetails> => {
@@ -560,23 +637,6 @@ const buildFallbackScript = (theme: string): Script => ({
   ],
 });
 
-const createTimestamps = (script: Script): ScriptTimestamp[] => {
-  let cursor = 0;
-  return script.lines.map((line, index) => {
-    const duration = Math.max(1400, line.text.length * 105);
-    const startMs = cursor;
-    const endMs = startMs + duration;
-    cursor = endMs;
-    return {
-      index,
-      speaker: line.speaker,
-      text: line.text,
-      startMs,
-      endMs,
-    };
-  });
-};
-
 const createAssText = (
   subtitleItems: Array<{ speaker: string; text: string; startMs: number; endMs: number }>
 ): string => {
@@ -606,68 +666,17 @@ const toAssTime = (milliseconds: number): string => {
   )}.${String(cs).padStart(2, "0")}`;
 };
 
-const synthesizeToneAudio = async (outputPath: string, durationMs: number): Promise<void> => {
-  const seconds = Math.max(1, durationMs / 1000).toFixed(3);
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      `sine=frequency=660:sample_rate=44100:duration=${seconds}`,
-      "-c:a",
-      "pcm_s16le",
-      outputPath,
-    ],
-    path.dirname(outputPath)
-  );
-};
-
-const createPlaceholderBackground = async (outputPath: string): Promise<void> => {
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "color=c=0x1f2937:s=1920x1080:d=1",
-      "-vf",
-      "drawbox=x=0:y=0:w=1920:h=360:color=0x0ea5e9@0.35:t=fill",
-      "-frames:v",
-      "1",
-      outputPath,
-    ],
-    path.dirname(outputPath)
-  );
-};
-
-const createPlaceholderCharacter = async (outputPath: string): Promise<void> => {
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "color=c=black@0.0:s=640x900:d=1",
-      "-vf",
-      [
-        "drawbox=x=120:y=60:w=400:h=780:color=0xfef08a@0.95:t=fill",
-        "drawbox=x=210:y=170:w=70:h=70:color=0x0f172a@0.92:t=fill",
-        "drawbox=x=360:y=170:w=70:h=70:color=0x0f172a@0.92:t=fill",
-        "drawbox=x=245:y=310:w=150:h=28:color=0x0f172a@0.85:t=fill",
-      ].join(","),
-      "-frames:v",
-      "1",
-      outputPath,
-    ],
-    path.dirname(outputPath)
-  );
-};
-
-const composeVideoWithFfmpeg = async (runDir: string): Promise<void> => {
+const composeVideoWithFfmpeg = async ({
+  runDir,
+  backgroundPath,
+  characterPath,
+  subtitlesPath,
+}: {
+  runDir: string;
+  backgroundPath: string;
+  characterPath: string;
+  subtitlesPath: string;
+}): Promise<void> => {
   await runCommand(
     "ffmpeg",
     [
@@ -675,15 +684,15 @@ const composeVideoWithFfmpeg = async (runDir: string): Promise<void> => {
       "-loop",
       "1",
       "-i",
-      "background.png",
+      backgroundPath,
       "-loop",
       "1",
       "-i",
-      "character.png",
+      characterPath,
       "-i",
       "audio.wav",
       "-filter_complex",
-      "[0:v][1:v]overlay=x=W-w-80:y=H-h-20,ass=subtitles.ass",
+      `[0:v][1:v]overlay=x=W-w-80:y=H-h-20,ass=${subtitlesPath}`,
       "-shortest",
       "-c:v",
       "libx264",

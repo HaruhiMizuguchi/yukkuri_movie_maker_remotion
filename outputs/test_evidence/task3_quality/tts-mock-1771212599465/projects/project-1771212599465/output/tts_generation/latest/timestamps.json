@@ -1,0 +1,16 @@
+[
+  {
+    "index": 0,
+    "speaker": "reimu",
+    "text": "最初のセリフです。",
+    "startMs": 0,
+    "endMs": 1400
+  },
+  {
+    "index": 1,
+    "speaker": "marisa",
+    "text": "二つ目のセリフです。",
+    "startMs": 1400,
+    "endMs": 2800
+  }
+]

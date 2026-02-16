@@ -14,3 +14,5 @@
 - `remotion` パッケージだけでは `remotion` CLI コマンドは使えない。CLI 実行には `@remotion/cli` か `@remotion/renderer` を別途導入する必要がある。
 - `pnpm add --filter ...` 実行時に `node_modules is present. Lockfile only installation` と表示された場合、実体の依存が展開されないことがある。続けて `pnpm install` を実行すると不足依存が解決される。
 - Gemini API の疎通テストでは、認証が正常でもクォータ枯渇時に HTTP 429 (`RESOURCE_EXHAUSTED`) が返る。接続可否とクォータ不足は別扱いで判定する。
+- AivisSpeech は環境によって話者が1種類のみ（例: Anneli）でも稼働する。`speaker` 文字列を固定IDに決め打ちせず、`/speakers` の style 一覧から動的選択する実装が安全。
+- PowerShell のコマンド長制限で巨大な here-string 一括書き込みが失敗することがある。大きな編集は `apply_patch` か分割書き込みを優先する。

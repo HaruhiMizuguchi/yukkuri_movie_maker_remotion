@@ -1,0 +1,14 @@
+{
+  "title": "字幕",
+  "theme": "字幕テスト",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "字幕の1行目です。"
+    },
+    {
+      "speaker": "marisa",
+      "text": "字幕の2行目です。"
+    }
+  ]
+}

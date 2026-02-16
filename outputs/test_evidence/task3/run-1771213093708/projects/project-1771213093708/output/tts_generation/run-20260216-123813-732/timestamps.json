@@ -1,0 +1,30 @@
+[
+  {
+    "index": 0,
+    "speaker": "reimu",
+    "text": "AIで学ぶ宇宙ニュースの全体像を短く整理していきます。",
+    "startMs": 0,
+    "endMs": 2430
+  },
+  {
+    "index": 1,
+    "speaker": "marisa",
+    "text": "最初に結論から押さえると理解が早いぜ。",
+    "startMs": 2430,
+    "endMs": 4140
+  },
+  {
+    "index": 2,
+    "speaker": "reimu",
+    "text": "背景と具体例を順番に見ていきましょう。",
+    "startMs": 4140,
+    "endMs": 5850
+  },
+  {
+    "index": 3,
+    "speaker": "marisa",
+    "text": "最後に次のアクションを確認して締めるぜ。",
+    "startMs": 5850,
+    "endMs": 7650
+  }
+]

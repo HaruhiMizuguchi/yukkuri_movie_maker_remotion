@@ -1,0 +1,16 @@
+[
+  {
+    "index": 0,
+    "speaker": "reimu",
+    "text": "これはAivisSpeechの実接続テストです。",
+    "startMs": 0,
+    "endMs": 3218
+  },
+  {
+    "index": 1,
+    "speaker": "marisa",
+    "text": "実際にAPIへ接続して音声を生成しています。",
+    "startMs": 3218,
+    "endMs": 6953
+  }
+]

@@ -1,0 +1,10 @@
+{"at":"2026-02-16T03:38:13.717Z","event":"start","jobId":"job-integration"}
+{"at":"2026-02-16T03:38:13.731Z","event":"completed","jobId":"job-integration","lineCount":4}
+{"at":"2026-02-16T03:38:13.733Z","event":"start","jobId":"job-integration"}
+{"at":"2026-02-16T03:38:14.027Z","event":"completed","jobId":"job-integration","provider":"mock","usedStyleIds":[]}
+{"at":"2026-02-16T03:38:14.029Z","event":"start","jobId":"job-integration"}
+{"at":"2026-02-16T03:38:14.044Z","event":"completed","jobId":"job-integration","lineCount":4}
+{"at":"2026-02-16T03:38:14.046Z","event":"start","jobId":"job-integration"}
+{"at":"2026-02-16T03:38:15.596Z","event":"completed","jobId":"job-integration","renderer":"ffmpeg","characterImagePath":"projects/project-1771213093708/output/video_composition/run-20260216-123814-44/character.png"}
+{"at":"2026-02-16T03:38:15.598Z","event":"start","jobId":"job-integration"}
+{"at":"2026-02-16T03:38:16.938Z","event":"completed","jobId":"job-integration","finalPath":"projects/project-1771213093708/output/final_encoding/run-20260216-123815-597/final.mp4"}

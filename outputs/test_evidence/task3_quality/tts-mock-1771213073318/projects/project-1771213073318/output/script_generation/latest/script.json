@@ -1,0 +1,14 @@
+{
+  "title": "テスト",
+  "theme": "音声合成テスト",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "最初のセリフです。"
+    },
+    {
+      "speaker": "marisa",
+      "text": "二つ目のセリフです。"
+    }
+  ]
+}

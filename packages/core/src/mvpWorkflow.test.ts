@@ -59,7 +59,11 @@ describe("MVP workflow implementations", () => {
 
     await runWorkflow(
       ctx,
-      createDefaultWorkflowImplementations({ outputRoot: evidenceRoot, disableRemotion: true })
+      createDefaultWorkflowImplementations({
+        outputRoot: evidenceRoot,
+        disableRemotion: true,
+        ttsProvider: "mock",
+      })
     );
 
     const scriptPath = path.join(

@@ -52,6 +52,7 @@ describe("production workflow implementations", () => {
       outputRoot,
       disableRemotion: true,
       retryCount: 2,
+      ttsProvider: "mock",
     });
 
     await runWorkflow(ctx, implementations, { mode: "full" });

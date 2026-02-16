@@ -1,0 +1,7 @@
+{
+  "renderer": "ffmpeg",
+  "audioPath": "projects/project-1771213093985/output/tts_generation/latest/audio.wav",
+  "subtitlesPath": "projects/project-1771213093985/output/subtitle_generation/latest/subtitles.ass",
+  "backgroundImagePath": "projects/project-1771213093985/output/video_composition/run-20260216-123814-95/background.png",
+  "characterImagePath": "projects/project-1771213093985/input/assets/characters/main.png"
+}

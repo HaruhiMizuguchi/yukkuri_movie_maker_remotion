@@ -1,0 +1,26 @@
+{
+  "title": "AIで学ぶ宇宙開発を3分で理解する",
+  "theme": "AIで学ぶ宇宙開発",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "AIで学ぶ宇宙開発の全体像を短く整理していきます。",
+      "emotion": "normal"
+    },
+    {
+      "speaker": "marisa",
+      "text": "最初に結論から押さえると理解が早いぜ。",
+      "emotion": "happy"
+    },
+    {
+      "speaker": "reimu",
+      "text": "背景と具体例を順番に見ていきましょう。",
+      "emotion": "normal"
+    },
+    {
+      "speaker": "marisa",
+      "text": "最後に次のアクションを確認して締めるぜ。",
+      "emotion": "serious"
+    }
+  ]
+}
