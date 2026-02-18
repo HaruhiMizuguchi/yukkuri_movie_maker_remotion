@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n WEB,API,WORKER \"pnpm -C apps/web dev\" \"pnpm -C apps/api dev\" \"pnpm -C apps/worker dev\"",
+    "dev": "concurrently -k -n WEB,API,WORKER \"corepack pnpm -C apps/web dev\" \"corepack pnpm -C apps/api dev\" \"corepack pnpm -C apps/worker dev\"",
     "lint": "eslint .",
     "format": "prettier -w .",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
@@ -15,7 +15,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "cli": "pnpm -C apps/cli start"
+    "cli": "corepack pnpm -C apps/cli start"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
