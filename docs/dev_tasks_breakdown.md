@@ -14,6 +14,7 @@
 - 2026-02-16: タスク3の品質改善として、TTSをAivisSpeech実接続化・立ち絵素材優先合成化・モジュール別品質テストを追加
 - 2026-02-16: タスク3の通し品質確認として `task3FullRunReal.test.ts` を追加し、Aivis実接続で `script_generation` から `final_encoding` まで通し生成（証跡: `outputs/test_evidence/task3_quality/full-run-1771242863439/`）を実行
 - 2026-02-16: 現在の機能一覧を `docs/current_capabilities.md` に整理（ローカル運用資料として `.gitignore` 対象化）
+- 2026-02-16: `docs/current_capabilities.md` に GUI の起動方法・画面別の最短利用フロー・起動確認ポイントを追記
 
 ---
 
