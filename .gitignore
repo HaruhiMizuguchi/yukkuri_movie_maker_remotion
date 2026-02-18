@@ -1,3 +1,4 @@
 node_modules
 .env
 outputs/test_evidence/**/tmp/
+docs/current_capabilities.md
