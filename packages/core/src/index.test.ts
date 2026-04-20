@@ -14,17 +14,16 @@ const createPrismaMock = (workflowSteps: Array<any> = []) => {
   const prisma = {
     workflowStep: {
       findMany: vi.fn().mockResolvedValue(workflowSteps),
+      upsert: vi.fn().mockImplementation(async (payload) => {
+        upserts.push(payload);
+        return payload;
+      }),
       update: vi.fn().mockImplementation(async (payload) => {
         updates.push(payload);
         return payload;
       }),
     },
   };
-
-  prisma.workflowStep.upsert = vi.fn().mockImplementation(async (payload) => {
-    upserts.push(payload);
-    return payload;
-  });
 
   return { prisma, updates, upserts };
 };
@@ -36,7 +35,7 @@ describe("runWorkflow", () => {
     const implementations: WorkflowStepImplementations = {
       script_generation: implementation,
     };
-    const ctx = { jobId: "job-1", prisma } as WorkflowContext;
+    const ctx = { jobId: "job-1", prisma } as unknown as WorkflowContext;
 
     await runWorkflow(ctx, implementations);
 
@@ -50,7 +49,7 @@ describe("runWorkflow", () => {
 
   it("未実装のステップをスキップとして記録する", async () => {
     const { prisma, updates } = createPrismaMock();
-    const ctx = { jobId: "job-2", prisma } as WorkflowContext;
+    const ctx = { jobId: "job-2", prisma } as unknown as WorkflowContext;
 
     await runWorkflow(ctx, {});
 
@@ -70,7 +69,7 @@ describe("runWorkflow", () => {
       },
     ]);
     const implementation = vi.fn().mockResolvedValue({ ok: "again" });
-    const ctx = { jobId: "job-3", prisma } as WorkflowContext;
+    const ctx = { jobId: "job-3", prisma } as unknown as WorkflowContext;
 
     await runWorkflow(ctx, { script_generation: implementation });
 
@@ -90,7 +89,7 @@ describe("runWorkflow", () => {
       },
     ]);
     const implementation = vi.fn().mockResolvedValue({ ok: "retry" });
-    const ctx = { jobId: "job-4", prisma } as WorkflowContext;
+    const ctx = { jobId: "job-4", prisma } as unknown as WorkflowContext;
 
     await runWorkflow(ctx, { script_generation: implementation });
 
@@ -104,7 +103,7 @@ describe("runWorkflow", () => {
   it("指定したステップを手動スキップとして記録する", async () => {
     const { prisma, upserts } = createPrismaMock();
     const implementation = vi.fn().mockResolvedValue({ ok: "skip" });
-    const ctx = { jobId: "job-5", prisma } as WorkflowContext;
+    const ctx = { jobId: "job-5", prisma } as unknown as WorkflowContext;
 
     await runWorkflow(ctx, { script_generation: implementation }, { skipSteps: ["script_generation"] });
 

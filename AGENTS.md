@@ -17,3 +17,10 @@
 - AivisSpeech は環境によって話者が1種類のみ（例: Anneli）でも稼働する。`speaker` 文字列を固定IDに決め打ちせず、`/speakers` の style 一覧から動的選択する実装が安全。
 - PowerShell のコマンド長制限で巨大な here-string 一括書き込みが失敗することがある。大きな編集は `apply_patch` か分割書き込みを優先する。
 - 実行ポリシーによっては `git restore` や `Remove-Item` など削除系コマンドがブロックされる。作業ツリー整理は `.gitignore` 追加や、意図した削除をコミットで確定する運用に切り替えると止まりにくい。
+- `corepack pnpm dev` 配下で `concurrently` が子プロセスを起動する場合、`pnpm -C ...` だと Windows 環境で `pnpm` 未解決になることがある。ルート `package.json` の子コマンドは `corepack pnpm -C ...` に統一する。
+- Windows で Node.js から `corepack.cmd` を `spawn` 直呼びすると `EINVAL` になる場合がある。`corepack ...` の実行は `shell: true` のコマンド文字列実行にすると安定する。
+- pnpm ワークスペースルートへ開発依存を追加する場合、`corepack pnpm add -Dw <package>` のように `-w` を明示しないと `ERR_PNPM_ADDING_TO_ROOT` で止まる。
+- Playwright の `webServer` がタイムアウトした場合でも、起動途中の Vite/Node プロセスがポートを掴んだまま残ることがある。再実行前に `Get-NetTCPConnection -LocalPort 3000` で確認すると原因切り分けが早い。
+- Windows のESM CLI判定は `file://${process.argv[1]}` の手組みだと `file:///C:/...` と一致せず実行本体が走らない。`pathToFileURL(process.argv[1]).href` で比較する。
+- Playwrightを複数project並列で動かすと、ワーカーごとの `Date` 由来runIdが1秒ずれて別ディレクトリになることがある。ビジュアル回帰の最新マニフェスト探索は「最新runディレクトリ1個」ではなくprojectごとの最新を拾う。
+- Prisma schema がリポジトリルートにある場合、ルートに `prisma` が無いと `prisma generate` が自己インストールを試み、Windows環境で `pnpm` 未解決により失敗することがある。ルートdevDependencyに `prisma` と `@prisma/client` を置くと安定する。

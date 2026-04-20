@@ -1,7 +1,11 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 
-export const SimpleComposition: React.FC<{ title: string }> = ({ title }) => {
+export type SimpleCompositionProps = Record<string, unknown> & {
+  title: string;
+};
+
+export const SimpleComposition: React.FC<SimpleCompositionProps> = ({ title }) => {
   return (
     <AbsoluteFill style={{ backgroundColor: "#0b1020", color: "white", justifyContent: "center", alignItems: "center" }}>
       <div style={{ fontSize: 72, fontWeight: 800 }}>{title}</div>

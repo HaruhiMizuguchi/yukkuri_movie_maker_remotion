@@ -15,7 +15,7 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         defaultProps={{ title: "Hello Remotion" }}
       />
-      <Composition<YmmCompositionProps>
+      <Composition<any, YmmCompositionProps>
         id="YmmComposition"
         component={YmmComposition}
         durationInFrames={30 * 10}

@@ -8,7 +8,7 @@ export type SubtitleTrack = {
   speaker: string;
 };
 
-export type YmmCompositionProps = {
+export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];

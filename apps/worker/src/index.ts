@@ -12,7 +12,12 @@ const env = envSchema.parse(process.env);
 
 const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
-const implementations = createProductionWorkflowImplementations();
+const implementations = createProductionWorkflowImplementations({
+  outputRoot: process.env.YMM_WORKFLOW_OUTPUT_ROOT,
+  ttsProvider: process.env.YMM_TTS_PROVIDER === "mock" ? "mock" : "aivis",
+  allowMockTtsFallback: process.env.YMM_ALLOW_MOCK_TTS_FALLBACK === "true",
+  disableRemotion: process.env.YMM_DISABLE_REMOTION === "true",
+});
 
 async function ensureSteps(jobId: string) {
   for (const stepName of WORKFLOW_STEPS) {

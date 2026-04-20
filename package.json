@@ -7,23 +7,41 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n WEB,API,WORKER \"corepack pnpm -C apps/web dev\" \"corepack pnpm -C apps/api dev\" \"corepack pnpm -C apps/worker dev\"",
+    "dev": "node scripts/devWithLogging.mjs",
     "lint": "eslint .",
     "format": "prettier -w .",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:journey": "playwright test e2e/customerJourney.spec.ts",
+    "test:e2e:visual": "node scripts/runCustomerJourneyVisual.mjs",
+    "test:e2e:visual:update": "node scripts/runCustomerJourneyVisual.mjs --update",
+    "test:e2e:visual:check": "node scripts/visualRegression.mjs",
+    "test:e2e:real:preflight": "node scripts/checkRealE2ePrereqs.mjs",
+    "test:e2e:real": "playwright test -c playwright.real.config.ts",
+    "test:e2e:report": "playwright show-report outputs/test_evidence/playwright/html-report",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:up": "docker compose -f docker-compose.e2e.yml up -d",
+    "db:down": "docker compose -f docker-compose.e2e.yml down",
     "cli": "corepack pnpm -C apps/cli start"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@prisma/client": "6.19.2",
     "@types/node": "^22.10.2",
+    "@types/pngjs": "6.0.5",
+    "@types/react": "19.2.10",
+    "@types/react-dom": "19.2.3",
     "concurrently": "^9.1.0",
+    "dotenv": "16.4.7",
     "eslint": "^9.17.0",
+    "pixelmatch": "7.1.0",
+    "pngjs": "7.0.0",
     "prettier": "^3.4.2",
+    "prisma": "6.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }
 }
-

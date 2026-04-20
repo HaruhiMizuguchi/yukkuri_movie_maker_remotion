@@ -15,6 +15,11 @@
 - 2026-02-16: タスク3の通し品質確認として `task3FullRunReal.test.ts` を追加し、Aivis実接続で `script_generation` から `final_encoding` まで通し生成（証跡: `outputs/test_evidence/task3_quality/full-run-1771242863439/`）を実行
 - 2026-02-16: 現在の機能一覧を `docs/current_capabilities.md` に整理（ローカル運用資料として `.gitignore` 対象化）
 - 2026-02-16: `docs/current_capabilities.md` に GUI の起動方法・画面別の最短利用フロー・起動確認ポイントを追記
+- 2026-02-18: Windows環境で `corepack pnpm dev` 実行時に子プロセスの `pnpm` 解決が失敗する問題を修正（ルート `dev`/`cli` スクリプトを `corepack pnpm` 呼び出しへ統一）
+- 2026-02-18: `pnpm dev` をログラッパー化し、PowerShell上の開発サーバー出力を `logs/dev/latest.log` と実行単位ログに同時保存
+- 2026-04-16: カスタマージャーニーE2E/ビジュアル回帰の環境整備に着手
+- 2026-04-16: PlaywrightでGUI顧客導線E2Eを追加し、スクリーンショット/AI視覚レビュー用マニフェストを `outputs/test_evidence/customer_journey/` に保存する構成を追加
+- 2026-04-17: 良品スクリーンショットとの差分判定スクリプト、実API/DB/Worker用Playwright E2E、DB前提診断、Docker Compose定義、型検査ゲートを追加
 
 ---
 
@@ -22,6 +27,8 @@
 - [x] `.env` と `config/` のテンプレ整理（必要キー一覧の明文化）
 - [x] Prisma `schema.prisma` の見直し（成果物管理の拡張余地確認）
 - [x] ローカル開発起動フローの整理（`pnpm dev` の役割確認）
+- [x] Windowsでの `corepack pnpm dev` 起動互換性を確保（子プロセス側も `corepack pnpm` を使用）
+- [x] `pnpm dev` の標準出力/標準エラーを `logs/dev/*.log` に記録し、PowerShell実行時のトラブル調査を容易化
 
 ## 1. データモデル / 共有型
 - [x] `packages/shared` に台本（Script）型定義を追加
@@ -107,3 +114,17 @@
 - [x] YouTube Upload（API連携）
 - [x] プロジェクトのテンプレ化
 - [x] 複数ユーザー対応（将来）
+
+---
+
+## 9. カスタマージャーニーE2E / ビジュアル回帰
+- [x] Playwright を導入し、GUIの主要画面を顧客導線として通すE2Eを追加
+- [x] 各導線チェックポイントのスクリーンショットとメタデータを `outputs/test_evidence/` に保存
+- [x] AI視覚レビューに渡せるビジュアル回帰用マニフェストを生成
+- [x] E2Eの実行方法とTDD上の不足要素をドキュメント化
+- [x] 実API・DB・Workerを使ったブラウザE2Eを追加
+- [x] 良品スクリーンショットとの自動差分しきい値管理を追加
+- [x] ルート `typecheck` をTDDゲートとして通る状態に修正
+- [x] PostgreSQL前提診断とDocker Compose起動手順を追加
+- [ ] 実API E2Eをこの端末で完走確認（現状はPostgreSQL/Docker daemon未起動でpreflight停止）
+- [ ] 実API E2E用DBのテストデータ破棄を自動化

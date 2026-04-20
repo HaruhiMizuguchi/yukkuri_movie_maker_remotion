@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 export type WorkflowContext = {
   jobId: string;
@@ -136,7 +136,7 @@ export async function runWorkflow(
         data: {
           status: "COMPLETED",
           completedAt,
-          outputJson: output ?? { ok: true },
+          outputJson: toPrismaJson(output ?? { ok: true }),
           error: null,
         },
       });
@@ -159,3 +159,6 @@ const readSkipReason = (outputJson: unknown): string | null => {
   const reason = (outputJson as { reason?: unknown }).reason;
   return typeof reason === "string" ? reason : null;
 };
+
+const toPrismaJson = (value: unknown): Prisma.InputJsonValue =>
+  JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;

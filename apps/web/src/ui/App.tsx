@@ -331,7 +331,7 @@ export function App() {
         </div>
         <div style={styles.statusCard}>
           <div>選択中プロジェクト</div>
-          <strong>{selectedProject?.id ?? "未選択"}</strong>
+          <strong data-testid="selected-project-id">{selectedProject?.id ?? "未選択"}</strong>
           <small>{selectedProject?.theme ?? "テーマ未設定"}</small>
         </div>
       </header>
@@ -340,6 +340,7 @@ export function App() {
         {screens.map((screen) => (
           <button
             key={screen.id}
+            data-testid={`nav-${screen.id}`}
             onClick={() => setActiveScreen(screen.id)}
             className={screen.id === activeScreen ? "tab-active" : "tab"}
           >
@@ -348,11 +349,15 @@ export function App() {
         ))}
       </nav>
 
-      {message ? <div style={styles.message}>{message}</div> : null}
+      {message ? (
+        <div style={styles.message} role="status" data-testid="app-message">
+          {message}
+        </div>
+      ) : null}
 
       <main style={styles.main}>
         {activeScreen === "dashboard" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-dashboard">
             <h2 style={styles.panelTitle}>プロジェクト一覧</h2>
             <div style={styles.metricRow}>
               <Metric label="プロジェクト数" value={dashboardStats.projectCount} />
@@ -382,16 +387,22 @@ export function App() {
         ) : null}
 
         {activeScreen === "wizard" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-wizard">
             <h2 style={styles.panelTitle}>プロジェクト作成ウィザード</h2>
             <label style={styles.label}>テーマ</label>
             <input
+              data-testid="wizard-theme-input"
               style={styles.input}
               value={wizardTheme}
               onChange={(event) => setWizardTheme(event.target.value)}
             />
             <label style={styles.label}>モード</label>
-            <select style={styles.input} value={wizardMode} onChange={(event) => setWizardMode(event.target.value)}>
+            <select
+              data-testid="wizard-mode-select"
+              style={styles.input}
+              value={wizardMode}
+              onChange={(event) => setWizardMode(event.target.value)}
+            >
               <option value="full">full</option>
               <option value="scriptOnly">scriptOnly</option>
               <option value="renderOnly">renderOnly</option>
@@ -409,14 +420,18 @@ export function App() {
                 </option>
               ))}
             </select>
-            <button style={styles.primaryButton} onClick={() => void createProject()}>
+            <button
+              style={styles.primaryButton}
+              data-testid="wizard-create-button"
+              onClick={() => void createProject()}
+            >
               作成
             </button>
           </section>
         ) : null}
 
         {activeScreen === "project" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-project">
             <h2 style={styles.panelTitle}>プロジェクト詳細</h2>
             {!projectDetail ? <div>プロジェクトを選択してください</div> : null}
             {projectDetail ? (
@@ -451,16 +466,18 @@ export function App() {
         ) : null}
 
         {activeScreen === "script" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-script">
             <h2 style={styles.panelTitle}>台本編集</h2>
             <label style={styles.label}>タイトル</label>
             <input
+              data-testid="script-title-input"
               style={styles.input}
               value={scriptDraft.title ?? ""}
               onChange={(event) => setScriptDraft({ ...scriptDraft, title: event.target.value })}
             />
             <label style={styles.label}>テーマ</label>
             <input
+              data-testid="script-theme-input"
               style={styles.input}
               value={scriptDraft.theme ?? ""}
               onChange={(event) => setScriptDraft({ ...scriptDraft, theme: event.target.value })}
@@ -469,6 +486,7 @@ export function App() {
             {scriptDraft.lines.map((line, index) => (
               <div key={`line-${index}`} style={styles.lineRow}>
                 <input
+                  data-testid={`script-line-speaker-${index}`}
                   style={styles.inputSmall}
                   value={line.speaker}
                   onChange={(event) => {
@@ -478,6 +496,7 @@ export function App() {
                   }}
                 />
                 <input
+                  data-testid={`script-line-text-${index}`}
                   style={styles.input}
                   value={line.text}
                   onChange={(event) => {
@@ -490,6 +509,7 @@ export function App() {
             ))}
             <button
               style={styles.secondaryButton}
+              data-testid="script-add-line-button"
               onClick={() =>
                 setScriptDraft({
                   ...scriptDraft,
@@ -499,17 +519,18 @@ export function App() {
             >
               行を追加
             </button>
-            <button style={styles.primaryButton} onClick={() => void saveScript()}>
+            <button style={styles.primaryButton} data-testid="script-save-button" onClick={() => void saveScript()}>
               保存
             </button>
           </section>
         ) : null}
 
         {activeScreen === "assets" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-assets">
             <h2 style={styles.panelTitle}>素材管理</h2>
             <div style={styles.lineRow}>
               <select
+                data-testid="asset-type-select"
                 style={styles.inputSmall}
                 value={assetForm.type}
                 onChange={(event) => setAssetForm({ ...assetForm, type: event.target.value })}
@@ -520,22 +541,24 @@ export function App() {
                 <option value="subtitle">subtitle</option>
               </select>
               <input
+                data-testid="asset-name-input"
                 style={styles.inputSmall}
                 placeholder="表示名"
                 value={assetForm.name}
                 onChange={(event) => setAssetForm({ ...assetForm, name: event.target.value })}
               />
               <input
+                data-testid="asset-path-input"
                 style={styles.input}
                 placeholder="relativePath"
                 value={assetForm.relativePath}
                 onChange={(event) => setAssetForm({ ...assetForm, relativePath: event.target.value })}
               />
-              <button style={styles.secondaryButton} onClick={() => void addAsset()}>
+              <button style={styles.secondaryButton} data-testid="asset-add-button" onClick={() => void addAsset()}>
                 登録
               </button>
             </div>
-            <div style={styles.list}>
+            <div style={styles.list} data-testid="asset-list">
               {assets.map((asset) => (
                 <div key={asset.id} style={styles.assetRow}>
                   <strong>{asset.name}</strong>
@@ -548,7 +571,7 @@ export function App() {
         ) : null}
 
         {activeScreen === "timeline" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-timeline">
             <h2 style={styles.panelTitle}>タイムライン編集</h2>
             {!timelineDraft ? <div>台本保存後にタイムラインを読み込めます。</div> : null}
             {timelineDraft ? (
@@ -556,6 +579,7 @@ export function App() {
                 <div style={styles.lineRow}>
                   <label style={styles.labelInline}>in</label>
                   <input
+                    data-testid="timeline-in-input"
                     style={styles.inputSmall}
                     type="number"
                     value={timelineDraft.playbackRange.inMs}
@@ -569,6 +593,7 @@ export function App() {
                   />
                   <label style={styles.labelInline}>out</label>
                   <input
+                    data-testid="timeline-out-input"
                     style={styles.inputSmall}
                     type="number"
                     value={timelineDraft.playbackRange.outMs}
@@ -630,7 +655,11 @@ export function App() {
                     ))}
                   </div>
                 ))}
-                <button style={styles.primaryButton} onClick={() => void saveTimelineAll()}>
+                <button
+                  style={styles.primaryButton}
+                  data-testid="timeline-save-button"
+                  onClick={() => void saveTimelineAll()}
+                >
                   タイムライン保存
                 </button>
                 <button style={styles.secondaryButton} onClick={() => void createTemplateFromCurrent()}>
@@ -642,16 +671,20 @@ export function App() {
         ) : null}
 
         {activeScreen === "preview" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-preview">
             <h2 style={styles.panelTitle}>プレビュー & レンダリング</h2>
-            <button style={styles.secondaryButton} onClick={() => void loadPreview()}>
+            <button style={styles.secondaryButton} data-testid="preview-load-button" onClick={() => void loadPreview()}>
               プレビュー情報を取得
             </button>
-            <button style={styles.primaryButton} onClick={() => void createRenderJob()}>
+            <button
+              style={styles.primaryButton}
+              data-testid="preview-render-button"
+              onClick={() => void createRenderJob()}
+            >
               レンダリング実行
             </button>
             {preview ? (
-              <div style={styles.previewCard}>
+              <div style={styles.previewCard} data-testid="preview-summary">
                 <div>durationInFrames: {preview.remotionProps.durationInFrames}</div>
                 <div>字幕クリップ数: {preview.remotionProps.subtitleTracks.length}</div>
               </div>
@@ -660,11 +693,12 @@ export function App() {
         ) : null}
 
         {activeScreen === "settings" ? (
-          <section style={styles.panel}>
+          <section style={styles.panel} data-testid="screen-settings">
             <h2 style={styles.panelTitle}>設定</h2>
             <div style={styles.lineRow}>
               <label style={styles.labelInline}>Google API Key</label>
               <input
+                data-testid="settings-google-input"
                 style={styles.input}
                 value={settings.apiKeys.google ?? ""}
                 onChange={(event) =>
@@ -678,6 +712,7 @@ export function App() {
             <div style={styles.lineRow}>
               <label style={styles.labelInline}>Width</label>
               <input
+                data-testid="settings-width-input"
                 style={styles.inputSmall}
                 type="number"
                 value={settings.outputPreset.width}
@@ -693,6 +728,7 @@ export function App() {
               />
               <label style={styles.labelInline}>Height</label>
               <input
+                data-testid="settings-height-input"
                 style={styles.inputSmall}
                 type="number"
                 value={settings.outputPreset.height}
@@ -708,6 +744,7 @@ export function App() {
               />
               <label style={styles.labelInline}>FPS</label>
               <input
+                data-testid="settings-fps-input"
                 style={styles.inputSmall}
                 type="number"
                 value={settings.outputPreset.fps}
@@ -722,7 +759,7 @@ export function App() {
                 }
               />
             </div>
-            <button style={styles.primaryButton} onClick={() => void saveSettings()}>
+            <button style={styles.primaryButton} data-testid="settings-save-button" onClick={() => void saveSettings()}>
               保存
             </button>
           </section>

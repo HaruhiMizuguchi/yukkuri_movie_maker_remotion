@@ -1,5 +1,7 @@
 import type { TimelineData, TimelineTrack } from "@ymm/shared";
 
+export type { TimelineData } from "@ymm/shared";
+
 type MoveClipInput = {
   trackId: string;
   clipId: string;
