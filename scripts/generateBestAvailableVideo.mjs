@@ -1,92 +1,43 @@
 import "dotenv/config";
 
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { createReadStream, promises as fs } from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const WORKSPACE_ROOT = process.cwd();
-const OUTPUT_ROOT = path.join(WORKSPACE_ROOT, "outputs", "production_runs");
+const DEFAULT_OUTPUT_ROOT = path.join(WORKSPACE_ROOT, "outputs", "production_runs");
 const MEDIA_ROOT = path.join(WORKSPACE_ROOT, ".kamui", "movie", "media");
 const FRAME_RATE = 30;
 const WIDTH = 1920;
 const HEIGHT = 1080;
 
-const SCRIPT = {
+const BASE_SCRIPT = {
   title: "今この環境で作れるAI動画生成フロー",
-  theme: "AivisSpeech実音声とFFmpeg演出で作る一分台の自動生成デモ",
+  theme: "AivisSpeech実音声とRemotion演出で作る自動生成デモ",
   lines: [
-    {
-      speaker: "霊夢",
-      text: "今日は、この環境で今できる動画生成を、一本の完成品として見せます。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "テスト用の確認じゃなく、台本、音声、字幕、映像、最終エンコードまで通すぜ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "使える強みは、AivisSpeech、FFmpeg、そして既存の高解像度素材です。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "外部LLMがクォータで止まっても、制作そのものは止めない構成にするんだ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "台本は、結論、素材、音声、検証の順に並べ、視聴者が迷わない流れにします。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "一画面一メッセージを守る。情報を詰め込みすぎないのがコツだぜ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "音声はAivisSpeechへ実接続し、話者スタイルを自動で選んで生成します。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "一つの話者でも、通常とテンション高めを使えば、掛け合いの役割を分けられるぜ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "生成した音声は一行ごとに保存し、実測した長さを字幕タイミングへ反映します。",
-    },
-    {
-      speaker: "霊夢",
-      text: "映像はサイバーパンク都市と雨の路地を組み合わせ、ズームとカットでテンポを作ります。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "背景音楽は小さく混ぜる。主役はナレーションだから、音量の優先順位を守るぜ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "字幕は大きく、縁取りを厚くし、章タイトルで今の工程が分かるようにします。",
-    },
-    {
-      speaker: "霊夢",
-      text: "運用で重要なのは、完成動画だけでなく、中間成果物とログを残すことです。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "失敗しても、どの音声行か、どの合成ステップか、後から追える状態にするわけだな。",
-    },
-    {
-      speaker: "魔理沙",
-      text: "最後はH.264とAACで再エンコードし、長さ、解像度、コーデックまで検証するぜ。",
-    },
-    {
-      speaker: "霊夢",
-      text: "結論です。今この環境だけでも、一分台の解説動画を実音声つきで最後まで生成できます。",
-    },
-    {
-      speaker: "霊夢",
-      text: "次は専用立ち絵と画像生成APIを足せば、さらに完成度を上げられます。",
-    },
+    { speaker: "霊夢", text: "今日は、この環境で今できる動画生成を、一本の完成品として見せます。" },
+    { speaker: "魔理沙", text: "テスト用の確認じゃなく、台本、音声、字幕、映像、最終エンコードまで通すぜ。" },
+    { speaker: "霊夢", text: "使える強みは、AivisSpeech、Remotion、そして既存の高解像度素材です。" },
+    { speaker: "魔理沙", text: "外部LLMがクォータで止まっても、制作そのものは止めない構成にするんだ。" },
+    { speaker: "霊夢", text: "台本は、結論、素材、音声、検証の順に並べ、視聴者が迷わない流れにします。" },
+    { speaker: "魔理沙", text: "一画面一メッセージを守る。情報を詰め込みすぎないのがコツだぜ。" },
+    { speaker: "霊夢", text: "音声はAivisSpeechへ実接続し、話者スタイルを自動で選んで生成します。" },
+    { speaker: "魔理沙", text: "一つの話者でも、通常とテンション高めを使えば、掛け合いの役割を分けられるぜ。" },
+    { speaker: "霊夢", text: "生成した音声は一行ごとに保存し、実測した長さを字幕タイミングへ反映します。" },
+    { speaker: "霊夢", text: "映像はサイバーパンク都市と雨の路地を切り替え、ショット単位でテンポを作ります。" },
+    { speaker: "魔理沙", text: "BGMは小さく混ぜる。主役はナレーションだから、ダッキングの優先順位を守るぜ。" },
+    { speaker: "霊夢", text: "字幕はキーワードを強調し、章タイトルで今の工程が分かるようにします。" },
+    { speaker: "霊夢", text: "運用で重要なのは、完成動画だけでなく、中間成果物とログを残すことです。" },
+    { speaker: "魔理沙", text: "失敗しても、どの音声行か、どのショットか、後から追える状態にするわけだな。" },
+    { speaker: "魔理沙", text: "最後はH.264とAACで再エンコードし、長さ、解像度、コーデックまで検証するぜ。" },
+    { speaker: "霊夢", text: "結論です。今この環境だけでも、一分台の解説動画を実音声つきで最後まで生成できます。" },
+    { speaker: "霊夢", text: "次は専用立ち絵と画像生成APIを足せば、さらに完成度を上げられます。" },
   ],
 };
 
-const CHAPTERS = [
+const BASE_CHAPTERS = [
   { lineIndex: 0, title: "現在の生成力" },
   { lineIndex: 4, title: "台本設計" },
   { lineIndex: 6, title: "実音声生成" },
@@ -112,19 +63,59 @@ const STEP_NAMES = [
   "verification",
 ];
 
-const args = new Set(process.argv.slice(2));
+const PLAN_ARTIFACTS = [
+  "video_composition/composition.json",
+  "video_composition/shot-plan.json",
+  "video_composition/visual-plan.json",
+  "video_composition/subtitle-presentation.json",
+  "video_composition/audio-mix-plan.json",
+  "video_composition/chapter-plan.json",
+];
 
-if (args.has("--dry-run")) {
+const RICH_FEATURES = [
+  "remotion_rendering",
+  "shot_planning",
+  "visual_asset_rotation",
+  "subtitle_emphasis",
+  "audio_ducking",
+  "chapter_transition",
+];
+
+const PROFILE_PRESETS = {
+  production: {
+    id: "production",
+    lineCount: BASE_SCRIPT.lines.length,
+    durationRangeSec: { min: 60, max: 120 },
+    narrationPaddingMs: 2200,
+    maxShotDurationMs: 4400,
+    minimumSizeBytes: 5_000_000,
+  },
+  smoke: {
+    id: "smoke",
+    lineCount: 6,
+    durationRangeSec: { min: 15, max: 60 },
+    narrationPaddingMs: 1200,
+    maxShotDurationMs: 3600,
+    minimumSizeBytes: 1_000_000,
+  },
+};
+
+const cliOptions = parseCliOptions(process.argv.slice(2));
+const profile = createProfile(cliOptions.profile);
+
+if (cliOptions.dryRun) {
   console.log(
     JSON.stringify(
       {
-        title: SCRIPT.title,
-        lineCount: SCRIPT.lines.length,
-        targetDurationSec: { min: 60, max: 120 },
+        profile: profile.id,
+        title: profile.script.title,
+        lineCount: profile.script.lines.length,
+        renderer: "remotion",
+        targetDurationSec: profile.durationRangeSec,
         steps: STEP_NAMES,
-        requiredAssets: Object.values(ASSETS).map((assetPath) =>
-          path.relative(WORKSPACE_ROOT, assetPath).replaceAll("\\", "/")
-        ),
+        planArtifacts: PLAN_ARTIFACTS,
+        richFeatures: RICH_FEATURES,
+        requiredAssets: Object.values(ASSETS).map((assetPath) => toRelativeWorkspacePath(assetPath)),
       },
       null,
       2
@@ -134,29 +125,43 @@ if (args.has("--dry-run")) {
 }
 
 const main = async () => {
-  // 今回の実生成は、既存ワークフローと同じ粒度で中間成果物を保存する。
   const runId = createRunId();
+  const outputRoot = cliOptions.outputRoot ?? DEFAULT_OUTPUT_ROOT;
   const projectId = `best-available-${runId}`;
-  const projectRoot = path.join(OUTPUT_ROOT, runId, "projects", projectId);
-  const summaryPath = path.join(OUTPUT_ROOT, runId, "run_summary.json");
+  const projectRoot = path.join(outputRoot, runId, "projects", projectId);
+  const summaryPath = path.join(outputRoot, runId, "run_summary.json");
   const logPath = path.join(projectRoot, "logs", "workflow.log");
 
   await ensureProjectLayout(projectRoot);
-  await writeWorkflowLog(logPath, "run_start", { runId, projectId });
+  await writeWorkflowLog(logPath, "run_start", {
+    runId,
+    projectId,
+    profile: profile.id,
+    renderer: "remotion",
+  });
   await ensureAssetsExist(logPath);
 
-  const scriptPath = await writeScript(projectRoot, runId, logPath);
-  const ttsResult = await synthesizeNarration(projectRoot, runId, logPath);
-  const subtitleResult = await writeSubtitles(projectRoot, runId, ttsResult.timestamps, logPath);
-  const compositionResult = await composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPath);
+  const scriptPath = await writeScript(projectRoot, runId, logPath, profile);
+  const ttsResult = await synthesizeNarration(projectRoot, runId, logPath, profile);
+  const subtitleResult = await writeSubtitles(projectRoot, runId, ttsResult.timestamps, logPath, profile);
+  const compositionResult = await composeVideo(
+    projectRoot,
+    runId,
+    ttsResult,
+    subtitleResult,
+    logPath,
+    profile
+  );
   const finalResult = await encodeFinal(projectRoot, runId, compositionResult.previewPath, logPath);
-  const verification = await verifyFinal(finalResult.finalPath, logPath);
+  const verification = await verifyFinal(finalResult.finalPath, logPath, profile);
 
   const summary = {
     runId,
     projectId,
-    title: SCRIPT.title,
-    theme: SCRIPT.theme,
+    profile: profile.id,
+    renderer: compositionResult.renderer,
+    title: profile.script.title,
+    theme: profile.script.theme,
     scriptPath,
     ttsProvider: "aivis",
     audioPath: ttsResult.narrationPath,
@@ -164,6 +169,12 @@ const main = async () => {
     previewPath: compositionResult.previewPath,
     finalPath: finalResult.finalPath,
     finalCopyPath: finalResult.finalCopyPath,
+    compositionPath: compositionResult.compositionPath,
+    shotPlanPath: compositionResult.shotPlanPath,
+    visualPlanPath: compositionResult.visualPlanPath,
+    subtitlePresentationPath: compositionResult.subtitlePresentationPath,
+    audioMixPlanPath: compositionResult.audioMixPlanPath,
+    chapterPlanPath: compositionResult.chapterPlanPath,
     workflowLogPath: logPath,
     durationSec: verification.durationSec,
     verification,
@@ -174,6 +185,7 @@ const main = async () => {
     finalPath: finalResult.finalPath,
     durationSec: verification.durationSec,
     sizeBytes: verification.sizeBytes,
+    renderer: compositionResult.renderer,
   });
 
   console.log(JSON.stringify(summary, null, 2));
@@ -183,6 +195,60 @@ main().catch(async (error) => {
   console.error(error instanceof Error ? error.stack ?? error.message : String(error));
   process.exit(1);
 });
+
+function parseCliOptions(argv) {
+  const options = {
+    dryRun: false,
+    profile: "production",
+    outputRoot: null,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+    if (arg === "--profile") {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error("--profile requires a value.");
+      }
+      options.profile = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--output-root") {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error("--output-root requires a value.");
+      }
+      options.outputRoot = path.isAbsolute(value) ? value : path.resolve(WORKSPACE_ROOT, value);
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return options;
+}
+
+function createProfile(profileName) {
+  const preset = PROFILE_PRESETS[profileName];
+  if (!preset) {
+    throw new Error(`Unknown profile: ${profileName}`);
+  }
+
+  const lines = BASE_SCRIPT.lines.slice(0, preset.lineCount);
+  return {
+    ...preset,
+    script: {
+      ...BASE_SCRIPT,
+      lines,
+    },
+    chapters: BASE_CHAPTERS.filter((chapter) => chapter.lineIndex < lines.length),
+  };
+}
 
 function createRunId() {
   const now = new Date();
@@ -211,25 +277,25 @@ async function ensureAssetsExist(logPath) {
     await fs.stat(assetPath);
     await writeWorkflowLog(logPath, "asset_ready", {
       name,
-      path: path.relative(WORKSPACE_ROOT, assetPath).replaceAll("\\", "/"),
+      path: toRelativeWorkspacePath(assetPath),
     });
   }
 }
 
-async function writeScript(projectRoot, runId, logPath) {
+async function writeScript(projectRoot, runId, logPath, profileConfig) {
   const runDir = await prepareStepDir(projectRoot, "script_generation", runId);
   const scriptPath = path.join(runDir, "script.json");
-  await writeJson(scriptPath, SCRIPT);
+  await writeJson(scriptPath, profileConfig.script);
   await syncLatest(runDir);
   await writeWorkflowLog(logPath, "step_completed", {
     stepName: "script_generation",
     scriptPath,
-    lineCount: SCRIPT.lines.length,
+    lineCount: profileConfig.script.lines.length,
   });
   return scriptPath;
 }
 
-async function synthesizeNarration(projectRoot, runId, logPath) {
+async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
   const runDir = await prepareStepDir(projectRoot, "tts_generation", runId);
   const clipsDir = path.join(runDir, "clips");
   await fs.mkdir(clipsDir, { recursive: true });
@@ -238,6 +304,7 @@ async function synthesizeNarration(projectRoot, runId, logPath) {
     /\/$/,
     ""
   );
+  await waitForAivisReady(baseUrl, logPath);
   const speakers = await fetchJson(`${baseUrl}/speakers`);
   const catalog = speakers.flatMap((speaker) =>
     (speaker.styles || []).map((style) => ({
@@ -255,8 +322,8 @@ async function synthesizeNarration(projectRoot, runId, logPath) {
   const usedStyleIds = [];
   let cursorMs = 0;
 
-  for (let index = 0; index < SCRIPT.lines.length; index += 1) {
-    const line = SCRIPT.lines[index];
+  for (let index = 0; index < profileConfig.script.lines.length; index += 1) {
+    const line = profileConfig.script.lines[index];
     const styleId = selectStyleId(catalog, line.speaker);
     const clipPath = path.join(clipsDir, `line-${String(index + 1).padStart(3, "0")}.wav`);
     const query = await fetchJson(
@@ -339,11 +406,11 @@ async function synthesizeNarration(projectRoot, runId, logPath) {
   };
 }
 
-async function writeSubtitles(projectRoot, runId, timestamps, logPath) {
+async function writeSubtitles(projectRoot, runId, timestamps, logPath, profileConfig) {
   const runDir = await prepareStepDir(projectRoot, "subtitle_generation", runId);
   const assPath = path.join(runDir, "subtitles.ass");
   const subtitlesJsonPath = path.join(runDir, "subtitles.json");
-  const assText = createAss(timestamps);
+  const assText = createAss(timestamps, profileConfig);
   await fs.writeFile(assPath, assText, "utf-8");
   await writeJson(
     subtitlesJsonPath,
@@ -364,181 +431,572 @@ async function writeSubtitles(projectRoot, runId, timestamps, logPath) {
   return { runDir, assPath, subtitlesJsonPath };
 }
 
-async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPath) {
+async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPath, profileConfig) {
   const runDir = await prepareStepDir(projectRoot, "video_composition", runId);
-  const targetDuration = Math.max(62, Math.ceil(ttsResult.durationSec + 2.5));
-  if (targetDuration > 120) {
+  const durationMs = Math.max(
+    profileConfig.durationRangeSec.min * 1000,
+    Math.ceil(ttsResult.durationSec * 1000 + profileConfig.narrationPaddingMs)
+  );
+  if (durationMs > profileConfig.durationRangeSec.max * 1000) {
     throw new Error(
-      `Narration is too long for a 1-2 minute deliverable: ${ttsResult.durationSec.toFixed(3)}s`
+      `Narration is too long for ${profileConfig.id}: ${ttsResult.durationSec.toFixed(3)}s`
     );
   }
-  const baseVisualPath = path.join(runDir, "base_visual.mp4");
-  const previewPath = path.join(runDir, "preview.mp4");
-  const segmentPaths = await createVisualSegments(runDir, targetDuration, logPath);
-  const concatPath = path.join(runDir, "segments.txt");
-  await fs.writeFile(
-    concatPath,
-    `${segmentPaths.map((segmentPath) => `file '${toFfmpegPath(segmentPath)}'`).join("\n")}\n`,
-    "utf-8"
-  );
-  await runCommand(
-    "ffmpeg",
-    ["-y", "-f", "concat", "-safe", "0", "-i", concatPath, "-c", "copy", baseVisualPath],
-    runDir
-  );
 
+  const audioCopyPath = path.join(runDir, "narration.wav");
   const assCopyPath = path.join(runDir, "subtitles.ass");
-  await fs.copyFile(subtitleResult.assPath, assCopyPath);
-  await fs.copyFile(ttsResult.narrationPath, path.join(runDir, "narration.wav"));
+  const shotPlanPath = path.join(runDir, "shot-plan.json");
+  const visualPlanPath = path.join(runDir, "visual-plan.json");
+  const subtitlePresentationPath = path.join(runDir, "subtitle-presentation.json");
+  const audioMixPlanPath = path.join(runDir, "audio-mix-plan.json");
+  const chapterPlanPath = path.join(runDir, "chapter-plan.json");
+  const compositionPath = path.join(runDir, "composition.json");
+  const previewPath = path.join(runDir, "preview.mp4");
 
+  await Promise.all([
+    fs.copyFile(ttsResult.narrationPath, audioCopyPath),
+    fs.copyFile(subtitleResult.assPath, assCopyPath),
+  ]);
+
+  const chapterPlan = createChapterPlan({
+    timestamps: ttsResult.timestamps,
+    chapters: profileConfig.chapters,
+    durationMs,
+  });
+  const shotPlan = createShotPlan({
+    timestamps: ttsResult.timestamps,
+    chapters: profileConfig.chapters,
+    maxShotDurationMs: profileConfig.maxShotDurationMs,
+  });
+  const visualPlan = await createVisualPlan({
+    shotPlan,
+    chapterPlan,
+  });
+  const subtitlePresentation = createSubtitlePresentation(ttsResult.timestamps);
+  const audioMixAssets = await prepareRemotionAudioAssets({
+    runDir,
+    durationMs,
+  });
+  const audioMixPlan = createAudioMixPlan({
+    durationMs,
+    timestamps: ttsResult.timestamps,
+    chapters: chapterPlan.chapters,
+    subtitlePresentation,
+    audioMixAssets,
+  });
+
+  await Promise.all([
+    writeJson(shotPlanPath, shotPlan),
+    writeJson(visualPlanPath, {
+      assets: visualPlan.assets.map((asset) => ({
+        ...asset,
+        path: toRelativeWorkspacePath(asset.path),
+      })),
+      tracks: visualPlan.tracks,
+    }),
+    writeJson(subtitlePresentationPath, subtitlePresentation),
+    writeJson(audioMixPlanPath, {
+      ...audioMixPlan,
+      assets: {
+        bgmPath: toRelativeWorkspacePath(audioMixPlan.assets.bgmPath),
+        ambientPath: toRelativeWorkspacePath(audioMixPlan.assets.ambientPath),
+        accentPath: toRelativeWorkspacePath(audioMixPlan.assets.accentPath),
+        transitionPath: toRelativeWorkspacePath(audioMixPlan.assets.transitionPath),
+      },
+    }),
+    writeJson(chapterPlanPath, chapterPlan),
+  ]);
+
+  await renderWithRemotion({
+    outputPath: previewPath,
+    title: profileConfig.script.title,
+    theme: profileConfig.script.theme,
+    durationMs,
+    audioPath: audioCopyPath,
+    subtitleTracks: ttsResult.timestamps,
+    shotPlan,
+    visualPlan,
+    subtitlePresentation,
+    audioMixPlan,
+    chapterPlan,
+  });
+
+  const composition = {
+    renderer: "remotion",
+    profile: profileConfig.id,
+    frameRate: FRAME_RATE,
+    width: WIDTH,
+    height: HEIGHT,
+    targetDurationSec: Number((durationMs / 1000).toFixed(3)),
+    assets: Object.fromEntries(
+      Object.entries(ASSETS).map(([key, assetPath]) => [key, toRelativeWorkspacePath(assetPath)])
+    ),
+    shotCount: shotPlan.length,
+    visualTrackCount: visualPlan.tracks.length,
+    emphasisCount: subtitlePresentation.emphasisCount,
+    audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+    chapterCount: chapterPlan.chapters.length,
+    lineCount: ttsResult.timestamps.length,
+  };
+  await writeJson(compositionPath, composition);
+  await syncLatest(runDir);
+  await writeWorkflowLog(logPath, "step_completed", {
+    stepName: "video_composition",
+    renderer: "remotion",
+    shotCount: shotPlan.length,
+    visualTrackCount: visualPlan.tracks.length,
+    emphasisCount: subtitlePresentation.emphasisCount,
+    audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+    chapterCount: chapterPlan.chapters.length,
+    previewPath,
+  });
+
+  return {
+    runDir,
+    renderer: "remotion",
+    previewPath,
+    compositionPath,
+    shotPlanPath,
+    visualPlanPath,
+    subtitlePresentationPath,
+    audioMixPlanPath,
+    chapterPlanPath,
+  };
+}
+
+function createChapterPlan({ timestamps, chapters, durationMs }) {
+  return {
+    chapters: chapters.map((chapter, index) => {
+      const startMs = timestamps[chapter.lineIndex]?.startMs ?? 0;
+      const nextChapterStartMs =
+        chapters[index + 1] && timestamps[chapters[index + 1].lineIndex]
+          ? timestamps[chapters[index + 1].lineIndex].startMs
+          : durationMs;
+      return {
+        id: `chapter-${String(index + 1).padStart(2, "0")}`,
+        title: chapter.title,
+        startMs,
+        endMs: nextChapterStartMs,
+        lineIndexes: [chapter.lineIndex],
+        transitionDurationMs: 560,
+      };
+    }),
+  };
+}
+
+function createShotPlan({ timestamps, chapters, maxShotDurationMs }) {
+  const chapterStartIndexes = new Set(chapters.map((chapter) => chapter.lineIndex));
+  const shots = [];
+
+  for (const item of timestamps) {
+    const segmentCount = Math.max(1, Math.ceil((item.endMs - item.startMs) / maxShotDurationMs));
+    for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+      const startMs =
+        item.startMs + Math.floor(((item.endMs - item.startMs) * segmentIndex) / segmentCount);
+      const endMs =
+        segmentIndex === segmentCount - 1
+          ? item.endMs
+          : item.startMs +
+            Math.floor(((item.endMs - item.startMs) * (segmentIndex + 1)) / segmentCount);
+      const type = pickShotType({
+        text: item.text,
+        speaker: item.speaker,
+        segmentIndex,
+        segmentCount,
+        chapterStart: chapterStartIndexes.has(item.index) && segmentIndex === 0,
+      });
+      const motion = getShotMotion(type, shots.length);
+      shots.push({
+        id: `shot-${String(shots.length + 1).padStart(3, "0")}`,
+        type,
+        startMs,
+        endMs,
+        lineIndexes: [item.index],
+        focusSpeaker: item.speaker,
+        zoomStart: motion.zoomStart,
+        zoomEnd: motion.zoomEnd,
+        panX: motion.panX,
+        panY: motion.panY,
+      });
+    }
+  }
+
+  if (shots.length > 0) {
+    shots[0].startMs = 0;
+    shots[shots.length - 1].endMs =
+      timestamps[timestamps.length - 1]?.endMs ?? shots[shots.length - 1].endMs;
+  }
+
+  return shots;
+}
+
+function pickShotType({ text, speaker, segmentIndex, segmentCount, chapterStart }) {
+  if (chapterStart) {
+    return "wide";
+  }
+  if (/[0-9]+|AivisSpeech|Remotion|FFmpeg|H\.264|AAC|API/i.test(text)) {
+    return "insert";
+  }
+  if (segmentCount > 1 && segmentIndex === segmentCount - 1) {
+    return "close";
+  }
+  if (speaker === "魔理沙") {
+    return segmentIndex % 2 === 0 ? "close" : "medium";
+  }
+  return segmentIndex % 2 === 0 ? "medium" : "wide";
+}
+
+function getShotMotion(type, index) {
+  if (type === "wide") {
+    return {
+      zoomStart: 1.02,
+      zoomEnd: 1.08,
+      panX: index % 2 === 0 ? -0.05 : 0.05,
+      panY: -0.03,
+    };
+  }
+  if (type === "close") {
+    return {
+      zoomStart: 1.08,
+      zoomEnd: 1.13,
+      panX: index % 2 === 0 ? 0.04 : -0.04,
+      panY: 0.02,
+    };
+  }
+  if (type === "insert") {
+    return {
+      zoomStart: 1.04,
+      zoomEnd: 1.1,
+      panX: index % 2 === 0 ? 0.03 : -0.03,
+      panY: -0.01,
+    };
+  }
+  return {
+    zoomStart: 1.04,
+    zoomEnd: 1.09,
+    panX: index % 2 === 0 ? -0.02 : 0.02,
+    panY: 0,
+  };
+}
+
+async function createVisualPlan({ shotPlan, chapterPlan }) {
+  const assetCatalog = await buildVisualAssetCatalog();
+  const cycle = ["cityVideo", "cityImage", "alleyVideo", "alleyImage"];
+  const useCounts = new Map();
+  const chapterStarts = new Map(chapterPlan.chapters.map((chapter) => [chapter.startMs, chapter.id]));
+
+  const tracks = shotPlan.map((shot, index) => {
+    const preferredAssetId =
+      shot.type === "insert"
+        ? index % 2 === 0
+          ? "cityImage"
+          : "alleyImage"
+        : cycle[index % cycle.length];
+    const asset = assetCatalog[preferredAssetId];
+    const useCount = useCounts.get(asset.id) ?? 0;
+    useCounts.set(asset.id, useCount + 1);
+    const trackDurationMs = shot.endMs - shot.startMs;
+    const availableStartMs = Math.max(0, (asset.durationMs ?? 0) - trackDurationMs - 80);
+    const sourceStartMs =
+      asset.sourceType === "video" && availableStartMs > 0 ? (useCount * 700) % availableStartMs : 0;
+    return {
+      id: `visual-${String(index + 1).padStart(3, "0")}`,
+      shotId: shot.id,
+      assetId: asset.id,
+      sourceType: asset.sourceType,
+      startMs: shot.startMs,
+      endMs: shot.endMs,
+      sourceStartMs,
+      zoomStart: shot.zoomStart,
+      zoomEnd: shot.zoomEnd,
+      panX: shot.panX,
+      panY: shot.panY,
+      accentColor: chapterStarts.has(shot.startMs) ? "rgba(245,158,11,0.85)" : asset.accentColor,
+    };
+  });
+
+  return {
+    assets: Object.values(assetCatalog),
+    tracks,
+  };
+}
+
+async function buildVisualAssetCatalog() {
+  const [cityVideoDurationMs, alleyVideoDurationMs] = await Promise.all([
+    probeMediaDurationMs(ASSETS.cityVideo),
+    probeMediaDurationMs(ASSETS.alleyVideo),
+  ]);
+
+  return {
+    cityVideo: {
+      id: "cityVideo",
+      sourceType: "video",
+      path: ASSETS.cityVideo,
+      durationMs: cityVideoDurationMs,
+      accentColor: "rgba(59,130,246,0.62)",
+    },
+    alleyVideo: {
+      id: "alleyVideo",
+      sourceType: "video",
+      path: ASSETS.alleyVideo,
+      durationMs: alleyVideoDurationMs,
+      accentColor: "rgba(16,185,129,0.56)",
+    },
+    cityImage: {
+      id: "cityImage",
+      sourceType: "image",
+      path: ASSETS.cityImage,
+      durationMs: null,
+      accentColor: "rgba(96,165,250,0.5)",
+    },
+    alleyImage: {
+      id: "alleyImage",
+      sourceType: "image",
+      path: ASSETS.alleyImage,
+      durationMs: null,
+      accentColor: "rgba(45,212,191,0.46)",
+    },
+  };
+}
+
+function createSubtitlePresentation(timestamps) {
+  let emphasisCount = 0;
+  const items = timestamps.map((item) => {
+    const tokens = createSubtitleTokens(item.text);
+    emphasisCount += tokens.filter((token) => token.kind === "emphasis").length;
+    return {
+      speaker: item.speaker,
+      text: item.text,
+      startMs: item.startMs,
+      endMs: item.endMs,
+      keywordBadge: pickKeywordBadge(tokens),
+      tokens,
+    };
+  });
+
+  return {
+    items,
+    emphasisCount,
+  };
+}
+
+function createSubtitleTokens(text) {
+  const emphasisPattern = /(AivisSpeech|Remotion|FFmpeg|H\.264|AAC|API|[0-9]+(?:\.[0-9]+)?|[ァ-ヶー]{2,})/g;
+  const tokens = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(emphasisPattern)) {
+    const value = match[0];
+    const index = match.index ?? 0;
+    if (cursor < index) {
+      tokens.push({ text: text.slice(cursor, index), kind: "plain" });
+    }
+    const kind = /^[0-9]/.test(value) ? "secondary" : "emphasis";
+    tokens.push({ text: value, kind });
+    cursor = index + value.length;
+  }
+
+  if (cursor < text.length) {
+    tokens.push({ text: text.slice(cursor), kind: "plain" });
+  }
+
+  return tokens.length > 0 ? tokens : [{ text, kind: "plain" }];
+}
+
+function pickKeywordBadge(tokens) {
+  const candidate = tokens.find((token) => token.kind === "emphasis" && token.text.length >= 2);
+  return candidate?.text ?? null;
+}
+
+function createAudioMixPlan({ durationMs, timestamps, chapters, subtitlePresentation, audioMixAssets }) {
+  const bgmWindows = [];
+  let cursor = 0;
+  for (const item of timestamps) {
+    if (cursor < item.startMs) {
+      bgmWindows.push({ startMs: cursor, endMs: item.startMs, volume: 0.14 });
+    }
+    bgmWindows.push({ startMs: item.startMs, endMs: item.endMs, volume: 0.075 });
+    cursor = item.endMs;
+  }
+  if (cursor < durationMs) {
+    bgmWindows.push({ startMs: cursor, endMs: durationMs, volume: 0.14 });
+  }
+
+  const ambientWindows = [{ startMs: 0, endMs: durationMs, volume: 0.03 }];
+  const seCues = [];
+
+  for (const chapter of chapters) {
+    seCues.push({
+      id: `se-transition-${chapter.id}`,
+      kind: "transition",
+      assetKey: "transition",
+      startMs: Math.max(0, chapter.startMs - 120),
+      durationMs: 420,
+      volume: 0.26,
+    });
+  }
+
+  const emphasisItems = subtitlePresentation.items.filter((item) => item.keywordBadge).slice(0, 4);
+  for (const [index, item] of emphasisItems.entries()) {
+    seCues.push({
+      id: `se-accent-${String(index + 1).padStart(2, "0")}`,
+      kind: "accent",
+      assetKey: "accent",
+      startMs: Math.min(durationMs - 380, item.startMs + 180),
+      durationMs: 320,
+      volume: 0.2,
+    });
+  }
+
+  return {
+    bgmWindows,
+    ambientWindows,
+    seCues,
+    assets: {
+      bgmPath: ASSETS.music,
+      ambientPath: audioMixAssets.ambientPath,
+      accentPath: audioMixAssets.accentPath,
+      transitionPath: audioMixAssets.transitionPath,
+    },
+  };
+}
+
+async function prepareRemotionAudioAssets({ runDir, durationMs }) {
+  const durationSec = Math.max(1, durationMs / 1000);
+  const ambientPath = path.join(runDir, "ambient.wav");
+  const accentPath = path.join(runDir, "accent.wav");
+  const transitionPath = path.join(runDir, "transition.wav");
+
+  // Remotion での多層ミックス用に短いSEと環境音を生成する。
   await runCommand(
     "ffmpeg",
     [
       "-y",
+      "-f",
+      "lavfi",
       "-i",
-      baseVisualPath,
-      "-i",
-      "narration.wav",
-      "-stream_loop",
-      "-1",
-      "-i",
-      ASSETS.music,
-      "-filter_complex",
-      `[0:v]ass=subtitles.ass[v];[1:a]apad=pad_dur=2.2[narr];[2:a]volume=0.085,atrim=0:${targetDuration.toFixed(
-        3
-      )}[music];[narr][music]amix=inputs=2:duration=first:dropout_transition=1,alimiter=limit=0.95[a]`,
-      "-map",
-      "[v]",
-      "-map",
-      "[a]",
-      "-t",
-      targetDuration.toFixed(3),
-      "-c:v",
-      "libx264",
-      "-preset",
-      "slow",
-      "-crf",
-      "18",
-      "-pix_fmt",
-      "yuv420p",
+      `anoisesrc=color=pink:sample_rate=48000:duration=${durationSec.toFixed(3)}`,
+      "-af",
+      "highpass=f=120,lowpass=f=1800",
       "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-      "-movflags",
-      "+faststart",
-      previewPath,
+      "pcm_s16le",
+      ambientPath,
+    ],
+    runDir
+  );
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=960:sample_rate=48000:duration=0.320",
+      "-af",
+      "afade=t=out:st=0.12:d=0.20",
+      "-c:a",
+      "pcm_s16le",
+      accentPath,
+    ],
+    runDir
+  );
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=420:sample_rate=48000:duration=0.420",
+      "-af",
+      "afade=t=in:st=0:d=0.06,afade=t=out:st=0.22:d=0.20",
+      "-c:a",
+      "pcm_s16le",
+      transitionPath,
     ],
     runDir
   );
 
-  const compositionPath = path.join(runDir, "composition.json");
-  await writeJson(compositionPath, {
-    renderer: "ffmpeg",
-    frameRate: FRAME_RATE,
-    width: WIDTH,
-    height: HEIGHT,
-    targetDurationSec: targetDuration,
-    assets: Object.fromEntries(
-      Object.entries(ASSETS).map(([key, assetPath]) => [
-        key,
-        path.relative(WORKSPACE_ROOT, assetPath).replaceAll("\\", "/"),
-      ])
-    ),
-  });
-  await syncLatest(runDir);
-  await writeWorkflowLog(logPath, "step_completed", {
-    stepName: "video_composition",
-    previewPath,
-    targetDuration,
-  });
-  return { runDir, previewPath, baseVisualPath, compositionPath, targetDuration };
+  return { ambientPath, accentPath, transitionPath };
 }
 
-async function createVisualSegments(runDir, targetDuration, logPath) {
-  const segmentPlan = buildSegmentPlan(targetDuration);
-  const segmentPaths = [];
-  for (let index = 0; index < segmentPlan.length; index += 1) {
-    const segment = segmentPlan[index];
-    const outputPath = path.join(runDir, `segment-${String(index + 1).padStart(2, "0")}.mp4`);
-    if (segment.kind === "image") {
-      const frames = Math.max(1, Math.round(segment.duration * FRAME_RATE));
-      await runCommand(
-        "ffmpeg",
-        [
-          "-y",
-          "-loop",
-          "1",
-          "-i",
-          segment.source,
-          "-vf",
-          `scale=${WIDTH}:${HEIGHT},zoompan=z='min(zoom+0.00065,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${WIDTH}x${HEIGHT}:fps=${FRAME_RATE},format=yuv420p`,
-          "-frames:v",
-          String(frames),
-          "-an",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "veryfast",
-          "-crf",
-          "18",
-          "-pix_fmt",
-          "yuv420p",
-          outputPath,
-        ],
-        runDir
-      );
-    } else {
-      await runCommand(
-        "ffmpeg",
-        [
-          "-y",
-          "-stream_loop",
-          "-1",
-          "-i",
-          segment.source,
-          "-t",
-          segment.duration.toFixed(3),
-          "-vf",
-          `scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},fps=${FRAME_RATE},format=yuv420p`,
-          "-an",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "veryfast",
-          "-crf",
-          "18",
-          "-pix_fmt",
-          "yuv420p",
-          outputPath,
-        ],
-        runDir
-      );
-    }
-    segmentPaths.push(outputPath);
-    await writeWorkflowLog(logPath, "visual_segment_completed", {
-      index,
-      kind: segment.kind,
-      duration: segment.duration,
-      outputPath,
-    });
+async function renderWithRemotion({
+  outputPath,
+  title,
+  theme,
+  durationMs,
+  audioPath,
+  subtitleTracks,
+  shotPlan,
+  visualPlan,
+  subtitlePresentation,
+  audioMixPlan,
+  chapterPlan,
+}) {
+  const assetRoutes = {
+    "/audio.wav": audioPath,
+    "/bgm.mp3": audioMixPlan.assets.bgmPath,
+    "/ambient.wav": audioMixPlan.assets.ambientPath,
+    "/accent.wav": audioMixPlan.assets.accentPath,
+    "/transition.wav": audioMixPlan.assets.transitionPath,
+  };
+  for (const asset of visualPlan.assets) {
+    assetRoutes[`/visual/${asset.id}${path.extname(asset.path)}`] = asset.path;
   }
-  return segmentPaths;
-}
 
-function buildSegmentPlan(targetDuration) {
-  const raw = [
-    { kind: "image", source: ASSETS.cityImage, weight: 0.18 },
-    { kind: "video", source: ASSETS.cityVideo, weight: 0.18 },
-    { kind: "image", source: ASSETS.alleyImage, weight: 0.2 },
-    { kind: "video", source: ASSETS.alleyVideo, weight: 0.18 },
-    { kind: "image", source: ASSETS.cityImage, weight: 0.14 },
-    { kind: "video", source: ASSETS.cityVideo, weight: 0.12 },
-  ];
-  const durations = raw.map((item) => Math.max(5, Math.round(targetDuration * item.weight)));
-  const delta = targetDuration - durations.reduce((sum, duration) => sum + duration, 0);
-  durations[durations.length - 1] += delta;
-  return raw.map((item, index) => ({ ...item, duration: durations[index] }));
+  const assetServer = await startAssetServer(assetRoutes);
+  try {
+    const [{ bundle }, { selectComposition, renderMedia }] = await Promise.all([
+      importWorkspacePackage("@remotion/bundler"),
+      importWorkspacePackage("@remotion/renderer"),
+    ]);
+    const entryPoint = path.join(WORKSPACE_ROOT, "packages", "remotion", "src", "index.tsx");
+    const serveUrl = await bundle({
+      entryPoint,
+      onProgress: () => undefined,
+    });
+    const inputProps = {
+      title,
+      theme,
+      durationMs,
+      audioPath: assetServer.urls["/audio.wav"],
+      subtitleTracks,
+      shotPlan,
+      visualPlan: {
+        assets: visualPlan.assets.map((asset) => ({
+          ...asset,
+          path: assetServer.urls[`/visual/${asset.id}${path.extname(asset.path)}`],
+        })),
+        tracks: visualPlan.tracks,
+      },
+      subtitlePresentation,
+      audioMixPlan: {
+        ...audioMixPlan,
+        assets: {
+          bgmPath: assetServer.urls["/bgm.mp3"],
+          ambientPath: assetServer.urls["/ambient.wav"],
+          accentPath: assetServer.urls["/accent.wav"],
+          transitionPath: assetServer.urls["/transition.wav"],
+        },
+      },
+      chapterPlan,
+    };
+    const composition = await selectComposition({
+      serveUrl,
+      id: "YmmComposition",
+      inputProps,
+    });
+    await renderMedia({
+      codec: "h264",
+      serveUrl,
+      composition,
+      outputLocation: outputPath,
+      inputProps,
+      logLevel: "error",
+    });
+  } finally {
+    await assetServer.close();
+  }
 }
 
 async function encodeFinal(projectRoot, runId, previewPath, logPath) {
@@ -587,7 +1045,7 @@ async function encodeFinal(projectRoot, runId, previewPath, logPath) {
   return { runDir, finalPath, finalCopyPath };
 }
 
-async function verifyFinal(finalPath, logPath) {
+async function verifyFinal(finalPath, logPath, profileConfig) {
   const durationSec = await probeDurationSec(finalPath);
   const media = await probeMedia(finalPath);
   const stat = await fs.stat(finalPath);
@@ -602,7 +1060,10 @@ async function verifyFinal(finalPath, logPath) {
     width: video?.width,
     height: video?.height,
   };
-  if (verification.durationSec < 60 || verification.durationSec > 120) {
+  if (
+    verification.durationSec < profileConfig.durationRangeSec.min ||
+    verification.durationSec > profileConfig.durationRangeSec.max
+  ) {
     throw new Error(`Final duration is out of range: ${verification.durationSec}s`);
   }
   if (verification.videoCodec !== "h264" || verification.audioCodec !== "aac") {
@@ -613,11 +1074,32 @@ async function verifyFinal(finalPath, logPath) {
   if (verification.width !== WIDTH || verification.height !== HEIGHT) {
     throw new Error(`Unexpected resolution: ${verification.width}x${verification.height}`);
   }
-  if (verification.sizeBytes < 5_000_000) {
+  if (verification.sizeBytes < profileConfig.minimumSizeBytes) {
     throw new Error(`Final video is too small: ${verification.sizeBytes} bytes`);
   }
   await writeWorkflowLog(logPath, "verification_completed", verification);
   return verification;
+}
+
+async function waitForAivisReady(baseUrl, logPath) {
+  const startedAt = Date.now();
+  const deadlineMs = 90_000;
+  while (Date.now() - startedAt < deadlineMs) {
+    try {
+      const response = await fetch(`${baseUrl}/speakers`);
+      if (response.ok) {
+        await writeWorkflowLog(logPath, "aivis_ready", {
+          baseUrl,
+          elapsedMs: Date.now() - startedAt,
+        });
+        return;
+      }
+    } catch {
+      // 起動途中は接続エラーが返るため、一定時間は待機する。
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  throw new Error(`AivisSpeech did not become ready within ${deadlineMs}ms: ${baseUrl}`);
 }
 
 async function prepareStepDir(projectRoot, stepName, runId) {
@@ -633,7 +1115,10 @@ async function syncLatest(runDir) {
 }
 
 function selectStyleId(catalog, speaker) {
-  const preferred = speaker === "魔理沙" ? ["テンション高め", "上機嫌", "通常"] : ["ノーマル", "通常", "落ち着き"];
+  const preferred =
+    speaker === "魔理沙"
+      ? ["テンション高め", "上機嫌", "通常"]
+      : ["ノーマル", "通常", "落ち着き"];
   for (const name of preferred) {
     const match = catalog.find((item) => item.styleName.includes(name));
     if (match) {
@@ -643,35 +1128,34 @@ function selectStyleId(catalog, speaker) {
   return catalog[0].styleId;
 }
 
-function createAss(timestamps) {
-  // ASS字幕に章タイトルも同居させ、映像合成時の文字入れを一箇所で管理する。
+function createAss(timestamps, profileConfig) {
   const events = [];
   events.push(
     dialogue({
       layer: 2,
       startMs: 250,
-      endMs: 6400,
+      endMs: 5400,
       style: "Title",
-      text: `${SCRIPT.title}\\N{\\fs50}${SCRIPT.theme}`,
+      text: `${profileConfig.script.title}\\N{\\fs50}${profileConfig.script.theme}`,
     })
   );
   events.push(
     dialogue({
       layer: 2,
       startMs: 800,
-      endMs: 6400,
+      endMs: 5400,
       style: "Note",
-      text: "台本  音声  字幕  映像  検証",
+      text: "台本  音声  字幕  Remotion  検証",
     })
   );
 
-  for (const chapter of CHAPTERS) {
+  for (const chapter of profileConfig.chapters) {
     const startMs = Math.max(0, timestamps[chapter.lineIndex]?.startMs ?? 0);
     events.push(
       dialogue({
         layer: 1,
         startMs,
-        endMs: startMs + 3600,
+        endMs: startMs + 3200,
         style: "Chapter",
         text: chapter.title,
       })
@@ -741,7 +1225,11 @@ function wrapJapanese(text, width) {
 }
 
 function escapeAss(text) {
-  return text.replaceAll("{", "\\{").replaceAll("}", "\\}").replaceAll("\r", " ").replaceAll("\n", "\\N");
+  return text
+    .replaceAll("{", "\\{")
+    .replaceAll("}", "\\}")
+    .replaceAll("\r", " ")
+    .replaceAll("\n", "\\N");
 }
 
 async function fetchJson(url, init) {
@@ -781,6 +1269,11 @@ async function probeDurationSec(targetPath) {
   return duration;
 }
 
+async function probeMediaDurationMs(targetPath) {
+  const durationSec = await probeDurationSec(targetPath);
+  return Math.max(1, Math.round(durationSec * 1000));
+}
+
 async function probeMedia(targetPath) {
   const stdout = await runCommand(
     "ffprobe",
@@ -806,6 +1299,136 @@ async function writeJson(targetPath, payload) {
 
 function toFfmpegPath(targetPath) {
   return targetPath.replaceAll("\\", "/").replaceAll("'", "'\\''");
+}
+
+function toRelativeWorkspacePath(targetPath) {
+  return path.relative(WORKSPACE_ROOT, targetPath).replaceAll("\\", "/");
+}
+
+async function importWorkspacePackage(packageName) {
+  const pnpmRoot = path.join(WORKSPACE_ROOT, "node_modules", ".pnpm");
+  const packagePrefix = `${packageName.replace("/", "+")}@`;
+  const entries = await fs.readdir(pnpmRoot, { withFileTypes: true });
+  const matched = entries.find(
+    (entry) => entry.isDirectory() && entry.name.startsWith(packagePrefix)
+  );
+  if (!matched) {
+    throw new Error(`Package was not found in pnpm store: ${packageName}`);
+  }
+  const entryPath = path.join(
+    pnpmRoot,
+    matched.name,
+    "node_modules",
+    ...packageName.split("/"),
+    "dist",
+    "index.js"
+  );
+  return import(pathToFileURL(entryPath).href);
+}
+
+async function startAssetServer(assetRoutes) {
+  const server = createServer((request, response) => {
+    const requestPath = request.url ? request.url.split("?")[0] : "/";
+    const targetPath = assetRoutes[requestPath];
+    if (!targetPath) {
+      response.statusCode = 404;
+      response.end("not found");
+      return;
+    }
+
+    serveStaticAsset({ request, response, targetPath }).catch(() => {
+      response.statusCode = 500;
+      response.end("failed to read asset");
+    });
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine temporary asset server address.");
+  }
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  return {
+    urls: Object.fromEntries(
+      Object.keys(assetRoutes).map((routePath) => [routePath, `${baseUrl}${routePath}`])
+    ),
+    close: async () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      }),
+  };
+}
+
+async function serveStaticAsset({ request, response, targetPath }) {
+  const stat = await fs.stat(targetPath);
+  const contentType = guessContentType(targetPath);
+  const rangeHeader = request.headers.range;
+  response.setHeader("Content-Type", contentType);
+  response.setHeader("Accept-Ranges", "bytes");
+
+  if (!rangeHeader) {
+    response.statusCode = 200;
+    response.setHeader("Content-Length", stat.size);
+    createReadStream(targetPath).pipe(response);
+    return;
+  }
+
+  const match = /^bytes=(\d+)-(\d+)?$/.exec(rangeHeader);
+  if (!match) {
+    response.statusCode = 416;
+    response.end();
+    return;
+  }
+
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : stat.size - 1;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || end >= stat.size) {
+    response.statusCode = 416;
+    response.end();
+    return;
+  }
+
+  response.statusCode = 206;
+  response.setHeader("Content-Length", end - start + 1);
+  response.setHeader("Content-Range", `bytes ${start}-${end}/${stat.size}`);
+  createReadStream(targetPath, { start, end }).pipe(response);
+}
+
+function guessContentType(targetPath) {
+  const extension = path.extname(targetPath).toLowerCase();
+  if (extension === ".wav") {
+    return "audio/wav";
+  }
+  if (extension === ".mp3") {
+    return "audio/mpeg";
+  }
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  if (extension === ".mp4") {
+    return "video/mp4";
+  }
+  return "application/octet-stream";
 }
 
 async function runCommand(command, commandArgs, cwd) {

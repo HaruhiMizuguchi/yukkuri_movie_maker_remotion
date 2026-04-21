@@ -28,6 +28,8 @@
 - 2026-04-21: `subtitle-presentation.json` を追加し、重要語・英字語・数字の強調表示とキーワードバッジを Remotion 字幕へ反映
 - 2026-04-21: `audio-mix-plan.json` と簡易BGM/環境音/SE生成を追加し、Remotion 側でダッキングとSE差し込みを実装
 - 2026-04-21: `chapter-plan.json` を追加し、章見出し帯と短尺フラッシュ/スライドのトランジションを Remotion 演出へ反映
+- 2026-04-21: 実生成ショーケース `scripts/generateBestAvailableVideo.mjs` を Remotion 正規経路へ移行し、`visual-plan.json` と AivisSpeech 実接続の smoke 実生成テストを追加
+- 2026-04-21: Remotion 版ショーケースの本番プロファイルを実行し、`outputs/production_runs/run-20260421-214420-055/` に 101秒・1920x1080・H.264/AAC の完成MP4を生成
 
 ---
 
@@ -146,6 +148,9 @@
 - [x] AivisSpeech実接続で音声を生成し、実測尺から字幕を作成
 - [x] 既存高解像度素材とBGMを使い、FFmpegで字幕焼き込み・BGMミックス・H.264/AAC最終エンコードを実行
 - [x] `outputs/production_runs/run-20260420-205959-832/projects/best-available-run-20260420-205959-832/final/final.mp4` を検証済み成果物として生成（105秒、1920x1080、H.264/AAC、102,765,593 bytes）
+- [x] ショーケース経路の `video_composition` を Remotion 正規経路へ移行し、`visual-plan.json` とショット単位の素材切り替えを追加
+- [x] `tests/generateBestAvailableVideo.test.ts` に AivisSpeech 実接続の smoke 実生成を追加し、Remotion `composition.json` / `workflow.log` / 最終MP4を検証
+- [x] `outputs/production_runs/run-20260421-214420-055/projects/best-available-run-20260421-214420-055/final/final.mp4` を Remotion 版ショーケース成果物として生成（101秒、1920x1080、H.264/AAC、110,903,245 bytes）
 
 ---
 

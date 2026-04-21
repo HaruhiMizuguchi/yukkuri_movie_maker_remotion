@@ -1,5 +1,13 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Audio,
+  Img,
+  OffthreadVideo,
+  Sequence,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 
 export type SubtitleTrack = {
   startMs: number;
@@ -85,6 +93,30 @@ export type ChapterPlan = {
   }>;
 };
 
+export type VisualPlan = {
+  assets: Array<{
+    id: string;
+    sourceType: "image" | "video";
+    path: string;
+    durationMs: number | null;
+    accentColor?: string;
+  }>;
+  tracks: Array<{
+    id: string;
+    shotId: string;
+    assetId: string;
+    sourceType: "image" | "video";
+    startMs: number;
+    endMs: number;
+    sourceStartMs: number;
+    zoomStart: number;
+    zoomEnd: number;
+    panX: number;
+    panY: number;
+    accentColor?: string;
+  }>;
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
@@ -94,6 +126,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   subtitlePresentation?: SubtitlePresentationPlan;
   audioMixPlan?: AudioMixPlan;
   chapterPlan?: ChapterPlan;
+  visualPlan?: VisualPlan;
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -127,6 +160,10 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   },
   chapterPlan = {
     chapters: [],
+  },
+  visualPlan = {
+    assets: [],
+    tracks: [],
   },
   audioPath,
   backgroundImagePath,
@@ -191,6 +228,10 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   const shotProgress = currentShot
     ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
     : 0;
+  const visualAssetMap = useMemo(
+    () => new Map(visualPlan.assets.map((asset) => [asset.id, asset])),
+    [visualPlan.assets]
+  );
   const backgroundScale = currentShot
     ? currentShot.zoomStart + (currentShot.zoomEnd - currentShot.zoomStart) * shotProgress
     : 1;
@@ -214,7 +255,28 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
-      {backgroundImagePath ? (
+      {visualPlan.tracks.length > 0 ? (
+        <>
+          {visualPlan.tracks.map((track) => {
+            const asset = visualAssetMap.get(track.assetId);
+            if (!asset) {
+              return null;
+            }
+            return (
+              <Sequence
+                key={track.id}
+                from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
+                durationInFrames={Math.max(
+                  1,
+                  Math.ceil(((track.endMs - track.startMs) / 1000) * fps)
+                )}
+              >
+                <VisualTrackLayer asset={asset} track={track} />
+              </Sequence>
+            );
+          })}
+        </>
+      ) : backgroundImagePath ? (
         <Img
           src={backgroundImagePath}
           style={{
@@ -467,6 +529,63 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         );
       })}
       {audioPath ? <Audio src={audioPath} /> : null}
+    </AbsoluteFill>
+  );
+};
+
+const VisualTrackLayer: React.FC<{
+  asset: VisualPlan["assets"][number];
+  track: VisualPlan["tracks"][number];
+}> = ({ asset, track }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const durationFrames = Math.max(1, Math.ceil(((track.endMs - track.startMs) / 1000) * fps));
+  const progress = durationFrames <= 1 ? 0 : frame / (durationFrames - 1);
+  const scale = track.zoomStart + (track.zoomEnd - track.zoomStart) * progress;
+  const translateX = track.panX * 240;
+  const translateY = track.panY * 180;
+  const style: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+    transformOrigin: "center center",
+    filter: "saturate(1.06) contrast(1.04)",
+  };
+
+  return (
+    <AbsoluteFill>
+      {asset.sourceType === "video" ? (
+        <OffthreadVideo
+          src={asset.path}
+          muted
+          trimBefore={Math.max(0, Math.floor((track.sourceStartMs / 1000) * fps))}
+          style={style}
+        />
+      ) : (
+        <Img src={asset.path} style={style} />
+      )}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(15,23,42,0.24) 0%, rgba(15,23,42,0.06) 34%, rgba(15,23,42,0.46) 100%)",
+        }}
+      />
+      {track.accentColor ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `radial-gradient(circle at 18% 18%, ${track.accentColor} 0%, transparent 44%)`,
+            mixBlendMode: "screen",
+            opacity: 0.72,
+          }}
+        />
+      ) : null}
     </AbsoluteFill>
   );
 };

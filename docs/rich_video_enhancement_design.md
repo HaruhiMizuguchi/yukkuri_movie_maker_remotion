@@ -35,6 +35,7 @@
 ### 2. Remotion 側
 - `packages/remotion/src/yukkuri/YmmComposition.tsx` をリッチ化し、次を描画する
   - 背景のズーム/パン
+  - ショットごとの画像/動画素材切り替え
   - キャラクターの位置・スケール・口パク・まばたき・表情
   - 字幕の色替え・ハイライト・ポップ表示
   - 章トランジションの帯・フラッシュ・見出し
@@ -57,11 +58,13 @@
 - `video_composition` の正式 renderer を `remotion` にする
 - `disableRemotion` 指定時のみ FFmpeg 合成を許可する
 - Remotion 入力 props を組み立てる純関数を用意し、描画ロジックと I/O を分離する
+- 実生成ショーケースでは `visual-plan.json` を追加し、画像/動画素材の切り替えとトリミング開始位置を props 化する
 
 #### テスト設計
 - Unit: Remotion 入力 props に必要な各計画が統合されること
 - Integration: `video_composition` 実行で `composition.json.renderer === "remotion"` になること
 - Regression: `preview.mp4` が生成され、`ffprobe` で映像・音声ストリームが確認できること
+- Real: `tests/generateBestAvailableVideo.test.ts` から AivisSpeech 実接続の smoke 実生成を走らせ、`visual-plan.json` / `composition.json` / `workflow.log` / `final.mp4` を検証する
 
 ### B. 自動ショット割り
 #### 設計
@@ -136,5 +139,6 @@
 
 ## リスク
 - Remotion 側の依存解決が崩れると `video_composition` の正規経路が停止する
+- `node` 直実行スクリプトでは pnpm 仮想ストア配下の依存が通常 import で見つからない場合があるため、CLI 経路では実体パス解決が必要
 - 音響演出は素材不在時に見た目だけ豪華で音が破綻する可能性があるため、フォールバック素材生成が必要
 - 字幕強調やトランジションを盛りすぎると可読性が落ちるため、上限値を設ける
