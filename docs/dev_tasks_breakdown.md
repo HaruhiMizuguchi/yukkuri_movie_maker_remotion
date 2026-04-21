@@ -20,6 +20,8 @@
 - 2026-04-16: カスタマージャーニーE2E/ビジュアル回帰の環境整備に着手
 - 2026-04-16: PlaywrightでGUI顧客導線E2Eを追加し、スクリーンショット/AI視覚レビュー用マニフェストを `outputs/test_evidence/customer_journey/` に保存する構成を追加
 - 2026-04-17: 良品スクリーンショットとの差分判定スクリプト、実API/DB/Worker用Playwright E2E、DB前提診断、Docker Compose定義、型検査ゲートを追加
+- 2026-04-20: 現環境で利用可能な最高品質寄りの実生成として、AivisSpeech実接続・既存高解像度素材・FFmpeg合成/再エンコードを通す `scripts/generateBestAvailableVideo.mjs` を追加し、105秒の完成MP4を `outputs/production_runs/run-20260420-205959-832/` に生成
+- 2026-04-21: リッチ動画化の設計メモを `docs/rich_video_enhancement_design.md` に追加し、Remotion優先の演出基盤・ショット割り・口パク/表情・字幕強調・音響演出・章トランジションの実装計画を定義
 
 ---
 
@@ -128,3 +130,25 @@
 - [x] PostgreSQL前提診断とDocker Compose起動手順を追加
 - [ ] 実API E2Eをこの端末で完走確認（現状はPostgreSQL/Docker daemon未起動でpreflight停止）
 - [ ] 実API E2E用DBのテストデータ破棄を自動化
+
+---
+
+## 10. 実生成ショーケース
+- [x] 生成前に利用可能なAPI/素材/FFmpegを確認（AivisSpeechは手動起動後に `/speakers` がHTTP 200、GeminiはHTTP 429クォータ枯渇、OpenAIはHTTP 401）
+- [x] 1〜2分の本番寄り動画を生成する `scripts/generateBestAvailableVideo.mjs` を追加
+- [x] ドライラン計画のVitestを追加し、台本行数・縦串ステップ・必須素材を検証
+- [x] AivisSpeech実接続で音声を生成し、実測尺から字幕を作成
+- [x] 既存高解像度素材とBGMを使い、FFmpegで字幕焼き込み・BGMミックス・H.264/AAC最終エンコードを実行
+- [x] `outputs/production_runs/run-20260420-205959-832/projects/best-available-run-20260420-205959-832/final/final.mp4` を検証済み成果物として生成（105秒、1920x1080、H.264/AAC、102,765,593 bytes）
+
+---
+
+## 11. リッチ動画化（Remotion優先）
+- [x] リッチ動画化の設計メモを追加し、機能別の設計・テスト方針・実装順を整理
+- [ ] `video_composition` を Remotion 優先の正規経路へ移行し、演出ロジックを Remotion props 化
+- [ ] 台本と字幕タイミングから自動ショット割りを生成し、`shot-plan.json` として保存
+- [ ] 口パク・まばたき・表情切替の演技計画を生成し、立ち絵描画に反映
+- [ ] キーワード強調、補助ラベル、ポップ表現を含む字幕表示計画を追加
+- [ ] SE・環境音・BGMダッキングを Remotion 側の音量カーブで実装
+- [ ] 章見出しと短尺トランジションを追加
+- [ ] 追加演出の observability を `composition.json` と `workflow.log` に記録
