@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
+import { createCharacterPerformancePlan } from "./characterPerformance";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
@@ -303,18 +304,24 @@ export function createDefaultWorkflowImplementations(
       const script = ScriptSchema.parse(await readJson(scriptPath));
       const subtitleTracks = (await readJson(subtitlesJsonPath)) as ScriptTimestamp[];
       const shotPlan = createShotPlan({ script, timestamps: subtitleTracks });
+      const characterPerformance = createCharacterPerformancePlan({
+        script,
+        timestamps: subtitleTracks,
+      });
 
       const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
       const subtitlesCopyPath = path.join(stepDir.runDir, "subtitles.ass");
       const compositionJsonPath = path.join(stepDir.runDir, "composition.json");
       const shotPlanPath = path.join(stepDir.runDir, "shot-plan.json");
+      const characterPerformancePath = path.join(stepDir.runDir, "character-performance.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
       await Promise.all([
         fs.copyFile(audioPath, audioCopyPath),
         fs.copyFile(subtitlesAssPath, subtitlesCopyPath),
         writeJson(shotPlanPath, shotPlan),
+        writeJson(characterPerformancePath, characterPerformance),
       ]);
       const visualAssets = await prepareTask3VisualAssets({
         projectRoot,
@@ -336,6 +343,7 @@ export function createDefaultWorkflowImplementations(
           characterImagePath: visualAssets.characterRenderPath,
           subtitleTracks,
           shotPlan,
+          characterPerformance,
           durationMs,
           title: "ゆっくり解説MVP",
           theme: details.theme,
@@ -358,13 +366,18 @@ export function createDefaultWorkflowImplementations(
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
         shotCount: shotPlan.length,
+        characterCueCount:
+          characterPerformance.mouthCues.length +
+          characterPerformance.blinkCues.length +
+          characterPerformance.expressionCues.length,
       });
       await syncLatest(stepDir);
 
-      const [previewStat, compositionStat, shotPlanStat] = await Promise.all([
+      const [previewStat, compositionStat, shotPlanStat, characterPerformanceStat] = await Promise.all([
         fs.stat(previewPath),
         fs.stat(compositionJsonPath),
         fs.stat(shotPlanPath),
+        fs.stat(characterPerformancePath),
       ]);
       await registerProjectFiles({
         prisma: ctx.prisma,
@@ -393,6 +406,13 @@ export function createDefaultWorkflowImplementations(
             fileSizeBytes: shotPlanStat.size,
             kind: "shot_plan",
           },
+          {
+            type: "metadata",
+            relativePath: toRelativePath(outputRoot, characterPerformancePath),
+            fileCategory: "intermediate",
+            fileSizeBytes: characterPerformanceStat.size,
+            kind: "character_performance",
+          },
         ],
       });
       await appendStepLog(projectRoot, "video_composition", {
@@ -402,12 +422,20 @@ export function createDefaultWorkflowImplementations(
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
         shotCount: shotPlan.length,
+        characterCueCount:
+          characterPerformance.mouthCues.length +
+          characterPerformance.blinkCues.length +
+          characterPerformance.expressionCues.length,
       });
 
       logger.info("video_composition completed", {
         previewPath,
         renderer: usingRemotion ? "remotion" : "ffmpeg",
         shotCount: shotPlan.length,
+        characterCueCount:
+          characterPerformance.mouthCues.length +
+          characterPerformance.blinkCues.length +
+          characterPerformance.expressionCues.length,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
@@ -415,6 +443,10 @@ export function createDefaultWorkflowImplementations(
         characterImagePath: visualAssets.characterSourceRelativePath,
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
         shotCount: shotPlan.length,
+        characterCueCount:
+          characterPerformance.mouthCues.length +
+          characterPerformance.blinkCues.length +
+          characterPerformance.expressionCues.length,
       };
     },
     final_encoding: async (ctx) => {
@@ -746,6 +778,7 @@ const renderWithRemotion = async ({
   characterImagePath,
   subtitleTracks,
   shotPlan,
+  characterPerformance,
   durationMs,
   title,
   theme,
@@ -769,6 +802,16 @@ const renderWithRemotion = async ({
     panX: number;
     panY: number;
   }>;
+  characterPerformance: {
+    mouthCues: Array<{ startMs: number; endMs: number; openness: number; speaker: string }>;
+    blinkCues: Array<{ startMs: number; endMs: number }>;
+    expressionCues: Array<{
+      startMs: number;
+      endMs: number;
+      expression: "normal" | "happy" | "serious" | "surprised";
+      speaker: string;
+    }>;
+  };
   durationMs: number;
   title: string;
   theme: string;
@@ -794,6 +837,7 @@ const renderWithRemotion = async ({
       theme,
       subtitleTracks,
       shotPlan,
+      characterPerformance,
       durationMs,
       audioPath: assetServer.urls.audioPath,
       backgroundImagePath: assetServer.urls.backgroundImagePath,

@@ -21,11 +21,31 @@ export type ShotPlanItem = {
   panY: number;
 };
 
+export type CharacterPerformancePlan = {
+  mouthCues: Array<{
+    startMs: number;
+    endMs: number;
+    openness: number;
+    speaker: string;
+  }>;
+  blinkCues: Array<{
+    startMs: number;
+    endMs: number;
+  }>;
+  expressionCues: Array<{
+    startMs: number;
+    endMs: number;
+    expression: "normal" | "happy" | "serious" | "surprised";
+    speaker: string;
+  }>;
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
   shotPlan?: ShotPlanItem[];
+  characterPerformance?: CharacterPerformancePlan;
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -37,6 +57,11 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   theme,
   subtitleTracks,
   shotPlan = [],
+  characterPerformance = {
+    mouthCues: [],
+    blinkCues: [],
+    expressionCues: [],
+  },
   audioPath,
   backgroundImagePath,
   characterImagePath,
@@ -56,6 +81,27 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
     () => shotPlan.find((shot) => currentMs >= shot.startMs && currentMs < shot.endMs) ?? null,
     [currentMs, shotPlan]
   );
+  const currentMouthCue = useMemo(
+    () =>
+      characterPerformance.mouthCues.find(
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+      ) ?? null,
+    [characterPerformance.mouthCues, currentMs]
+  );
+  const currentBlinkCue = useMemo(
+    () =>
+      characterPerformance.blinkCues.find(
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+      ) ?? null,
+    [characterPerformance.blinkCues, currentMs]
+  );
+  const currentExpressionCue = useMemo(
+    () =>
+      characterPerformance.expressionCues.find(
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+      ) ?? null,
+    [characterPerformance.expressionCues, currentMs]
+  );
   const shotProgress = currentShot
     ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
     : 0;
@@ -67,6 +113,9 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   const characterScale =
     currentShot?.type === "close" ? 1.08 : currentShot?.type === "wide" ? 0.96 : 1.02;
   const characterTranslateX = currentShot ? currentShot.panX * 120 : 0;
+  const speakingBounce = currentMouthCue ? -8 : 0;
+  const mouthScale = currentMouthCue ? 0.5 + currentMouthCue.openness : 0;
+  const expressionStyle = getExpressionStyle(currentExpressionCue?.expression ?? "normal");
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
@@ -89,18 +138,79 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         />
       )}
       {characterImagePath ? (
-        <Img
-          src={characterImagePath}
+        <div
           style={{
             position: "absolute",
             right: 60,
             bottom: 0,
             width: 540,
             height: 860,
-            objectFit: "contain",
-            transform: `translateX(${characterTranslateX}px) scale(${characterScale})`,
+            transform: `translate(${characterTranslateX}px, ${speakingBounce}px) scale(${characterScale})`,
           }}
-        />
+        >
+          <Img
+            src={characterImagePath}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: expressionStyle.filter,
+              opacity: currentBlinkCue ? 0.95 : 1,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 24,
+              borderRadius: 24,
+              boxShadow: expressionStyle.glow,
+              opacity: 0.85,
+            }}
+          />
+          {currentMouthCue ? (
+            <div
+              style={{
+                position: "absolute",
+                left: "47%",
+                top: "50%",
+                width: 54,
+                height: 20,
+                marginLeft: -27,
+                borderRadius: 999,
+                backgroundColor: "rgba(255,255,255,0.78)",
+                boxShadow: "0 0 18px rgba(255,255,255,0.32)",
+                transform: `scaleY(${mouthScale})`,
+                transformOrigin: "center center",
+              }}
+            />
+          ) : null}
+          {currentBlinkCue ? (
+            <>
+              <div
+                style={{
+                  position: "absolute",
+                  left: "33%",
+                  top: "24%",
+                  width: 62,
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: "rgba(15,23,42,0.82)",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  left: "57%",
+                  top: "24%",
+                  width: 62,
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: "rgba(15,23,42,0.82)",
+                }}
+              />
+            </>
+          ) : null}
+        </div>
       ) : null}
       <div
         style={{
@@ -146,4 +256,29 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
       {audioPath ? <Audio src={audioPath} /> : null}
     </AbsoluteFill>
   );
+};
+
+const getExpressionStyle = (expression: "normal" | "happy" | "serious" | "surprised") => {
+  if (expression === "happy") {
+    return {
+      filter: "saturate(1.08) brightness(1.02)",
+      glow: "0 0 36px rgba(250, 204, 21, 0.35)",
+    };
+  }
+  if (expression === "serious") {
+    return {
+      filter: "saturate(0.92) contrast(1.05)",
+      glow: "0 0 30px rgba(59, 130, 246, 0.3)",
+    };
+  }
+  if (expression === "surprised") {
+    return {
+      filter: "saturate(1.15) brightness(1.05)",
+      glow: "0 0 38px rgba(248, 113, 113, 0.36)",
+    };
+  }
+  return {
+    filter: "none",
+    glow: "0 0 18px rgba(255,255,255,0.14)",
+  };
 };

@@ -121,14 +121,29 @@ describe("video composition remotion", () => {
     const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
     const previewPath = path.join(projectRoot, "output", "video_composition", "latest", "preview.mp4");
     const shotPlanPath = path.join(projectRoot, "output", "video_composition", "latest", "shot-plan.json");
+    const characterPerformancePath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "character-performance.json"
+    );
     const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
       renderer: string;
       shotCount: number;
+      characterCueCount: number;
     };
     const shotPlan = JSON.parse(await fs.readFile(shotPlanPath, "utf-8")) as Array<{
       startMs: number;
       endMs: number;
     }>;
+    const characterPerformance = JSON.parse(
+      await fs.readFile(characterPerformancePath, "utf-8")
+    ) as {
+      mouthCues: Array<unknown>;
+      blinkCues: Array<unknown>;
+      expressionCues: Array<unknown>;
+    };
     const codecName = await runCommand(
       "ffprobe",
       [
@@ -147,8 +162,11 @@ describe("video composition remotion", () => {
 
     expect(composition.renderer).toBe("remotion");
     expect(composition.shotCount).toBeGreaterThanOrEqual(2);
+    expect(composition.characterCueCount).toBeGreaterThan(0);
     expect(shotPlan).toHaveLength(composition.shotCount);
     expect(shotPlan[0]?.startMs).toBe(0);
+    expect(characterPerformance.mouthCues.length).toBeGreaterThan(0);
+    expect(characterPerformance.expressionCues.length).toBeGreaterThan(0);
     expect(codecName).toBe("h264");
   }, 120000);
 
