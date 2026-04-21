@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AbsoluteFill, Audio, Img, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 
 export type SubtitleTrack = {
   startMs: number;
@@ -55,6 +55,25 @@ export type SubtitlePresentationPlan = {
   emphasisCount: number;
 };
 
+export type AudioMixPlan = {
+  bgmWindows: Array<{ startMs: number; endMs: number; volume: number }>;
+  ambientWindows: Array<{ startMs: number; endMs: number; volume: number }>;
+  seCues: Array<{
+    id: string;
+    kind: "accent" | "transition";
+    assetKey: "accent" | "transition";
+    startMs: number;
+    durationMs: number;
+    volume: number;
+  }>;
+  assets: {
+    bgmPath: string;
+    ambientPath: string;
+    accentPath: string;
+    transitionPath: string;
+  };
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
@@ -62,6 +81,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;
   subtitlePresentation?: SubtitlePresentationPlan;
+  audioMixPlan?: AudioMixPlan;
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -81,6 +101,17 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   subtitlePresentation = {
     items: [],
     emphasisCount: 0,
+  },
+  audioMixPlan = {
+    bgmWindows: [],
+    ambientWindows: [],
+    seCues: [],
+    assets: {
+      bgmPath: "",
+      ambientPath: "",
+      accentPath: "",
+      transitionPath: "",
+    },
   },
   audioPath,
   backgroundImagePath,
@@ -316,6 +347,40 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           {currentSubtitlePresentation.keywordBadge}
         </div>
       ) : null}
+      {audioMixPlan.assets.ambientPath ? (
+        <Audio
+          src={audioMixPlan.assets.ambientPath}
+          volume={(audioFrame) =>
+            getWindowVolume(audioMixPlan.ambientWindows, (audioFrame / fps) * 1000)
+          }
+        />
+      ) : null}
+      {audioMixPlan.assets.bgmPath ? (
+        <Audio
+          src={audioMixPlan.assets.bgmPath}
+          volume={(audioFrame) =>
+            getWindowVolume(audioMixPlan.bgmWindows, (audioFrame / fps) * 1000)
+          }
+        />
+      ) : null}
+      {audioMixPlan.seCues.map((cue) => {
+        const cuePath =
+          cue.assetKey === "accent"
+            ? audioMixPlan.assets.accentPath
+            : audioMixPlan.assets.transitionPath;
+        if (!cuePath) {
+          return null;
+        }
+        return (
+          <Sequence
+            key={cue.id}
+            from={Math.max(0, Math.floor((cue.startMs / 1000) * fps))}
+            durationInFrames={Math.max(1, Math.ceil((cue.durationMs / 1000) * fps))}
+          >
+            <Audio src={cuePath} volume={cue.volume} />
+          </Sequence>
+        );
+      })}
       {audioPath ? <Audio src={audioPath} /> : null}
     </AbsoluteFill>
   );
@@ -364,4 +429,12 @@ const getSubtitleTokenStyle = (kind: "plain" | "emphasis" | "secondary") => {
   return {
     color: "#ffffff",
   };
+};
+
+const getWindowVolume = (
+  windows: Array<{ startMs: number; endMs: number; volume: number }>,
+  currentMs: number
+) => {
+  const matched = windows.find((window) => currentMs >= window.startMs && currentMs < window.endMs);
+  return matched?.volume ?? 0;
 };

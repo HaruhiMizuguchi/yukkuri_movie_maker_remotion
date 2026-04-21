@@ -5,6 +5,7 @@ import path from "node:path";
 import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import { createCharacterPerformancePlan } from "./characterPerformance";
+import { createAudioMixPlan } from "./audioMixPlan";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
@@ -321,6 +322,7 @@ export function createDefaultWorkflowImplementations(
       const shotPlanPath = path.join(stepDir.runDir, "shot-plan.json");
       const characterPerformancePath = path.join(stepDir.runDir, "character-performance.json");
       const subtitlePresentationPath = path.join(stepDir.runDir, "subtitle-presentation.json");
+      const audioMixPlanPath = path.join(stepDir.runDir, "audio-mix-plan.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
       await Promise.all([
@@ -340,6 +342,22 @@ export function createDefaultWorkflowImplementations(
 
       const durationMs = await probeMediaDurationMs(audioCopyPath);
       const usingRemotion = options.disableRemotion !== true;
+      const audioMixPlan = createAudioMixPlan({
+        durationMs,
+        timestamps: subtitleTracks,
+        shotPlan,
+        subtitlePresentation,
+      });
+      const audioMixAssets = await prepareRemotionAudioAssets({ runDir: stepDir.runDir, durationMs });
+      await writeJson(audioMixPlanPath, {
+        ...audioMixPlan,
+        assets: {
+          bgmPath: toRelativePath(outputRoot, audioMixAssets.bgmPath),
+          ambientPath: toRelativePath(outputRoot, audioMixAssets.ambientPath),
+          accentPath: toRelativePath(outputRoot, audioMixAssets.accentPath),
+          transitionPath: toRelativePath(outputRoot, audioMixAssets.transitionPath),
+        },
+      });
 
       if (usingRemotion) {
         await renderWithRemotion({
@@ -352,6 +370,10 @@ export function createDefaultWorkflowImplementations(
           shotPlan,
           characterPerformance,
           subtitlePresentation,
+          audioMixPlan: {
+            ...audioMixPlan,
+            assets: audioMixAssets,
+          },
           durationMs,
           title: "ゆっくり解説MVP",
           theme: details.theme,
@@ -379,6 +401,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
+        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
       });
       await syncLatest(stepDir);
 
@@ -388,12 +411,14 @@ export function createDefaultWorkflowImplementations(
         shotPlanStat,
         characterPerformanceStat,
         subtitlePresentationStat,
+        audioMixPlanStat,
       ] = await Promise.all([
         fs.stat(previewPath),
         fs.stat(compositionJsonPath),
         fs.stat(shotPlanPath),
         fs.stat(characterPerformancePath),
         fs.stat(subtitlePresentationPath),
+        fs.stat(audioMixPlanPath),
       ]);
       await registerProjectFiles({
         prisma: ctx.prisma,
@@ -436,6 +461,13 @@ export function createDefaultWorkflowImplementations(
             fileSizeBytes: subtitlePresentationStat.size,
             kind: "subtitle_presentation",
           },
+          {
+            type: "metadata",
+            relativePath: toRelativePath(outputRoot, audioMixPlanPath),
+            fileCategory: "intermediate",
+            fileSizeBytes: audioMixPlanStat.size,
+            kind: "audio_mix_plan",
+          },
         ],
       });
       await appendStepLog(projectRoot, "video_composition", {
@@ -450,6 +482,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
+        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
       });
 
       logger.info("video_composition completed", {
@@ -461,6 +494,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
+        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
@@ -473,6 +507,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
+        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
       };
     },
     final_encoding: async (ctx) => {
@@ -806,6 +841,7 @@ const renderWithRemotion = async ({
   shotPlan,
   characterPerformance,
   subtitlePresentation,
+  audioMixPlan,
   durationMs,
   title,
   theme,
@@ -853,15 +889,39 @@ const renderWithRemotion = async ({
     }>;
     emphasisCount: number;
   };
+  audioMixPlan: {
+    bgmWindows: Array<{ startMs: number; endMs: number; volume: number }>;
+    ambientWindows: Array<{ startMs: number; endMs: number; volume: number }>;
+    seCues: Array<{
+      id: string;
+      kind: "accent" | "transition";
+      assetKey: "accent" | "transition";
+      startMs: number;
+      durationMs: number;
+      volume: number;
+    }>;
+    assets: {
+      bgmPath: string;
+      ambientPath: string;
+      accentPath: string;
+      transitionPath: string;
+    };
+  };
   durationMs: number;
   title: string;
   theme: string;
   logger: Logger;
 }): Promise<void> => {
   const assetServer = await startAssetServer({
-    audioPath,
-    backgroundImagePath,
-    characterImagePath,
+    assets: {
+      "/audio.wav": { filePath: audioPath },
+      "/background.png": { filePath: backgroundImagePath },
+      "/character.png": { filePath: characterImagePath },
+      "/bgm.wav": { filePath: audioMixPlan.assets.bgmPath },
+      "/ambient.wav": { filePath: audioMixPlan.assets.ambientPath },
+      "/accent.wav": { filePath: audioMixPlan.assets.accentPath },
+      "/transition.wav": { filePath: audioMixPlan.assets.transitionPath },
+    },
   });
   try {
     const [{ bundle }, { selectComposition, renderMedia }] = await Promise.all([
@@ -880,10 +940,19 @@ const renderWithRemotion = async ({
       shotPlan,
       characterPerformance,
       subtitlePresentation,
+      audioMixPlan: {
+        ...audioMixPlan,
+        assets: {
+          bgmPath: assetServer.urls["/bgm.wav"],
+          ambientPath: assetServer.urls["/ambient.wav"],
+          accentPath: assetServer.urls["/accent.wav"],
+          transitionPath: assetServer.urls["/transition.wav"],
+        },
+      },
       durationMs,
-      audioPath: assetServer.urls.audioPath,
-      backgroundImagePath: assetServer.urls.backgroundImagePath,
-      characterImagePath: assetServer.urls.characterImagePath,
+      audioPath: assetServer.urls["/audio.wav"],
+      backgroundImagePath: assetServer.urls["/background.png"],
+      characterImagePath: assetServer.urls["/character.png"],
     };
     const composition = await selectComposition({
       serveUrl,
@@ -910,26 +979,16 @@ const renderWithRemotion = async ({
 };
 
 const startAssetServer = async ({
-  audioPath,
-  backgroundImagePath,
-  characterImagePath,
+  assets,
 }: {
-  audioPath: string;
-  backgroundImagePath: string;
-  characterImagePath: string;
+  assets: Record<string, { filePath: string }>;
 }): Promise<{
-  urls: {
-    audioPath: string;
-    backgroundImagePath: string;
-    characterImagePath: string;
-  };
+  urls: Record<string, string>;
   close: () => Promise<void>;
 }> => {
-  const assetMap = new Map<string, string>([
-    ["/audio.wav", audioPath],
-    ["/background.png", backgroundImagePath],
-    ["/character.png", characterImagePath],
-  ]);
+  const assetMap = new Map<string, string>(
+    Object.entries(assets).map(([routePath, value]) => [routePath, value.filePath])
+  );
 
   // Remotion のブラウザ実行から参照できるよう、ローカル成果物を一時HTTP配信する。
   const server = createServer((request, response) => {
@@ -966,11 +1025,9 @@ const startAssetServer = async ({
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   return {
-    urls: {
-      audioPath: `${baseUrl}/audio.wav`,
-      backgroundImagePath: `${baseUrl}/background.png`,
-      characterImagePath: `${baseUrl}/character.png`,
-    },
+    urls: Object.fromEntries(
+      Array.from(assetMap.keys()).map((routePath) => [routePath, `${baseUrl}${routePath}`])
+    ),
     close: async () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -1002,6 +1059,96 @@ const guessContentType = (targetPath: string): string => {
     return "image/webp";
   }
   return "application/octet-stream";
+};
+
+const prepareRemotionAudioAssets = async ({
+  runDir,
+  durationMs,
+}: {
+  runDir: string;
+  durationMs: number;
+}): Promise<{
+  bgmPath: string;
+  ambientPath: string;
+  accentPath: string;
+  transitionPath: string;
+}> => {
+  const durationSec = Math.max(1, durationMs / 1000);
+  const bgmPath = path.join(runDir, "bgm.wav");
+  const ambientPath = path.join(runDir, "ambient.wav");
+  const accentPath = path.join(runDir, "accent.wav");
+  const transitionPath = path.join(runDir, "transition.wav");
+
+  // Remotion でミックスする音源を最小構成で生成する。
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=220:sample_rate=48000:duration=${durationSec.toFixed(3)}`,
+      "-c:a",
+      "pcm_s16le",
+      bgmPath,
+    ],
+    runDir
+  );
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `anoisesrc=color=pink:sample_rate=48000:duration=${durationSec.toFixed(3)}`,
+      "-af",
+      "highpass=f=120,lowpass=f=1800",
+      "-c:a",
+      "pcm_s16le",
+      ambientPath,
+    ],
+    runDir
+  );
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=960:sample_rate=48000:duration=0.320",
+      "-af",
+      "afade=t=out:st=0.12:d=0.20",
+      "-c:a",
+      "pcm_s16le",
+      accentPath,
+    ],
+    runDir
+  );
+  await runCommand(
+    "ffmpeg",
+    [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=420:sample_rate=48000:duration=0.420",
+      "-af",
+      "afade=t=in:st=0:d=0.06,afade=t=out:st=0.22:d=0.20",
+      "-c:a",
+      "pcm_s16le",
+      transitionPath,
+    ],
+    runDir
+  );
+
+  return {
+    bgmPath,
+    ambientPath,
+    accentPath,
+    transitionPath,
+  };
 };
 
 const probeMediaDurationMs = async (targetPath: string): Promise<number> => {

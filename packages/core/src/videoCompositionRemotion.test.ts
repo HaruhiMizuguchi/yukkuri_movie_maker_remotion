@@ -135,11 +135,19 @@ describe("video composition remotion", () => {
       "latest",
       "subtitle-presentation.json"
     );
+    const audioMixPlanPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "audio-mix-plan.json"
+    );
     const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
       renderer: string;
       shotCount: number;
       characterCueCount: number;
       emphasisCount: number;
+      audioCueCount: number;
     };
     const shotPlan = JSON.parse(await fs.readFile(shotPlanPath, "utf-8")) as Array<{
       startMs: number;
@@ -156,6 +164,10 @@ describe("video composition remotion", () => {
       await fs.readFile(subtitlePresentationPath, "utf-8")
     ) as {
       items: Array<{ tokens: Array<{ kind: string }> }>;
+    };
+    const audioMixPlan = JSON.parse(await fs.readFile(audioMixPlanPath, "utf-8")) as {
+      seCues: Array<unknown>;
+      bgmWindows: Array<unknown>;
     };
     const codecName = await runCommand(
       "ffprobe",
@@ -177,6 +189,7 @@ describe("video composition remotion", () => {
     expect(composition.shotCount).toBeGreaterThanOrEqual(2);
     expect(composition.characterCueCount).toBeGreaterThan(0);
     expect(composition.emphasisCount).toBeGreaterThan(0);
+    expect(composition.audioCueCount).toBeGreaterThan(0);
     expect(shotPlan).toHaveLength(composition.shotCount);
     expect(shotPlan[0]?.startMs).toBe(0);
     expect(characterPerformance.mouthCues.length).toBeGreaterThan(0);
@@ -186,6 +199,8 @@ describe("video composition remotion", () => {
         item.tokens.some((token) => token.kind === "emphasis")
       )
     ).toBe(true);
+    expect(audioMixPlan.seCues.length).toBeGreaterThan(0);
+    expect(audioMixPlan.bgmWindows.length).toBeGreaterThan(0);
     expect(codecName).toBe("h264");
   }, 120000);
 
