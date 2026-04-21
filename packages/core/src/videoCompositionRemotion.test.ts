@@ -71,6 +71,14 @@ const writeJson = async (filePath: string, payload: unknown): Promise<void> => {
 };
 
 const prepareMinimalInputs = async (projectRoot: string): Promise<void> => {
+  await writeJson(path.join(projectRoot, "output", "script_generation", "latest", "script.json"), {
+    title: "Remotion テスト",
+    theme: "Remotion 標準経路",
+    lines: [
+      { speaker: "reimu", text: "最初の字幕です。" },
+      { speaker: "marisa", text: "二つ目の字幕です。" },
+    ],
+  });
   await writeJson(path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.json"), [
     { index: 0, speaker: "reimu", text: "最初の字幕です。", startMs: 0, endMs: 1400 },
     { index: 1, speaker: "marisa", text: "二つ目の字幕です。", startMs: 1400, endMs: 2800 },
@@ -112,9 +120,15 @@ describe("video composition remotion", () => {
 
     const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
     const previewPath = path.join(projectRoot, "output", "video_composition", "latest", "preview.mp4");
+    const shotPlanPath = path.join(projectRoot, "output", "video_composition", "latest", "shot-plan.json");
     const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
       renderer: string;
+      shotCount: number;
     };
+    const shotPlan = JSON.parse(await fs.readFile(shotPlanPath, "utf-8")) as Array<{
+      startMs: number;
+      endMs: number;
+    }>;
     const codecName = await runCommand(
       "ffprobe",
       [
@@ -132,6 +146,9 @@ describe("video composition remotion", () => {
     );
 
     expect(composition.renderer).toBe("remotion");
+    expect(composition.shotCount).toBeGreaterThanOrEqual(2);
+    expect(shotPlan).toHaveLength(composition.shotCount);
+    expect(shotPlan[0]?.startMs).toBe(0);
     expect(codecName).toBe("h264");
   }, 120000);
 

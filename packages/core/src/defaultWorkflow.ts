@@ -6,6 +6,7 @@ import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
+import { createShotPlan } from "./shotPlanning";
 import {
   type ScriptTimestamp,
   synthesizeTask3Speech,
@@ -292,17 +293,28 @@ export function createDefaultWorkflowImplementations(
         "latest",
         "subtitles.json"
       );
+      const scriptPath = path.join(
+        projectRoot,
+        "output",
+        "script_generation",
+        "latest",
+        "script.json"
+      );
+      const script = ScriptSchema.parse(await readJson(scriptPath));
       const subtitleTracks = (await readJson(subtitlesJsonPath)) as ScriptTimestamp[];
+      const shotPlan = createShotPlan({ script, timestamps: subtitleTracks });
 
       const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
       const subtitlesCopyPath = path.join(stepDir.runDir, "subtitles.ass");
       const compositionJsonPath = path.join(stepDir.runDir, "composition.json");
+      const shotPlanPath = path.join(stepDir.runDir, "shot-plan.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
       await Promise.all([
         fs.copyFile(audioPath, audioCopyPath),
         fs.copyFile(subtitlesAssPath, subtitlesCopyPath),
+        writeJson(shotPlanPath, shotPlan),
       ]);
       const visualAssets = await prepareTask3VisualAssets({
         projectRoot,
@@ -323,6 +335,7 @@ export function createDefaultWorkflowImplementations(
           backgroundImagePath: visualAssets.backgroundRenderPath,
           characterImagePath: visualAssets.characterRenderPath,
           subtitleTracks,
+          shotPlan,
           durationMs,
           title: "ゆっくり解説MVP",
           theme: details.theme,
@@ -344,12 +357,14 @@ export function createDefaultWorkflowImplementations(
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
+        shotCount: shotPlan.length,
       });
       await syncLatest(stepDir);
 
-      const [previewStat, compositionStat] = await Promise.all([
+      const [previewStat, compositionStat, shotPlanStat] = await Promise.all([
         fs.stat(previewPath),
         fs.stat(compositionJsonPath),
+        fs.stat(shotPlanPath),
       ]);
       await registerProjectFiles({
         prisma: ctx.prisma,
@@ -371,6 +386,13 @@ export function createDefaultWorkflowImplementations(
             fileCategory: "intermediate",
             fileSizeBytes: compositionStat.size,
           },
+          {
+            type: "metadata",
+            relativePath: toRelativePath(outputRoot, shotPlanPath),
+            fileCategory: "intermediate",
+            fileSizeBytes: shotPlanStat.size,
+            kind: "shot_plan",
+          },
         ],
       });
       await appendStepLog(projectRoot, "video_composition", {
@@ -379,17 +401,20 @@ export function createDefaultWorkflowImplementations(
         renderer: usingRemotion ? "remotion" : "ffmpeg",
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
+        shotCount: shotPlan.length,
       });
 
       logger.info("video_composition completed", {
         previewPath,
         renderer: usingRemotion ? "remotion" : "ffmpeg",
+        shotCount: shotPlan.length,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
         renderer: usingRemotion ? "remotion" : "ffmpeg",
         characterImagePath: visualAssets.characterSourceRelativePath,
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
+        shotCount: shotPlan.length,
       };
     },
     final_encoding: async (ctx) => {
@@ -720,6 +745,7 @@ const renderWithRemotion = async ({
   backgroundImagePath,
   characterImagePath,
   subtitleTracks,
+  shotPlan,
   durationMs,
   title,
   theme,
@@ -731,6 +757,18 @@ const renderWithRemotion = async ({
   backgroundImagePath: string;
   characterImagePath: string;
   subtitleTracks: ScriptTimestamp[];
+  shotPlan: Array<{
+    id: string;
+    type: "wide" | "medium" | "close" | "insert";
+    startMs: number;
+    endMs: number;
+    lineIndexes: number[];
+    focusSpeaker: string;
+    zoomStart: number;
+    zoomEnd: number;
+    panX: number;
+    panY: number;
+  }>;
   durationMs: number;
   title: string;
   theme: string;
@@ -755,6 +793,7 @@ const renderWithRemotion = async ({
       title,
       theme,
       subtitleTracks,
+      shotPlan,
       durationMs,
       audioPath: assetServer.urls.audioPath,
       backgroundImagePath: assetServer.urls.backgroundImagePath,

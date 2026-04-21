@@ -8,10 +8,24 @@ export type SubtitleTrack = {
   speaker: string;
 };
 
+export type ShotPlanItem = {
+  id: string;
+  type: "wide" | "medium" | "close" | "insert";
+  startMs: number;
+  endMs: number;
+  lineIndexes: number[];
+  focusSpeaker: string;
+  zoomStart: number;
+  zoomEnd: number;
+  panX: number;
+  panY: number;
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
+  shotPlan?: ShotPlanItem[];
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -22,6 +36,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   title,
   theme,
   subtitleTracks,
+  shotPlan = [],
   audioPath,
   backgroundImagePath,
   characterImagePath,
@@ -37,13 +52,33 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
       ) ?? null,
     [currentMs, subtitleTracks]
   );
+  const currentShot = useMemo(
+    () => shotPlan.find((shot) => currentMs >= shot.startMs && currentMs < shot.endMs) ?? null,
+    [currentMs, shotPlan]
+  );
+  const shotProgress = currentShot
+    ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
+    : 0;
+  const backgroundScale = currentShot
+    ? currentShot.zoomStart + (currentShot.zoomEnd - currentShot.zoomStart) * shotProgress
+    : 1;
+  const backgroundTranslateX = currentShot ? currentShot.panX * 240 : 0;
+  const backgroundTranslateY = currentShot ? currentShot.panY * 200 : 0;
+  const characterScale =
+    currentShot?.type === "close" ? 1.08 : currentShot?.type === "wide" ? 0.96 : 1.02;
+  const characterTranslateX = currentShot ? currentShot.panX * 120 : 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
       {backgroundImagePath ? (
         <Img
           src={backgroundImagePath}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: `translate(${backgroundTranslateX}px, ${backgroundTranslateY}px) scale(${backgroundScale})`,
+          }}
         />
       ) : (
         <AbsoluteFill
@@ -63,6 +98,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
             width: 540,
             height: 860,
             objectFit: "contain",
+            transform: `translateX(${characterTranslateX}px) scale(${characterScale})`,
           }}
         />
       ) : null}

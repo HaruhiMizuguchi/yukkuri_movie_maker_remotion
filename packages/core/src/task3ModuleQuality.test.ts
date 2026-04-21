@@ -258,6 +258,11 @@ describe("task3 module quality", () => {
     await writeJson(path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.json"), [
       { index: 0, speaker: "reimu", text: "動画の字幕", startMs: 0, endMs: 2000 },
     ]);
+    await writeJson(path.join(projectRoot, "output", "script_generation", "latest", "script.json"), {
+      title: "動画",
+      theme: "動画合成テスト",
+      lines: [{ speaker: "reimu", text: "動画の字幕" }],
+    });
     await fs.mkdir(path.join(projectRoot, "output", "subtitle_generation", "latest"), { recursive: true });
     await fs.writeFile(
       path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.ass"),
