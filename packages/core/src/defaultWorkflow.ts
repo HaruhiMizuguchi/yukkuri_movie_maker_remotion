@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { createReadStream, promises as fs } from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import { registerProjectFiles } from "./projectFile";
@@ -312,22 +312,23 @@ export function createDefaultWorkflowImplementations(
         requireCharacterAsset: options.requireCharacterAsset ?? false,
       });
 
-      const remotionRendered =
-        options.disableRemotion === true
-          ? false
-          : await tryRemotionRender({
-              workspaceRoot,
-              outputPath: previewPath,
-              audioPath: audioCopyPath,
-              backgroundImagePath: visualAssets.backgroundRenderPath,
-              characterImagePath: visualAssets.characterRenderPath,
-              subtitleTracks,
-              title: "ゆっくり解説MVP",
-              theme: details.theme,
-              logger,
-            });
+      const durationMs = await probeMediaDurationMs(audioCopyPath);
+      const usingRemotion = options.disableRemotion !== true;
 
-      if (!remotionRendered) {
+      if (usingRemotion) {
+        await renderWithRemotion({
+          workspaceRoot,
+          outputPath: previewPath,
+          audioPath: audioCopyPath,
+          backgroundImagePath: visualAssets.backgroundRenderPath,
+          characterImagePath: visualAssets.characterRenderPath,
+          subtitleTracks,
+          durationMs,
+          title: "ゆっくり解説MVP",
+          theme: details.theme,
+          logger,
+        });
+      } else {
         await composeVideoWithFfmpeg({
           runDir: stepDir.runDir,
           backgroundPath: path.basename(visualAssets.backgroundRenderPath),
@@ -337,11 +338,12 @@ export function createDefaultWorkflowImplementations(
       }
 
       await writeJson(compositionJsonPath, {
-        renderer: remotionRendered ? "remotion" : "ffmpeg",
+        renderer: usingRemotion ? "remotion" : "ffmpeg",
         audioPath: toRelativePath(outputRoot, audioPath),
         subtitlesPath: toRelativePath(outputRoot, subtitlesAssPath),
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
         characterImagePath: visualAssets.characterSourceRelativePath,
+        durationMs,
       });
       await syncLatest(stepDir);
 
@@ -374,17 +376,18 @@ export function createDefaultWorkflowImplementations(
       await appendStepLog(projectRoot, "video_composition", {
         event: "completed",
         jobId: ctx.jobId,
-        renderer: remotionRendered ? "remotion" : "ffmpeg",
+        renderer: usingRemotion ? "remotion" : "ffmpeg",
         characterImagePath: visualAssets.characterSourceRelativePath,
+        durationMs,
       });
 
       logger.info("video_composition completed", {
         previewPath,
-        renderer: remotionRendered ? "remotion" : "ffmpeg",
+        renderer: usingRemotion ? "remotion" : "ffmpeg",
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
-        renderer: remotionRendered ? "remotion" : "ffmpeg",
+        renderer: usingRemotion ? "remotion" : "ffmpeg",
         characterImagePath: visualAssets.characterSourceRelativePath,
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
       };
@@ -710,13 +713,14 @@ const composeVideoWithFfmpeg = async ({
   );
 };
 
-const tryRemotionRender = async ({
+const renderWithRemotion = async ({
   workspaceRoot,
   outputPath,
   audioPath,
   backgroundImagePath,
   characterImagePath,
   subtitleTracks,
+  durationMs,
   title,
   theme,
   logger,
@@ -727,10 +731,16 @@ const tryRemotionRender = async ({
   backgroundImagePath: string;
   characterImagePath: string;
   subtitleTracks: ScriptTimestamp[];
+  durationMs: number;
   title: string;
   theme: string;
   logger: Logger;
-}): Promise<boolean> => {
+}): Promise<void> => {
+  const assetServer = await startAssetServer({
+    audioPath,
+    backgroundImagePath,
+    characterImagePath,
+  });
   try {
     const [{ bundle }, { selectComposition, renderMedia }] = await Promise.all([
       import("@remotion/bundler"),
@@ -745,9 +755,10 @@ const tryRemotionRender = async ({
       title,
       theme,
       subtitleTracks,
-      audioPath: pathToFileURL(audioPath).toString(),
-      backgroundImagePath: pathToFileURL(backgroundImagePath).toString(),
-      characterImagePath: pathToFileURL(characterImagePath).toString(),
+      durationMs,
+      audioPath: assetServer.urls.audioPath,
+      backgroundImagePath: assetServer.urls.backgroundImagePath,
+      characterImagePath: assetServer.urls.characterImagePath,
     };
     const composition = await selectComposition({
       serveUrl,
@@ -762,13 +773,131 @@ const tryRemotionRender = async ({
       inputProps,
       logLevel: "error",
     });
-    return true;
   } catch (error) {
-    logger.warn("Remotion rendering failed. Fallback to ffmpeg.", {
+    logger.error("Remotion rendering failed.", {
       error: error instanceof Error ? error.message : String(error),
+      outputPath,
     });
-    return false;
+    throw error;
+  } finally {
+    await assetServer.close();
   }
+};
+
+const startAssetServer = async ({
+  audioPath,
+  backgroundImagePath,
+  characterImagePath,
+}: {
+  audioPath: string;
+  backgroundImagePath: string;
+  characterImagePath: string;
+}): Promise<{
+  urls: {
+    audioPath: string;
+    backgroundImagePath: string;
+    characterImagePath: string;
+  };
+  close: () => Promise<void>;
+}> => {
+  const assetMap = new Map<string, string>([
+    ["/audio.wav", audioPath],
+    ["/background.png", backgroundImagePath],
+    ["/character.png", characterImagePath],
+  ]);
+
+  // Remotion のブラウザ実行から参照できるよう、ローカル成果物を一時HTTP配信する。
+  const server = createServer((request, response) => {
+    const requestPath = request.url ? request.url.split("?")[0] : "/";
+    const targetPath = assetMap.get(requestPath);
+    if (!targetPath) {
+      response.statusCode = 404;
+      response.end("not found");
+      return;
+    }
+
+    const contentType = guessContentType(targetPath);
+    response.setHeader("Content-Type", contentType);
+    const stream = createReadStream(targetPath);
+    stream.on("error", () => {
+      response.statusCode = 500;
+      response.end("failed to read asset");
+    });
+    stream.pipe(response);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine temporary asset server address.");
+  }
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  return {
+    urls: {
+      audioPath: `${baseUrl}/audio.wav`,
+      backgroundImagePath: `${baseUrl}/background.png`,
+      characterImagePath: `${baseUrl}/character.png`,
+    },
+    close: async () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      }),
+  };
+};
+
+const guessContentType = (targetPath: string): string => {
+  const extension = path.extname(targetPath).toLowerCase();
+  if (extension === ".wav") {
+    return "audio/wav";
+  }
+  if (extension === ".mp3") {
+    return "audio/mpeg";
+  }
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  return "application/octet-stream";
+};
+
+const probeMediaDurationMs = async (targetPath: string): Promise<number> => {
+  const stdout = await runCommand(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      targetPath,
+    ],
+    path.dirname(targetPath)
+  );
+  const durationSec = Number(stdout.trim());
+  if (!Number.isFinite(durationSec) || durationSec <= 0) {
+    throw new Error(`Could not determine media duration: ${targetPath}`);
+  }
+  return Math.max(1, Math.round(durationSec * 1000));
 };
 
 const reencodeYoutubeCompatible = async (
@@ -813,21 +942,25 @@ const runCommand = async (
   command: string,
   args: string[],
   cwd: string
-): Promise<void> =>
+): Promise<string> =>
   new Promise((resolve, reject) => {
     const processRef = spawn(command, args, {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    let stdout = "";
     let stderr = "";
+    processRef.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
     processRef.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
     });
     processRef.on("error", (error) => reject(error));
     processRef.on("close", (code) => {
       if (code === 0) {
-        resolve();
+        resolve(stdout);
         return;
       }
       reject(new Error(`${command} exited with code ${code}: ${stderr}`));

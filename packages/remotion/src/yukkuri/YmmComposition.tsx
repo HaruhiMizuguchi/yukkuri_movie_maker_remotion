@@ -12,6 +12,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
+  durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
   characterImagePath?: string;
