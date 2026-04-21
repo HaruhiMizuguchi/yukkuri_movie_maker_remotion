@@ -26,3 +26,4 @@
 - Prisma schema がリポジトリルートにある場合、ルートに `prisma` が無いと `prisma generate` が自己インストールを試み、Windows環境で `pnpm` 未解決により失敗することがある。ルートdevDependencyに `prisma` と `@prisma/client` を置くと安定する。
 - AivisSpeechを `Start-Process` で起動した直後は、プロセスが立ち上がっていても `/speakers` が数十秒 `fetch failed` になることがある。実接続生成ではHTTP 200になるまでポーリングしてからTTSを開始する。
 - Remotion Renderer は `file://` の音声・画像をそのまま `Audio` / `Img` に渡すと Windows の headless Chrome で `Not allowed to load local resource` になりやすい。生成物を描画する場合は一時HTTPサーバー経由で配信すると安定する。
+- Remotion Bundler の entry point は `registerRoot()` を呼ぶファイルでないと失敗する。`Composition` を export するだけのファイルを指定すると bundle 時に停止する。
