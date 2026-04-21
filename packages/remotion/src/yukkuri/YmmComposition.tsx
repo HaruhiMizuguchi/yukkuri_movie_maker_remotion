@@ -74,6 +74,17 @@ export type AudioMixPlan = {
   };
 };
 
+export type ChapterPlan = {
+  chapters: Array<{
+    id: string;
+    title: string;
+    startMs: number;
+    endMs: number;
+    lineIndexes: number[];
+    transitionDurationMs: number;
+  }>;
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
@@ -82,6 +93,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   characterPerformance?: CharacterPerformancePlan;
   subtitlePresentation?: SubtitlePresentationPlan;
   audioMixPlan?: AudioMixPlan;
+  chapterPlan?: ChapterPlan;
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -112,6 +124,9 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
       accentPath: "",
       transitionPath: "",
     },
+  },
+  chapterPlan = {
+    chapters: [],
   },
   audioPath,
   backgroundImagePath,
@@ -160,6 +175,19 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
       ) ?? null,
     [currentMs, subtitlePresentation.items]
   );
+  const currentChapter = useMemo(
+    () => chapterPlan.chapters.find((chapter) => currentMs >= chapter.startMs && currentMs < chapter.endMs) ?? null,
+    [chapterPlan.chapters, currentMs]
+  );
+  const currentTransition = useMemo(
+    () =>
+      chapterPlan.chapters.find(
+        (chapter) =>
+          currentMs >= chapter.startMs &&
+          currentMs < chapter.startMs + chapter.transitionDurationMs
+      ) ?? null,
+    [chapterPlan.chapters, currentMs]
+  );
   const shotProgress = currentShot
     ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
     : 0;
@@ -174,6 +202,15 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   const speakingBounce = currentMouthCue ? -8 : 0;
   const mouthScale = currentMouthCue ? 0.5 + currentMouthCue.openness : 0;
   const expressionStyle = getExpressionStyle(currentExpressionCue?.expression ?? "normal");
+  const transitionProgress = currentTransition
+    ? Math.min(
+        1,
+        Math.max(
+          0,
+          (currentMs - currentTransition.startMs) / Math.max(1, currentTransition.transitionDurationMs)
+        )
+      )
+    : 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
@@ -195,6 +232,54 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           }}
         />
       )}
+      {currentTransition ? (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: `rgba(255,255,255,${0.16 * (1 - transitionProgress)})`,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 180,
+              left: 0,
+              width: 760,
+              height: 132,
+              backgroundColor: "rgba(15,23,42,0.82)",
+              borderLeft: "10px solid rgba(245,158,11,0.95)",
+              transform: `translateX(${(-1 + transitionProgress) * 220}px)`,
+              opacity: 1 - transitionProgress * 0.12,
+              boxShadow: "0 12px 34px rgba(0,0,0,0.28)",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: 34,
+                top: 22,
+                fontSize: 28,
+                opacity: 0.82,
+              }}
+            >
+              Chapter
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                left: 32,
+                top: 54,
+                fontSize: 56,
+                fontWeight: 800,
+              }}
+            >
+              {currentTransition.title}
+            </div>
+          </div>
+        </>
+      ) : null}
       {characterImagePath ? (
         <div
           style={{
@@ -292,7 +377,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           opacity: 0.9,
         }}
       >
-        {theme}
+        {currentChapter ? `${theme}  /  ${currentChapter.title}` : theme}
       </div>
       <div
         style={{

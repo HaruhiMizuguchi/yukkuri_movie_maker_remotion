@@ -27,6 +27,7 @@
 - 2026-04-21: `character-performance.json` を追加し、口パクcue・瞬きcue・感情推定を Remotion 立ち絵演出へ反映
 - 2026-04-21: `subtitle-presentation.json` を追加し、重要語・英字語・数字の強調表示とキーワードバッジを Remotion 字幕へ反映
 - 2026-04-21: `audio-mix-plan.json` と簡易BGM/環境音/SE生成を追加し、Remotion 側でダッキングとSE差し込みを実装
+- 2026-04-21: `chapter-plan.json` を追加し、章見出し帯と短尺フラッシュ/スライドのトランジションを Remotion 演出へ反映
 
 ---
 
@@ -155,5 +156,5 @@
 - [x] 口パク・まばたき・表情切替の演技計画を生成し、立ち絵描画に反映
 - [x] キーワード強調、補助ラベル、ポップ表現を含む字幕表示計画を追加
 - [x] SE・環境音・BGMダッキングを Remotion 側の音量カーブで実装
-- [ ] 章見出しと短尺トランジションを追加
-- [ ] 追加演出の observability を `composition.json` と `workflow.log` に記録
+- [x] 章見出しと短尺トランジションを追加
+- [x] 追加演出の observability を `composition.json` と `workflow.log` に記録

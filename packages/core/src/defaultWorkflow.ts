@@ -6,6 +6,7 @@ import type { Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import { createCharacterPerformancePlan } from "./characterPerformance";
 import { createAudioMixPlan } from "./audioMixPlan";
+import { createChapterPlan } from "./chapterPlan";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
@@ -314,6 +315,10 @@ export function createDefaultWorkflowImplementations(
         script,
         timestamps: subtitleTracks,
       });
+      const chapterPlan = createChapterPlan({
+        script,
+        timestamps: subtitleTracks,
+      });
 
       const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
@@ -323,6 +328,7 @@ export function createDefaultWorkflowImplementations(
       const characterPerformancePath = path.join(stepDir.runDir, "character-performance.json");
       const subtitlePresentationPath = path.join(stepDir.runDir, "subtitle-presentation.json");
       const audioMixPlanPath = path.join(stepDir.runDir, "audio-mix-plan.json");
+      const chapterPlanPath = path.join(stepDir.runDir, "chapter-plan.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
       await Promise.all([
@@ -331,6 +337,7 @@ export function createDefaultWorkflowImplementations(
         writeJson(shotPlanPath, shotPlan),
         writeJson(characterPerformancePath, characterPerformance),
         writeJson(subtitlePresentationPath, subtitlePresentation),
+        writeJson(chapterPlanPath, chapterPlan),
       ]);
       const visualAssets = await prepareTask3VisualAssets({
         projectRoot,
@@ -374,6 +381,7 @@ export function createDefaultWorkflowImplementations(
             ...audioMixPlan,
             assets: audioMixAssets,
           },
+          chapterPlan,
           durationMs,
           title: "ゆっくり解説MVP",
           theme: details.theme,
@@ -402,6 +410,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
         audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        chapterCount: chapterPlan.chapters.length,
       });
       await syncLatest(stepDir);
 
@@ -412,6 +421,7 @@ export function createDefaultWorkflowImplementations(
         characterPerformanceStat,
         subtitlePresentationStat,
         audioMixPlanStat,
+        chapterPlanStat,
       ] = await Promise.all([
         fs.stat(previewPath),
         fs.stat(compositionJsonPath),
@@ -419,6 +429,7 @@ export function createDefaultWorkflowImplementations(
         fs.stat(characterPerformancePath),
         fs.stat(subtitlePresentationPath),
         fs.stat(audioMixPlanPath),
+        fs.stat(chapterPlanPath),
       ]);
       await registerProjectFiles({
         prisma: ctx.prisma,
@@ -468,6 +479,13 @@ export function createDefaultWorkflowImplementations(
             fileSizeBytes: audioMixPlanStat.size,
             kind: "audio_mix_plan",
           },
+          {
+            type: "metadata",
+            relativePath: toRelativePath(outputRoot, chapterPlanPath),
+            fileCategory: "intermediate",
+            fileSizeBytes: chapterPlanStat.size,
+            kind: "chapter_plan",
+          },
         ],
       });
       await appendStepLog(projectRoot, "video_composition", {
@@ -483,6 +501,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
         audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        chapterCount: chapterPlan.chapters.length,
       });
 
       logger.info("video_composition completed", {
@@ -495,6 +514,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
         audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        chapterCount: chapterPlan.chapters.length,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
@@ -508,6 +528,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
         audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        chapterCount: chapterPlan.chapters.length,
       };
     },
     final_encoding: async (ctx) => {
@@ -842,6 +863,7 @@ const renderWithRemotion = async ({
   characterPerformance,
   subtitlePresentation,
   audioMixPlan,
+  chapterPlan,
   durationMs,
   title,
   theme,
@@ -907,6 +929,16 @@ const renderWithRemotion = async ({
       transitionPath: string;
     };
   };
+  chapterPlan: {
+    chapters: Array<{
+      id: string;
+      title: string;
+      startMs: number;
+      endMs: number;
+      lineIndexes: number[];
+      transitionDurationMs: number;
+    }>;
+  };
   durationMs: number;
   title: string;
   theme: string;
@@ -949,6 +981,7 @@ const renderWithRemotion = async ({
           transitionPath: assetServer.urls["/transition.wav"],
         },
       },
+      chapterPlan,
       durationMs,
       audioPath: assetServer.urls["/audio.wav"],
       backgroundImagePath: assetServer.urls["/background.png"],
