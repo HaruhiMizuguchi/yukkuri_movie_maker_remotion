@@ -25,6 +25,7 @@
 - 2026-04-21: `video_composition` の正規経路を Remotion 化し、`registerRoot`/動的duration/一時HTTP素材配信を追加して暗黙FFmpegフォールバックを廃止
 - 2026-04-21: `shot-plan.json` を生成する自動ショット割りを追加し、話者交代・尺・連続セリフに応じた `wide/medium/close/insert` を Remotion 演出へ反映
 - 2026-04-21: `character-performance.json` を追加し、口パクcue・瞬きcue・感情推定を Remotion 立ち絵演出へ反映
+- 2026-04-21: `subtitle-presentation.json` を追加し、重要語・英字語・数字の強調表示とキーワードバッジを Remotion 字幕へ反映
 
 ---
 
@@ -151,7 +152,7 @@
 - [x] `video_composition` を Remotion 優先の正規経路へ移行し、演出ロジックを Remotion props 化
 - [x] 台本と字幕タイミングから自動ショット割りを生成し、`shot-plan.json` として保存
 - [x] 口パク・まばたき・表情切替の演技計画を生成し、立ち絵描画に反映
-- [ ] キーワード強調、補助ラベル、ポップ表現を含む字幕表示計画を追加
+- [x] キーワード強調、補助ラベル、ポップ表現を含む字幕表示計画を追加
 - [ ] SE・環境音・BGMダッキングを Remotion 側の音量カーブで実装
 - [ ] 章見出しと短尺トランジションを追加
 - [ ] 追加演出の observability を `composition.json` と `workflow.log` に記録

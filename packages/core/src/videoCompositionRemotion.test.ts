@@ -128,10 +128,18 @@ describe("video composition remotion", () => {
       "latest",
       "character-performance.json"
     );
+    const subtitlePresentationPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "subtitle-presentation.json"
+    );
     const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
       renderer: string;
       shotCount: number;
       characterCueCount: number;
+      emphasisCount: number;
     };
     const shotPlan = JSON.parse(await fs.readFile(shotPlanPath, "utf-8")) as Array<{
       startMs: number;
@@ -143,6 +151,11 @@ describe("video composition remotion", () => {
       mouthCues: Array<unknown>;
       blinkCues: Array<unknown>;
       expressionCues: Array<unknown>;
+    };
+    const subtitlePresentation = JSON.parse(
+      await fs.readFile(subtitlePresentationPath, "utf-8")
+    ) as {
+      items: Array<{ tokens: Array<{ kind: string }> }>;
     };
     const codecName = await runCommand(
       "ffprobe",
@@ -163,10 +176,16 @@ describe("video composition remotion", () => {
     expect(composition.renderer).toBe("remotion");
     expect(composition.shotCount).toBeGreaterThanOrEqual(2);
     expect(composition.characterCueCount).toBeGreaterThan(0);
+    expect(composition.emphasisCount).toBeGreaterThan(0);
     expect(shotPlan).toHaveLength(composition.shotCount);
     expect(shotPlan[0]?.startMs).toBe(0);
     expect(characterPerformance.mouthCues.length).toBeGreaterThan(0);
     expect(characterPerformance.expressionCues.length).toBeGreaterThan(0);
+    expect(
+      subtitlePresentation.items.some((item) =>
+        item.tokens.some((token) => token.kind === "emphasis")
+      )
+    ).toBe(true);
     expect(codecName).toBe("h264");
   }, 120000);
 

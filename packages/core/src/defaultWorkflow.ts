@@ -8,6 +8,7 @@ import { createCharacterPerformancePlan } from "./characterPerformance";
 import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
+import { createSubtitlePresentationPlan } from "./subtitlePresentation";
 import {
   type ScriptTimestamp,
   synthesizeTask3Speech,
@@ -308,6 +309,10 @@ export function createDefaultWorkflowImplementations(
         script,
         timestamps: subtitleTracks,
       });
+      const subtitlePresentation = createSubtitlePresentationPlan({
+        script,
+        timestamps: subtitleTracks,
+      });
 
       const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
@@ -315,6 +320,7 @@ export function createDefaultWorkflowImplementations(
       const compositionJsonPath = path.join(stepDir.runDir, "composition.json");
       const shotPlanPath = path.join(stepDir.runDir, "shot-plan.json");
       const characterPerformancePath = path.join(stepDir.runDir, "character-performance.json");
+      const subtitlePresentationPath = path.join(stepDir.runDir, "subtitle-presentation.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
 
       await Promise.all([
@@ -322,6 +328,7 @@ export function createDefaultWorkflowImplementations(
         fs.copyFile(subtitlesAssPath, subtitlesCopyPath),
         writeJson(shotPlanPath, shotPlan),
         writeJson(characterPerformancePath, characterPerformance),
+        writeJson(subtitlePresentationPath, subtitlePresentation),
       ]);
       const visualAssets = await prepareTask3VisualAssets({
         projectRoot,
@@ -344,6 +351,7 @@ export function createDefaultWorkflowImplementations(
           subtitleTracks,
           shotPlan,
           characterPerformance,
+          subtitlePresentation,
           durationMs,
           title: "ゆっくり解説MVP",
           theme: details.theme,
@@ -370,14 +378,22 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.mouthCues.length +
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
+        emphasisCount: subtitlePresentation.emphasisCount,
       });
       await syncLatest(stepDir);
 
-      const [previewStat, compositionStat, shotPlanStat, characterPerformanceStat] = await Promise.all([
+      const [
+        previewStat,
+        compositionStat,
+        shotPlanStat,
+        characterPerformanceStat,
+        subtitlePresentationStat,
+      ] = await Promise.all([
         fs.stat(previewPath),
         fs.stat(compositionJsonPath),
         fs.stat(shotPlanPath),
         fs.stat(characterPerformancePath),
+        fs.stat(subtitlePresentationPath),
       ]);
       await registerProjectFiles({
         prisma: ctx.prisma,
@@ -413,6 +429,13 @@ export function createDefaultWorkflowImplementations(
             fileSizeBytes: characterPerformanceStat.size,
             kind: "character_performance",
           },
+          {
+            type: "metadata",
+            relativePath: toRelativePath(outputRoot, subtitlePresentationPath),
+            fileCategory: "intermediate",
+            fileSizeBytes: subtitlePresentationStat.size,
+            kind: "subtitle_presentation",
+          },
         ],
       });
       await appendStepLog(projectRoot, "video_composition", {
@@ -426,6 +449,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.mouthCues.length +
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
+        emphasisCount: subtitlePresentation.emphasisCount,
       });
 
       logger.info("video_composition completed", {
@@ -436,6 +460,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.mouthCues.length +
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
+        emphasisCount: subtitlePresentation.emphasisCount,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
@@ -447,6 +472,7 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.mouthCues.length +
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
+        emphasisCount: subtitlePresentation.emphasisCount,
       };
     },
     final_encoding: async (ctx) => {
@@ -779,6 +805,7 @@ const renderWithRemotion = async ({
   subtitleTracks,
   shotPlan,
   characterPerformance,
+  subtitlePresentation,
   durationMs,
   title,
   theme,
@@ -812,6 +839,20 @@ const renderWithRemotion = async ({
       speaker: string;
     }>;
   };
+  subtitlePresentation: {
+    items: Array<{
+      speaker: string;
+      text: string;
+      startMs: number;
+      endMs: number;
+      keywordBadge: string | null;
+      tokens: Array<{
+        text: string;
+        kind: "plain" | "emphasis" | "secondary";
+      }>;
+    }>;
+    emphasisCount: number;
+  };
   durationMs: number;
   title: string;
   theme: string;
@@ -838,6 +879,7 @@ const renderWithRemotion = async ({
       subtitleTracks,
       shotPlan,
       characterPerformance,
+      subtitlePresentation,
       durationMs,
       audioPath: assetServer.urls.audioPath,
       backgroundImagePath: assetServer.urls.backgroundImagePath,

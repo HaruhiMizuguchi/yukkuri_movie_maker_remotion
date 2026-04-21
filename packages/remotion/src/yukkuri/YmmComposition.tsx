@@ -40,12 +40,28 @@ export type CharacterPerformancePlan = {
   }>;
 };
 
+export type SubtitlePresentationPlan = {
+  items: Array<{
+    speaker: string;
+    text: string;
+    startMs: number;
+    endMs: number;
+    keywordBadge: string | null;
+    tokens: Array<{
+      text: string;
+      kind: "plain" | "emphasis" | "secondary";
+    }>;
+  }>;
+  emphasisCount: number;
+};
+
 export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;
+  subtitlePresentation?: SubtitlePresentationPlan;
   durationMs?: number;
   audioPath?: string;
   backgroundImagePath?: string;
@@ -61,6 +77,10 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
     mouthCues: [],
     blinkCues: [],
     expressionCues: [],
+  },
+  subtitlePresentation = {
+    items: [],
+    emphasisCount: 0,
   },
   audioPath,
   backgroundImagePath,
@@ -101,6 +121,13 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
       ) ?? null,
     [characterPerformance.expressionCues, currentMs]
+  );
+  const currentSubtitlePresentation = useMemo(
+    () =>
+      subtitlePresentation.items.find(
+        (item) => currentMs >= item.startMs && currentMs < item.endMs
+      ) ?? null,
+    [currentMs, subtitlePresentation.items]
   );
   const shotProgress = currentShot
     ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
@@ -251,8 +278,44 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           minHeight: 120,
         }}
       >
-        {currentSubtitle ? `${currentSubtitle.speaker}: ${currentSubtitle.text}` : ""}
+        {currentSubtitlePresentation ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+            <span style={{ color: "rgba(216,255,246,0.9)", marginRight: 10 }}>
+              {currentSubtitlePresentation.speaker}:
+            </span>
+            {currentSubtitlePresentation.tokens.map((token, index) => (
+              <span
+                key={`${token.kind}-${index}-${token.text}`}
+                style={getSubtitleTokenStyle(token.kind)}
+              >
+                {token.text}
+              </span>
+            ))}
+          </div>
+        ) : currentSubtitle ? (
+          `${currentSubtitle.speaker}: ${currentSubtitle.text}`
+        ) : (
+          ""
+        )}
       </div>
+      {currentSubtitlePresentation?.keywordBadge ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 64,
+            bottom: 188,
+            padding: "8px 18px",
+            borderRadius: 999,
+            backgroundColor: "rgba(245, 158, 11, 0.92)",
+            color: "#0f172a",
+            fontSize: 28,
+            fontWeight: 800,
+            boxShadow: "0 10px 28px rgba(0,0,0,0.25)",
+          }}
+        >
+          {currentSubtitlePresentation.keywordBadge}
+        </div>
+      ) : null}
       {audioPath ? <Audio src={audioPath} /> : null}
     </AbsoluteFill>
   );
@@ -280,5 +343,25 @@ const getExpressionStyle = (expression: "normal" | "happy" | "serious" | "surpri
   return {
     filter: "none",
     glow: "0 0 18px rgba(255,255,255,0.14)",
+  };
+};
+
+const getSubtitleTokenStyle = (kind: "plain" | "emphasis" | "secondary") => {
+  if (kind === "emphasis") {
+    return {
+      color: "#fef08a",
+      backgroundColor: "rgba(217, 119, 6, 0.24)",
+      padding: "0 6px",
+      borderRadius: 8,
+    };
+  }
+  if (kind === "secondary") {
+    return {
+      color: "#d8fff6",
+      padding: "0 2px",
+    };
+  }
+  return {
+    color: "#ffffff",
   };
 };
