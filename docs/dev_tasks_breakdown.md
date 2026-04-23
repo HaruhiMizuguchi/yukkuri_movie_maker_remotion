@@ -30,6 +30,7 @@
 - 2026-04-21: `chapter-plan.json` を追加し、章見出し帯と短尺フラッシュ/スライドのトランジションを Remotion 演出へ反映
 - 2026-04-21: 実生成ショーケース `scripts/generateBestAvailableVideo.mjs` を Remotion 正規経路へ移行し、`visual-plan.json` と AivisSpeech 実接続の smoke 実生成テストを追加
 - 2026-04-21: Remotion 版ショーケースの本番プロファイルを実行し、`outputs/production_runs/run-20260421-214420-055/` に 101秒・1920x1080・H.264/AAC の完成MP4を生成
+- 2026-04-22: 台本生成LLM用の疎通確認スクリプト `scripts/checkScriptGenerationLlm.mjs` と実接続テストを追加し、現在の Gemini 失敗要因が HTTP 429 / `RESOURCE_EXHAUSTED`（free tier `generateContent` クォータ 0）であることを確認
 
 ---
 
