@@ -40,6 +40,7 @@
 - 2026-04-27: ローカル起動を一発で行う `start_yukkuri_movie_maker.ps1` を追加し、AivisSpeech起動待ち・DB疎通確認・`db:push`・`pnpm dev` の順で開始できるようにした
 - 2026-04-27: `apps/worker` / `apps/api` 直起動時に `process.cwd()` が各アプリ配下になることで、Remotion entry point と `projects/` 出力先が repo ルートからずれていたため、両アプリで module URL ベースの `workspaceRoot` 解決へ修正し、worker では `outputRoot` も repo ルート既定へ統一、失敗ジョブ `2156b7ed-02ed-41b4-bc57-8a87c994408f` を `resume` で復旧
 - 2026-06-14: プロジェクト全体の目的・進捗・構成レビューを実施。`corepack pnpm typecheck` と代表 Vitest 21件の成功を確認し、生成物管理/API入力検証/ドキュメント同期/キャッシュ時ProjectFile再登録を改善候補として整理
+- 2026-06-15: Worker の pg-boss ペイロード処理を `renderJobHandler` に分離し、不正 `skipSteps` などでも `jobId` が読める場合は Job を `FAILED` へ更新するよう修正
 
 ---
 
