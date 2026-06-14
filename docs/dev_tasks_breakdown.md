@@ -31,6 +31,15 @@
 - 2026-04-21: 実生成ショーケース `scripts/generateBestAvailableVideo.mjs` を Remotion 正規経路へ移行し、`visual-plan.json` と AivisSpeech 実接続の smoke 実生成テストを追加
 - 2026-04-21: Remotion 版ショーケースの本番プロファイルを実行し、`outputs/production_runs/run-20260421-214420-055/` に 101秒・1920x1080・H.264/AAC の完成MP4を生成
 - 2026-04-22: 台本生成LLM用の疎通確認スクリプト `scripts/checkScriptGenerationLlm.mjs` と実接続テストを追加し、現在の Gemini 失敗要因が HTTP 429 / `RESOURCE_EXHAUSTED`（free tier `generateContent` クォータ 0）であることを確認
+- 2026-04-24: 完成動画の仕上げ調整向けに、手動テロップ追加・クリップ複製/削除・マーカー追加・再生範囲トリムを行える手動編集UIを追加
+- 2026-04-24: `timeline.json` の字幕/音声/再生範囲を `video_composition` の Remotion 正規経路へ反映し、`composition.json` に `manualEditSummary` を記録
+- 2026-04-24: 手動編集UIをさらにリッチ化し、視覚タイムライン、プレイヘッド/ズーム、選択インスペクタ、クリップ分割、100ms単位ナッジを追加
+- 2026-04-26: 実 API E2E の起動レースを解消するため `3001/health` とレンダージョブ作成メッセージの待機を追加し、`/api/jobs/:jobId` ほか Prisma `BigInt` を含む API 応答を JSON 安全化
+- 2026-04-26: E2E 一式をこの端末で再実行し、preflight 成功、顧客導線 E2E 成功、実 API/DB/Worker E2E 完走、visual regression はタイムライン/モバイルプレビューの 3 チェックポイント差分を検知
+- 2026-04-27: `scripts/generateBestAvailableVideo.mjs` を Gemini 実台本生成 + Gemini Imagen 実画像生成 + AivisSpeech 実音声生成を通す完全版経路へ拡張し、`outputs/production_runs/run-20260427-082324-289/` に 62秒・1920x1080・H.264/AAC の完成MP4を生成
+- 2026-04-27: ローカル起動を一発で行う `start_yukkuri_movie_maker.ps1` を追加し、AivisSpeech起動待ち・DB疎通確認・`db:push`・`pnpm dev` の順で開始できるようにした
+- 2026-04-27: `apps/worker` / `apps/api` 直起動時に `process.cwd()` が各アプリ配下になることで、Remotion entry point と `projects/` 出力先が repo ルートからずれていたため、両アプリで module URL ベースの `workspaceRoot` 解決へ修正し、worker では `outputRoot` も repo ルート既定へ統一、失敗ジョブ `2156b7ed-02ed-41b4-bc57-8a87c994408f` を `resume` で復旧
+- 2026-06-14: プロジェクト全体の目的・進捗・構成レビューを実施。`corepack pnpm typecheck` と代表 Vitest 21件の成功を確認し、生成物管理/API入力検証/ドキュメント同期/キャッシュ時ProjectFile再登録を改善候補として整理
 
 ---
 
@@ -103,6 +112,9 @@
 - [x] クリップのリサイズ（長さ変更）
 - [x] 基本パラメータ編集（フェード、音量、字幕スタイル）
 - [x] タイムライン → Remotion の同期
+- [x] 手動テロップ追加・クリップ複製/削除・マーカー追加をGUIから行えるようにする
+- [x] 手動編集済みタイムラインの尺/字幕/音声トリムを Remotion 実レンダリングへ反映する
+- [x] 視覚タイムライン上でクリップ選択・プレイヘッド基準分割・ナッジ編集を行えるようにする
 
 ---
 
@@ -137,7 +149,7 @@
 - [x] 良品スクリーンショットとの自動差分しきい値管理を追加
 - [x] ルート `typecheck` をTDDゲートとして通る状態に修正
 - [x] PostgreSQL前提診断とDocker Compose起動手順を追加
-- [ ] 実API E2Eをこの端末で完走確認（現状はPostgreSQL/Docker daemon未起動でpreflight停止）
+- [x] 実API E2Eをこの端末で完走確認（2026-04-26: PostgreSQL 起動後に preflight/実 API E2E 完走、`final.mp4` 生成まで確認）
 - [ ] 実API E2E用DBのテストデータ破棄を自動化
 
 ---
@@ -164,3 +176,14 @@
 - [x] SE・環境音・BGMダッキングを Remotion 側の音量カーブで実装
 - [x] 章見出しと短尺トランジションを追加
 - [x] 追加演出の observability を `composition.json` と `workflow.log` に記録
+
+---
+
+## 12. プロジェクト全体レビュー改善候補（2026-06-14）
+- [x] 目的・進捗・構成レビューを実施
+- [ ] `outputs/production_runs/`、`outputs/diagnostics/`、`projects/`、`apps/*/projects/` の追跡/ignore 方針を整理
+- [ ] API の素材アップロードと設定保存で、パストラバーサル対策・APIキー保存先・権限チェックを強化
+- [ ] API の `skipSteps` を Worker と同じ step enum で検証し、不正ペイロード時も DB 上の Job を失敗状態にする
+- [ ] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
+- [ ] `docs/e2e_customer_journey.md`、`docs/current_capabilities.md`、`docs/dev_tasks_breadown.md` の古い記述や重複を整理
+- [ ] `apps/web/src/ui/App.tsx` を画面・API client・timeline editor・styles に分割

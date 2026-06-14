@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addClip,
+  addMarker,
+  deleteClip,
+  duplicateClip,
   moveClip,
   resizeClip,
   setPlaybackRange,
+  splitClip,
   timelineToRemotionProps,
   type TimelineData,
+  updateClip,
 } from "./timeline";
 
 const sampleTimeline: TimelineData = {
@@ -75,6 +81,194 @@ describe("timeline operations", () => {
     const remotionProps = timelineToRemotionProps(sampleTimeline);
 
     expect(remotionProps.durationInFrames).toBe(360);
+    expect(remotionProps.durationMs).toBe(12000);
     expect(remotionProps.subtitleTracks[0].text).toBe("サンプル字幕");
+    expect(remotionProps.audioTracks[0]).toMatchObject({
+      assetPath: "output/tts_generation/latest/audio.wav",
+      startMs: 0,
+      endMs: 6000,
+      trimBeforeMs: 0,
+      volume: 1,
+    });
+    expect(remotionProps.manualEditSummary).toMatchObject({
+      subtitleClipCount: 1,
+      audioClipCount: 1,
+      markerCount: 1,
+    });
+  });
+
+  it("字幕クリップを追加・複製・削除できる", () => {
+    const added = addClip(sampleTimeline, {
+      trackId: "t-sub",
+      clip: {
+        id: "clip-sub-2",
+        assetType: "subtitle",
+        assetPath: "output/subtitle_generation/latest/subtitles.json",
+        startMs: 6200,
+        durationMs: 1600,
+        text: "手動テロップ",
+        style: "editorial",
+      },
+    });
+    expect(added.tracks[1].clips).toHaveLength(2);
+
+    const duplicated = duplicateClip(added, {
+      trackId: "t-sub",
+      clipId: "clip-sub-2",
+    });
+    expect(duplicated.tracks[1].clips).toHaveLength(3);
+    expect(duplicated.tracks[1].clips[2]?.id).toContain("clip-sub-2-copy");
+    expect(duplicated.tracks[1].clips[2]?.startMs).toBe(7800);
+
+    const deleted = deleteClip(duplicated, {
+      trackId: "t-sub",
+      clipId: "clip-sub-2",
+    });
+    expect(deleted.tracks[1].clips).toHaveLength(2);
+    expect(deleted.tracks[1].clips.some((clip) => clip.id === "clip-sub-2")).toBe(false);
+  });
+
+  it("クリップを指定位置で分割できる", () => {
+    const updated = splitClip(sampleTimeline, {
+      trackId: "t-audio",
+      clipId: "clip-1",
+      splitAtMs: 2400,
+    });
+
+    expect(updated.tracks[0].clips).toHaveLength(2);
+    expect(updated.tracks[0].clips[0]).toMatchObject({
+      id: "clip-1",
+      startMs: 0,
+      durationMs: 2400,
+      inMs: 0,
+      outMs: 2400,
+    });
+    expect(updated.tracks[0].clips[1]).toMatchObject({
+      id: "clip-1-split-2",
+      startMs: 2400,
+      durationMs: 3600,
+      inMs: 2400,
+      outMs: 6000,
+    });
+  });
+
+  it("クリップ内容とマーカーを更新できる", () => {
+    const updated = updateClip(sampleTimeline, {
+      trackId: "t-sub",
+      clipId: "clip-sub-1",
+      patch: {
+        text: "修正版テロップ",
+        style: "important",
+        startMs: 500,
+        durationMs: 5500,
+      },
+    });
+    const withMarker = addMarker(updated, {
+      id: "m2",
+      timeMs: 5200,
+      label: "調整ポイント",
+    });
+
+    expect(withMarker.tracks[1].clips[0]).toMatchObject({
+      text: "修正版テロップ",
+      style: "important",
+      startMs: 500,
+      durationMs: 5500,
+    });
+    expect(withMarker.markers).toContainEqual({
+      id: "m2",
+      timeMs: 5200,
+      label: "調整ポイント",
+    });
+  });
+
+  it("再生範囲に合わせて字幕と音声を正規化できる", () => {
+    const rangedTimeline: TimelineData = {
+      playbackRange: { inMs: 1000, outMs: 7000 },
+      markers: [
+        { id: "m1", timeMs: 500, label: "除外" },
+        { id: "m2", timeMs: 3000, label: "残す" },
+      ],
+      tracks: [
+        {
+          id: "track-audio",
+          name: "音声",
+          type: "audio",
+          clips: [
+            {
+              id: "audio-main",
+              assetType: "audio",
+              assetPath: "output/tts_generation/latest/audio.wav",
+              startMs: 0,
+              durationMs: 9000,
+              inMs: 0,
+              outMs: 9000,
+              volume: 0.8,
+              fadeInMs: 300,
+              fadeOutMs: 400,
+            },
+          ],
+        },
+        {
+          id: "track-subtitle",
+          name: "字幕",
+          type: "subtitle",
+          clips: [
+            {
+              id: "sub-1",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 0,
+              durationMs: 2500,
+              text: "冒頭は途中から残る",
+              style: "reimu",
+            },
+            {
+              id: "sub-2",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 5000,
+              durationMs: 3000,
+              text: "後半は途中で切れる",
+              style: "marisa",
+            },
+          ],
+        },
+      ],
+    };
+
+    const remotionProps = timelineToRemotionProps(rangedTimeline);
+
+    expect(remotionProps.durationMs).toBe(6000);
+    expect(remotionProps.durationInFrames).toBe(180);
+    expect(remotionProps.subtitleTracks).toEqual([
+      {
+        clipId: "sub-1",
+        startMs: 0,
+        endMs: 1500,
+        text: "冒頭は途中から残る",
+        speaker: "reimu",
+      },
+      {
+        clipId: "sub-2",
+        startMs: 4000,
+        endMs: 6000,
+        text: "後半は途中で切れる",
+        speaker: "marisa",
+      },
+    ]);
+    expect(remotionProps.audioTracks).toEqual([
+      {
+        clipId: "audio-main",
+        assetPath: "output/tts_generation/latest/audio.wav",
+        startMs: 0,
+        endMs: 6000,
+        trimBeforeMs: 1000,
+        volume: 0.8,
+        fadeInMs: 300,
+        fadeOutMs: 400,
+      },
+    ]);
+    expect(remotionProps.markers).toEqual([{ id: "m2", timeMs: 2000, label: "残す" }]);
   });
 });

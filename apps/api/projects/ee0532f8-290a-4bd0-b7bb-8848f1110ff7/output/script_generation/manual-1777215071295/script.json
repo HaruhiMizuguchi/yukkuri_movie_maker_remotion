@@ -1,0 +1,14 @@
+{
+  "title": "実APIから生成するE2E動画",
+  "theme": "実API E2E",
+  "lines": [
+    {
+      "speaker": "reimu",
+      "text": "実APIとDBとWorkerを通して検証します。"
+    },
+    {
+      "speaker": "marisa",
+      "text": "最後にMP4の存在まで確認するぜ。"
+    }
+  ]
+}

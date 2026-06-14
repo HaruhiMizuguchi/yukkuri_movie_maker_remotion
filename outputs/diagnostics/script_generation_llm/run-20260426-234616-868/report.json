@@ -1,0 +1,23 @@
+{
+  "runId": "run-20260426-234616-868",
+  "provider": "gemini",
+  "model": "gemini-2.0-flash",
+  "apiKeyConfigured": true,
+  "requestAttempted": true,
+  "success": true,
+  "classification": "ok",
+  "classificationDetail": "台本JSONを正常に取得し、shape検証も通過しました。",
+  "responseStatus": 200,
+  "errorStatus": null,
+  "workflowWouldFallback": false,
+  "outputDir": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868",
+  "reportPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\report.json",
+  "requestPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\request.json",
+  "rawResponsePath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\raw_response.txt",
+  "responseJsonPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\response.json",
+  "extractedTextPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\extracted_text.txt",
+  "generatedScriptPath": "C:\\python_program\\yukkuri_movie_maker_remotion\\outputs\\diagnostics\\script_generation_llm\\run-20260426-234616-868\\generated_script.json",
+  "lineCount": 8,
+  "startedAt": "2026-04-26T14:46:16.871Z",
+  "finishedAt": "2026-04-26T14:46:21.823Z"
+}

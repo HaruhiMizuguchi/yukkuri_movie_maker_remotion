@@ -1,0 +1,35 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "[\n  {\n    \"title\": \"疎通確認用ゆっくり解説\",\n    \"theme\": \"疎通確認\",\n    \"lines\": [\n      {\n        \"speaker\": \"霊夢\",\n        \"text\": \"やあ、みんな！霊夢だよ！今日は、ちゃんと音声が聞こえているか、映像が見えているかを確認するための、簡単な解説を始めるわ！\",\n        \"emotion\": \"cheerful\"\n      },\n      {\n        \"speaker\": \"魔理沙\",\n        \"text\": \"おう！魔理沙だぜ！今回は、お互いの環境がちゃんと繋がっているかを確認するってわけだな。\",\n        \"emotion\": \"excited\"\n      },\n      {\n        \"speaker\": \"霊夢\",\n        \"text\": \"そう！まずは、音声が聞こえているか確認するために、何か適当な言葉を発してみてくれるかしら？例えば…「こんにちは」とか！\",\n        \"emotion\": \"calm\"\n      },\n      {\n        \"speaker\": \"魔理沙\",\n        \"text\": \"よし、それじゃあ、魔理沙から。「こんにちはー！聞こえるかー？」\",\n        \"emotion\": \"loud\"\n      },\n      {\n        \"speaker\": \"霊夢\",\n        \"text\": \"ありがとう！ちゃんと聞こえたわ！次は、映像の確認ね。画面に霊夢と魔理沙がちゃんと映っているかしら？\",\n        \"emotion\": \"calm\"\n      },\n      {\n        \"speaker\": \"魔理沙\",\n        \"text\": \"もし、映像がカクカクしてたり、止まってたりしたら、コメントで教えてくれよな！\",\n        \"emotion\": \"urgent\"\n      },\n      {\n        \"speaker\": \"霊夢\",\n        \"text\": \"最後に、もし何か問題があったら、遠慮なくコメントで教えてね！みんなで協力して、快適な環境を作りましょう！\",\n        \"emotion\": \"encouraging\"\n      },\n      {\n        \"speaker\": \"魔理沙\",\n        \"text\": \"そういうことだ！よろしく頼むぜ！\",\n        \"emotion\": \"friendly\"\n      }\n    ]\n  }\n]"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.14912885030110676
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 50,
+    "candidatesTokenCount": 480,
+    "totalTokenCount": 530,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 50
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 480
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "cp3uae-SMLaL0-kP0rXYyQk"
+}

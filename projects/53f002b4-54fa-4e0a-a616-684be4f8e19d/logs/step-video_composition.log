@@ -1,0 +1,4 @@
+{"at":"2026-04-26T23:40:57.552Z","event":"start","jobId":"2156b7ed-02ed-41b4-bc57-8a87c994408f"}
+{"at":"2026-04-26T23:40:59.077Z","event":"start","jobId":"2156b7ed-02ed-41b4-bc57-8a87c994408f"}
+{"at":"2026-04-26T23:54:52.217Z","event":"start","jobId":"2156b7ed-02ed-41b4-bc57-8a87c994408f"}
+{"at":"2026-04-26T23:57:07.014Z","event":"completed","jobId":"2156b7ed-02ed-41b4-bc57-8a87c994408f","renderer":"remotion","characterImagePath":"projects/53f002b4-54fa-4e0a-a616-684be4f8e19d/output/video_composition/run-20260427-085452-214/character.png","durationMs":89688,"shotCount":16,"characterCueCount":482,"emphasisCount":3,"audioCueCount":34,"chapterCount":3}

@@ -1,0 +1,28 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Yu Gothic,48,&H00FFFFFF,&H0000FFFF,&H00101010,&H66000000,-1,0,0,0,100,100,0,0,1,2,0,2,30,30,60,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+
+Dialogue: 0,0:00:00.00,0:00:02.83,Default,,0,0,0,,霊夢: 皆さん、こんにちは！霊夢だよ！
+Dialogue: 0,0:00:02.83,0:00:07.67,Default,,0,0,0,,魔理沙: 魔理沙だぜ。今日は本能寺の変についてゆっくり解説していくぜ。
+Dialogue: 0,0:00:07.67,0:00:14.75,Default,,0,0,0,,霊夢: 本能寺の変…織田信長が明智光秀に討たれた、日本史における最大級のミステリーよね。
+Dialogue: 0,0:00:14.75,0:00:25.01,Default,,0,0,0,,魔理沙: ああ。信長の天下統一目前での出来事だったから、その衝撃は計り知れない。光秀の動機については、様々な説があるんだ。
+Dialogue: 0,0:00:25.01,0:00:27.32,Default,,0,0,0,,霊夢: 具体的にはどんな説があるの？
+Dialogue: 0,0:00:27.32,0:00:35.74,Default,,0,0,0,,魔理沙: まずは『怨恨説』だ。信長からの度重なるパワハラや、母親を人質にされたことへの恨みが原因という説だな。
+Dialogue: 0,0:00:35.74,0:00:38.77,Default,,0,0,0,,霊夢: パワハラ…現代にも通じるものがあるわね。
+Dialogue: 0,0:00:38.77,0:00:48.49,Default,,0,0,0,,魔理沙: 次に『野望説』だ。光秀自身が天下を狙っていたという説だな。信長を討ち、自分がその後釜に座ろうとした、というわけだ。
+Dialogue: 0,0:00:48.49,0:00:52.88,Default,,0,0,0,,霊夢: でも、光秀はすぐに羽柴秀吉に討たれてしまったわよね？
+Dialogue: 0,0:00:52.88,0:01:02.26,Default,,0,0,0,,魔理沙: ああ。だから『黒幕説』も根強いんだ。光秀の背後に、朝廷や他の大名がいて、信長を倒すように仕向けたという説だ。
+Dialogue: 0,0:01:02.26,0:01:04.87,Default,,0,0,0,,霊夢: 黒幕…誰が一番怪しいの？
+Dialogue: 0,0:01:04.87,0:01:16.39,Default,,0,0,0,,魔理沙: 有力なのは、朝廷、徳川家康、羽柴秀吉あたりだな。特に秀吉は、信長死後の天下をすぐに手に入れたから、怪しいと見られがちだ。
+Dialogue: 0,0:01:16.39,0:01:19.90,Default,,0,0,0,,霊夢: なるほどね。真相は闇の中、って感じね。
+Dialogue: 0,0:01:19.90,0:01:26.13,Default,,0,0,0,,魔理沙: そういうことだ。本能寺の変は、歴史のロマンを掻き立てる、永遠の謎と言えるだろう。
+Dialogue: 0,0:01:26.13,0:01:28.26,Default,,0,0,0,,霊夢: 今日はありがとう！またね！
+Dialogue: 0,0:01:28.26,0:01:29.68,Default,,0,0,0,,魔理沙: おう！またな！

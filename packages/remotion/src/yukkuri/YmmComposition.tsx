@@ -16,6 +16,17 @@ export type SubtitleTrack = {
   speaker: string;
 };
 
+export type ManualAudioTrack = {
+  clipId: string;
+  assetPath: string;
+  startMs: number;
+  endMs: number;
+  trimBeforeMs: number;
+  volume: number;
+  fadeInMs: number;
+  fadeOutMs: number;
+};
+
 export type ShotPlanItem = {
   id: string;
   type: "wide" | "medium" | "close" | "insert";
@@ -121,6 +132,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
+  audioTracks?: ManualAudioTrack[];
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;
   subtitlePresentation?: SubtitlePresentationPlan;
@@ -137,6 +149,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   title,
   theme,
   subtitleTracks,
+  audioTracks = [],
   shotPlan = [],
   characterPerformance = {
     mouthCues: [],
@@ -252,6 +265,8 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         )
       )
     : 0;
+
+  const hasManualAudioTracks = audioTracks.length > 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
@@ -528,7 +543,28 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           </Sequence>
         );
       })}
-      {audioPath ? <Audio src={audioPath} /> : null}
+      {hasManualAudioTracks
+        ? audioTracks.map((track) => (
+            <Sequence
+              key={track.clipId}
+              from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
+              durationInFrames={Math.max(
+                1,
+                Math.ceil(((track.endMs - track.startMs) / 1000) * fps)
+              )}
+            >
+              <Audio
+                src={track.assetPath}
+                trimBefore={Math.max(0, Math.floor((track.trimBeforeMs / 1000) * fps))}
+                volume={(audioFrame) =>
+                  getManualAudioTrackVolume(track, (audioFrame / fps) * 1000)
+                }
+              />
+            </Sequence>
+          ))
+        : audioPath
+          ? <Audio src={audioPath} />
+          : null}
     </AbsoluteFill>
   );
 };
@@ -641,4 +677,14 @@ const getWindowVolume = (
 ) => {
   const matched = windows.find((window) => currentMs >= window.startMs && currentMs < window.endMs);
   return matched?.volume ?? 0;
+};
+
+const getManualAudioTrackVolume = (track: ManualAudioTrack, relativeMs: number) => {
+  const durationMs = Math.max(1, track.endMs - track.startMs);
+  const fadeInRatio =
+    track.fadeInMs > 0 ? Math.min(1, Math.max(0, relativeMs / track.fadeInMs)) : 1;
+  const remainingMs = Math.max(0, durationMs - relativeMs);
+  const fadeOutRatio =
+    track.fadeOutMs > 0 ? Math.min(1, Math.max(0, remainingMs / track.fadeOutMs)) : 1;
+  return track.volume * Math.min(fadeInRatio, fadeOutRatio);
 };

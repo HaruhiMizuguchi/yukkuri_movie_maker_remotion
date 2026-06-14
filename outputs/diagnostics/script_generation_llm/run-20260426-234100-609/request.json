@@ -1,0 +1,24 @@
+{
+  "provider": "gemini",
+  "model": "gemini-2.0-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+  "timeoutMs": 30000,
+  "apiKeyConfigured": true,
+  "theme": "疎通確認用の台本生成",
+  "body": {
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。schema={title:string,theme:string,lines:[{speaker:string,text:string,emotion?:string}]}テーマ: 疎通確認用の台本生成"
+          }
+        ]
+      }
+    ],
+    "generationConfig": {
+      "temperature": 0.5,
+      "responseMimeType": "application/json"
+    }
+  }
+}

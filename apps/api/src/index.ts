@@ -21,6 +21,7 @@ import {
   saveTimeline,
   writeSettings,
 } from "./storage";
+import { resolveApiWorkspaceRoot } from "./workspaceRoot";
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -29,7 +30,7 @@ const env = envSchema.parse(process.env);
 
 const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
-const workspaceRoot = process.cwd();
+const workspaceRoot = resolveApiWorkspaceRoot(import.meta.url);
 
 const app = Fastify({ logger: true });
 
@@ -119,9 +120,9 @@ app.get("/api/projects", async (req) => {
   );
 
   if (!requestUserId) {
-    return withOwner;
+    return toJsonSafeValue(withOwner);
   }
-  return withOwner.filter((project) => project.ownerId === requestUserId);
+  return toJsonSafeValue(withOwner.filter((project) => project.ownerId === requestUserId));
 });
 
 app.post("/api/projects", async (req, reply) => {
@@ -184,7 +185,7 @@ app.get("/api/projects/:projectId", async (req, reply) => {
   const assets = await listProjectAssets(workspaceRoot, projectId);
   const logs = await readWorkflowLogs(projectId);
 
-  return {
+  return toJsonSafeValue({
     project,
     ownerId,
     jobs,
@@ -192,7 +193,7 @@ app.get("/api/projects/:projectId", async (req, reply) => {
     timeline,
     assets,
     logs,
-  };
+  });
 });
 
 app.post("/api/projects/:projectId/jobs", async (req, reply) => {
@@ -231,7 +232,7 @@ app.get("/api/jobs/:jobId", async (req, reply) => {
     return reply.code(404).send({ error: "not_found" });
   }
 
-  return job;
+  return toJsonSafeValue(job);
 });
 
 app.post("/api/jobs", async (req, reply) => {
@@ -439,6 +440,24 @@ const getRequestUserId = (headerValue: unknown): string | null => {
   }
   const trimmed = headerValue.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const toJsonSafeValue = (value: unknown): unknown => {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonSafeValue(item));
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, toJsonSafeValue(nestedValue)])
+    );
+  }
+  return value;
 };
 
 async function main() {

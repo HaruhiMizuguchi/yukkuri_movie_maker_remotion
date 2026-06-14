@@ -1,0 +1,2836 @@
+{
+  "mouthCues": [
+    {
+      "startMs": 0,
+      "endMs": 140,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 210,
+      "endMs": 350,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 420,
+      "endMs": 560,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 630,
+      "endMs": 770,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 840,
+      "endMs": 980,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 1050,
+      "endMs": 1190,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 1260,
+      "endMs": 1400,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 1470,
+      "endMs": 1610,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 1680,
+      "endMs": 1820,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 1890,
+      "endMs": 2030,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2100,
+      "endMs": 2240,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2310,
+      "endMs": 2450,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2520,
+      "endMs": 2660,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2730,
+      "endMs": 2831,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2831,
+      "endMs": 2971,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 3041,
+      "endMs": 3181,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 3251,
+      "endMs": 3391,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 3461,
+      "endMs": 3601,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 3671,
+      "endMs": 3811,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 3881,
+      "endMs": 4021,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 4091,
+      "endMs": 4231,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 4301,
+      "endMs": 4441,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 4511,
+      "endMs": 4651,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 4721,
+      "endMs": 4861,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 4931,
+      "endMs": 5071,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 5141,
+      "endMs": 5281,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 5351,
+      "endMs": 5491,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 5561,
+      "endMs": 5701,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 5771,
+      "endMs": 5911,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 5981,
+      "endMs": 6121,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 6191,
+      "endMs": 6331,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 6401,
+      "endMs": 6541,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 6611,
+      "endMs": 6751,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 6821,
+      "endMs": 6961,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7031,
+      "endMs": 7171,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7241,
+      "endMs": 7381,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7451,
+      "endMs": 7591,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7661,
+      "endMs": 7674,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7674,
+      "endMs": 7814,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 7884,
+      "endMs": 8024,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 8094,
+      "endMs": 8234,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 8304,
+      "endMs": 8444,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 8514,
+      "endMs": 8654,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 8724,
+      "endMs": 8864,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 8934,
+      "endMs": 9074,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 9144,
+      "endMs": 9284,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 9354,
+      "endMs": 9494,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 9564,
+      "endMs": 9704,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 9774,
+      "endMs": 9914,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 9984,
+      "endMs": 10124,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 10194,
+      "endMs": 10334,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 10404,
+      "endMs": 10544,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 10614,
+      "endMs": 10754,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 10824,
+      "endMs": 10964,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 11034,
+      "endMs": 11174,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 11244,
+      "endMs": 11384,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 11454,
+      "endMs": 11594,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 11664,
+      "endMs": 11804,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 11874,
+      "endMs": 12014,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 12084,
+      "endMs": 12224,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 12294,
+      "endMs": 12434,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 12504,
+      "endMs": 12644,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 12714,
+      "endMs": 12854,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 12924,
+      "endMs": 13064,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 13134,
+      "endMs": 13274,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 13344,
+      "endMs": 13484,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 13554,
+      "endMs": 13694,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 13764,
+      "endMs": 13904,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 13974,
+      "endMs": 14114,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 14184,
+      "endMs": 14324,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 14394,
+      "endMs": 14534,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 14604,
+      "endMs": 14744,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 14754,
+      "endMs": 14894,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 14964,
+      "endMs": 15104,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 15174,
+      "endMs": 15314,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 15384,
+      "endMs": 15524,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 15594,
+      "endMs": 15734,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 15804,
+      "endMs": 15944,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 16014,
+      "endMs": 16154,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 16224,
+      "endMs": 16364,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 16434,
+      "endMs": 16574,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 16644,
+      "endMs": 16784,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 16854,
+      "endMs": 16994,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 17064,
+      "endMs": 17204,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 17274,
+      "endMs": 17414,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 17484,
+      "endMs": 17624,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 17694,
+      "endMs": 17834,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 17904,
+      "endMs": 18044,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 18114,
+      "endMs": 18254,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 18324,
+      "endMs": 18464,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 18534,
+      "endMs": 18674,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 18744,
+      "endMs": 18884,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 18954,
+      "endMs": 19094,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 19164,
+      "endMs": 19304,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 19374,
+      "endMs": 19514,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 19584,
+      "endMs": 19724,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 19794,
+      "endMs": 19934,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 20004,
+      "endMs": 20144,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 20214,
+      "endMs": 20354,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 20424,
+      "endMs": 20564,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 20634,
+      "endMs": 20774,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 20844,
+      "endMs": 20984,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 21054,
+      "endMs": 21194,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 21264,
+      "endMs": 21404,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 21474,
+      "endMs": 21614,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 21684,
+      "endMs": 21824,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 21894,
+      "endMs": 22034,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 22104,
+      "endMs": 22244,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 22314,
+      "endMs": 22454,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 22524,
+      "endMs": 22664,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 22734,
+      "endMs": 22874,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 22944,
+      "endMs": 23084,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 23154,
+      "endMs": 23294,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 23364,
+      "endMs": 23504,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 23574,
+      "endMs": 23714,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 23784,
+      "endMs": 23924,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 23994,
+      "endMs": 24134,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 24204,
+      "endMs": 24344,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 24414,
+      "endMs": 24554,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 24624,
+      "endMs": 24764,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 24834,
+      "endMs": 24974,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 25017,
+      "endMs": 25157,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 25227,
+      "endMs": 25367,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 25437,
+      "endMs": 25577,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 25647,
+      "endMs": 25787,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 25857,
+      "endMs": 25997,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 26067,
+      "endMs": 26207,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 26277,
+      "endMs": 26417,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 26487,
+      "endMs": 26627,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 26697,
+      "endMs": 26837,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 26907,
+      "endMs": 27047,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 27117,
+      "endMs": 27257,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 27325,
+      "endMs": 27465,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 27535,
+      "endMs": 27675,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 27745,
+      "endMs": 27885,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 27955,
+      "endMs": 28095,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 28165,
+      "endMs": 28305,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 28375,
+      "endMs": 28515,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 28585,
+      "endMs": 28725,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 28795,
+      "endMs": 28935,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 29005,
+      "endMs": 29145,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 29215,
+      "endMs": 29355,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 29425,
+      "endMs": 29565,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 29635,
+      "endMs": 29775,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 29845,
+      "endMs": 29985,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 30055,
+      "endMs": 30195,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 30265,
+      "endMs": 30405,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 30475,
+      "endMs": 30615,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 30685,
+      "endMs": 30825,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 30895,
+      "endMs": 31035,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 31105,
+      "endMs": 31245,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 31315,
+      "endMs": 31455,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 31525,
+      "endMs": 31665,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 31735,
+      "endMs": 31875,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 31945,
+      "endMs": 32085,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 32155,
+      "endMs": 32295,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 32365,
+      "endMs": 32505,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 32575,
+      "endMs": 32715,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 32785,
+      "endMs": 32925,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 32995,
+      "endMs": 33135,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 33205,
+      "endMs": 33345,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 33415,
+      "endMs": 33555,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 33625,
+      "endMs": 33765,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 33835,
+      "endMs": 33975,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 34045,
+      "endMs": 34185,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 34255,
+      "endMs": 34395,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 34465,
+      "endMs": 34605,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 34675,
+      "endMs": 34815,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 34885,
+      "endMs": 35025,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35095,
+      "endMs": 35235,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35305,
+      "endMs": 35445,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35515,
+      "endMs": 35655,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35725,
+      "endMs": 35742,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35742,
+      "endMs": 35882,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 35952,
+      "endMs": 36092,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 36162,
+      "endMs": 36302,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 36372,
+      "endMs": 36512,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 36582,
+      "endMs": 36722,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 36792,
+      "endMs": 36932,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 37002,
+      "endMs": 37142,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 37212,
+      "endMs": 37352,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 37422,
+      "endMs": 37562,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 37632,
+      "endMs": 37772,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 37842,
+      "endMs": 37982,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38052,
+      "endMs": 38192,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38262,
+      "endMs": 38402,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38472,
+      "endMs": 38612,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38682,
+      "endMs": 38779,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38779,
+      "endMs": 38919,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 38989,
+      "endMs": 39129,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 39199,
+      "endMs": 39339,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 39409,
+      "endMs": 39549,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 39619,
+      "endMs": 39759,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 39829,
+      "endMs": 39969,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 40039,
+      "endMs": 40179,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 40249,
+      "endMs": 40389,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 40459,
+      "endMs": 40599,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 40669,
+      "endMs": 40809,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 40879,
+      "endMs": 41019,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 41089,
+      "endMs": 41229,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 41299,
+      "endMs": 41439,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 41509,
+      "endMs": 41649,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 41719,
+      "endMs": 41859,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 41929,
+      "endMs": 42069,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 42139,
+      "endMs": 42279,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 42349,
+      "endMs": 42489,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 42559,
+      "endMs": 42699,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 42769,
+      "endMs": 42909,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 42979,
+      "endMs": 43119,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 43189,
+      "endMs": 43329,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 43399,
+      "endMs": 43539,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 43609,
+      "endMs": 43749,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 43819,
+      "endMs": 43959,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 44029,
+      "endMs": 44169,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 44239,
+      "endMs": 44379,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 44449,
+      "endMs": 44589,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 44659,
+      "endMs": 44799,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 44869,
+      "endMs": 45009,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 45079,
+      "endMs": 45219,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 45289,
+      "endMs": 45429,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 45499,
+      "endMs": 45639,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 45709,
+      "endMs": 45849,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 45919,
+      "endMs": 46059,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 46129,
+      "endMs": 46269,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 46339,
+      "endMs": 46479,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 46549,
+      "endMs": 46689,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 46759,
+      "endMs": 46899,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 46969,
+      "endMs": 47109,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 47179,
+      "endMs": 47319,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 47389,
+      "endMs": 47529,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 47599,
+      "endMs": 47739,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 47809,
+      "endMs": 47949,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 48019,
+      "endMs": 48159,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 48229,
+      "endMs": 48369,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 48439,
+      "endMs": 48497,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 48497,
+      "endMs": 48637,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 48707,
+      "endMs": 48847,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 48917,
+      "endMs": 49057,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 49127,
+      "endMs": 49267,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 49337,
+      "endMs": 49477,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 49547,
+      "endMs": 49687,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 49757,
+      "endMs": 49897,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 49967,
+      "endMs": 50107,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 50177,
+      "endMs": 50317,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 50387,
+      "endMs": 50527,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 50597,
+      "endMs": 50737,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 50807,
+      "endMs": 50947,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 51017,
+      "endMs": 51157,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 51227,
+      "endMs": 51367,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 51437,
+      "endMs": 51577,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 51647,
+      "endMs": 51787,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 51857,
+      "endMs": 51997,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52067,
+      "endMs": 52207,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52277,
+      "endMs": 52417,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52487,
+      "endMs": 52627,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52697,
+      "endMs": 52837,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52882,
+      "endMs": 53022,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 53092,
+      "endMs": 53232,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 53302,
+      "endMs": 53442,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 53512,
+      "endMs": 53652,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 53722,
+      "endMs": 53862,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 53932,
+      "endMs": 54072,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 54142,
+      "endMs": 54282,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 54352,
+      "endMs": 54492,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 54562,
+      "endMs": 54702,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 54772,
+      "endMs": 54912,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 54982,
+      "endMs": 55122,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 55192,
+      "endMs": 55332,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 55402,
+      "endMs": 55542,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 55612,
+      "endMs": 55752,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 55822,
+      "endMs": 55962,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 56032,
+      "endMs": 56172,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 56242,
+      "endMs": 56382,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 56452,
+      "endMs": 56592,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 56662,
+      "endMs": 56802,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 56872,
+      "endMs": 57012,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 57082,
+      "endMs": 57222,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 57292,
+      "endMs": 57432,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 57502,
+      "endMs": 57642,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 57712,
+      "endMs": 57852,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 57922,
+      "endMs": 58062,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 58132,
+      "endMs": 58272,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 58342,
+      "endMs": 58482,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 58552,
+      "endMs": 58692,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 58762,
+      "endMs": 58902,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 58972,
+      "endMs": 59112,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 59182,
+      "endMs": 59322,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 59392,
+      "endMs": 59532,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 59602,
+      "endMs": 59742,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 59812,
+      "endMs": 59952,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 60022,
+      "endMs": 60162,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 60232,
+      "endMs": 60372,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 60442,
+      "endMs": 60582,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 60652,
+      "endMs": 60792,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 60862,
+      "endMs": 61002,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 61072,
+      "endMs": 61212,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 61282,
+      "endMs": 61422,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 61492,
+      "endMs": 61632,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 61702,
+      "endMs": 61842,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 61912,
+      "endMs": 62052,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 62122,
+      "endMs": 62262,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 62264,
+      "endMs": 62404,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 62474,
+      "endMs": 62614,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 62684,
+      "endMs": 62824,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 62894,
+      "endMs": 63034,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 63104,
+      "endMs": 63244,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 63314,
+      "endMs": 63454,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 63524,
+      "endMs": 63664,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 63734,
+      "endMs": 63874,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 63944,
+      "endMs": 64084,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64154,
+      "endMs": 64294,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64364,
+      "endMs": 64504,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64574,
+      "endMs": 64714,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64784,
+      "endMs": 64875,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64875,
+      "endMs": 65015,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 65085,
+      "endMs": 65225,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 65295,
+      "endMs": 65435,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 65505,
+      "endMs": 65645,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 65715,
+      "endMs": 65855,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 65925,
+      "endMs": 66065,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 66135,
+      "endMs": 66275,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 66345,
+      "endMs": 66485,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 66555,
+      "endMs": 66695,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 66765,
+      "endMs": 66905,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 66975,
+      "endMs": 67115,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 67185,
+      "endMs": 67325,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 67395,
+      "endMs": 67535,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 67605,
+      "endMs": 67745,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 67815,
+      "endMs": 67955,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 68025,
+      "endMs": 68165,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 68235,
+      "endMs": 68375,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 68445,
+      "endMs": 68585,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 68655,
+      "endMs": 68795,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 68865,
+      "endMs": 69005,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 69075,
+      "endMs": 69215,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 69285,
+      "endMs": 69425,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 69495,
+      "endMs": 69635,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 69705,
+      "endMs": 69845,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 69915,
+      "endMs": 70055,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 70125,
+      "endMs": 70265,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 70335,
+      "endMs": 70475,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 70545,
+      "endMs": 70685,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 70755,
+      "endMs": 70895,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 70965,
+      "endMs": 71105,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 71175,
+      "endMs": 71315,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 71385,
+      "endMs": 71525,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 71595,
+      "endMs": 71735,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 71805,
+      "endMs": 71945,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 72015,
+      "endMs": 72155,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 72225,
+      "endMs": 72365,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 72435,
+      "endMs": 72575,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 72645,
+      "endMs": 72785,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 72855,
+      "endMs": 72995,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 73065,
+      "endMs": 73205,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 73275,
+      "endMs": 73415,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 73485,
+      "endMs": 73625,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 73695,
+      "endMs": 73835,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 73905,
+      "endMs": 74045,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 74115,
+      "endMs": 74255,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 74325,
+      "endMs": 74465,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 74535,
+      "endMs": 74675,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 74745,
+      "endMs": 74885,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 74955,
+      "endMs": 75095,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 75165,
+      "endMs": 75305,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 75375,
+      "endMs": 75515,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 75585,
+      "endMs": 75725,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 75795,
+      "endMs": 75935,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 76005,
+      "endMs": 76145,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 76215,
+      "endMs": 76355,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 76399,
+      "endMs": 76539,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 76609,
+      "endMs": 76749,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 76819,
+      "endMs": 76959,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 77029,
+      "endMs": 77169,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 77239,
+      "endMs": 77379,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 77449,
+      "endMs": 77589,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 77659,
+      "endMs": 77799,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 77869,
+      "endMs": 78009,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 78079,
+      "endMs": 78219,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 78289,
+      "endMs": 78429,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 78499,
+      "endMs": 78639,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 78709,
+      "endMs": 78849,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 78919,
+      "endMs": 79059,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79129,
+      "endMs": 79269,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79339,
+      "endMs": 79479,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79549,
+      "endMs": 79689,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79759,
+      "endMs": 79899,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79906,
+      "endMs": 80046,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 80116,
+      "endMs": 80256,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 80326,
+      "endMs": 80466,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 80536,
+      "endMs": 80676,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 80746,
+      "endMs": 80886,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 80956,
+      "endMs": 81096,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 81166,
+      "endMs": 81306,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 81376,
+      "endMs": 81516,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 81586,
+      "endMs": 81726,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 81796,
+      "endMs": 81936,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 82006,
+      "endMs": 82146,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 82216,
+      "endMs": 82356,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 82426,
+      "endMs": 82566,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 82636,
+      "endMs": 82776,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 82846,
+      "endMs": 82986,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 83056,
+      "endMs": 83196,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 83266,
+      "endMs": 83406,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 83476,
+      "endMs": 83616,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 83686,
+      "endMs": 83826,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 83896,
+      "endMs": 84036,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 84106,
+      "endMs": 84246,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 84316,
+      "endMs": 84456,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 84526,
+      "endMs": 84666,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 84736,
+      "endMs": 84876,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 84946,
+      "endMs": 85086,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 85156,
+      "endMs": 85296,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 85366,
+      "endMs": 85506,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 85576,
+      "endMs": 85716,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 85786,
+      "endMs": 85926,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 85996,
+      "endMs": 86135,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 86135,
+      "endMs": 86275,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 86345,
+      "endMs": 86485,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 86555,
+      "endMs": 86695,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 86765,
+      "endMs": 86905,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 86975,
+      "endMs": 87115,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 87185,
+      "endMs": 87325,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 87395,
+      "endMs": 87535,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 87605,
+      "endMs": 87745,
+      "openness": 0.85,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 87815,
+      "endMs": 87955,
+      "openness": 0.35,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 88025,
+      "endMs": 88165,
+      "openness": 0.72,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 88235,
+      "endMs": 88263,
+      "openness": 0.5,
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 88263,
+      "endMs": 88403,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 88473,
+      "endMs": 88613,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 88683,
+      "endMs": 88823,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 88893,
+      "endMs": 89033,
+      "openness": 0.85,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 89103,
+      "endMs": 89243,
+      "openness": 0.35,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 89313,
+      "endMs": 89453,
+      "openness": 0.72,
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 89523,
+      "endMs": 89663,
+      "openness": 0.5,
+      "speaker": "魔理沙"
+    }
+  ],
+  "blinkCues": [
+    {
+      "startMs": 1900,
+      "endMs": 2020
+    },
+    {
+      "startMs": 4700,
+      "endMs": 4820
+    },
+    {
+      "startMs": 7500,
+      "endMs": 7620
+    },
+    {
+      "startMs": 10300,
+      "endMs": 10420
+    },
+    {
+      "startMs": 13100,
+      "endMs": 13220
+    },
+    {
+      "startMs": 15900,
+      "endMs": 16020
+    },
+    {
+      "startMs": 18700,
+      "endMs": 18820
+    },
+    {
+      "startMs": 21500,
+      "endMs": 21620
+    },
+    {
+      "startMs": 24300,
+      "endMs": 24420
+    },
+    {
+      "startMs": 27100,
+      "endMs": 27220
+    },
+    {
+      "startMs": 29900,
+      "endMs": 30020
+    },
+    {
+      "startMs": 32700,
+      "endMs": 32820
+    },
+    {
+      "startMs": 35500,
+      "endMs": 35620
+    },
+    {
+      "startMs": 38300,
+      "endMs": 38420
+    },
+    {
+      "startMs": 41100,
+      "endMs": 41220
+    },
+    {
+      "startMs": 43900,
+      "endMs": 44020
+    },
+    {
+      "startMs": 46700,
+      "endMs": 46820
+    },
+    {
+      "startMs": 49500,
+      "endMs": 49620
+    },
+    {
+      "startMs": 52300,
+      "endMs": 52420
+    },
+    {
+      "startMs": 55100,
+      "endMs": 55220
+    },
+    {
+      "startMs": 57900,
+      "endMs": 58020
+    },
+    {
+      "startMs": 60700,
+      "endMs": 60820
+    },
+    {
+      "startMs": 63500,
+      "endMs": 63620
+    },
+    {
+      "startMs": 66300,
+      "endMs": 66420
+    },
+    {
+      "startMs": 69100,
+      "endMs": 69220
+    },
+    {
+      "startMs": 71900,
+      "endMs": 72020
+    },
+    {
+      "startMs": 74700,
+      "endMs": 74820
+    },
+    {
+      "startMs": 77500,
+      "endMs": 77620
+    },
+    {
+      "startMs": 80300,
+      "endMs": 80420
+    },
+    {
+      "startMs": 83100,
+      "endMs": 83220
+    },
+    {
+      "startMs": 85900,
+      "endMs": 86020
+    },
+    {
+      "startMs": 88700,
+      "endMs": 88820
+    }
+  ],
+  "expressionCues": [
+    {
+      "startMs": 0,
+      "endMs": 2831,
+      "expression": "happy",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 2831,
+      "endMs": 7674,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 7674,
+      "endMs": 14754,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 14754,
+      "endMs": 25017,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 25017,
+      "endMs": 27325,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 27325,
+      "endMs": 35742,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 35742,
+      "endMs": 38779,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 38779,
+      "endMs": 48497,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 48497,
+      "endMs": 52882,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 52882,
+      "endMs": 62264,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 62264,
+      "endMs": 64875,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 64875,
+      "endMs": 76399,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 76399,
+      "endMs": 79906,
+      "expression": "normal",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 79906,
+      "endMs": 86135,
+      "expression": "normal",
+      "speaker": "魔理沙"
+    },
+    {
+      "startMs": 86135,
+      "endMs": 88263,
+      "expression": "happy",
+      "speaker": "霊夢"
+    },
+    {
+      "startMs": 88263,
+      "endMs": 89689,
+      "expression": "happy",
+      "speaker": "魔理沙"
+    }
+  ]
+}

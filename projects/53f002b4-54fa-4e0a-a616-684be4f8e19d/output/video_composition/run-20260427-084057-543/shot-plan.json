@@ -1,0 +1,226 @@
+[
+  {
+    "id": "shot-001",
+    "type": "wide",
+    "startMs": 0,
+    "endMs": 2831,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1,
+    "zoomEnd": 1.04,
+    "panX": -0.027999999999999997,
+    "panY": -0.01
+  },
+  {
+    "id": "shot-002",
+    "type": "close",
+    "startMs": 2831,
+    "endMs": 7674,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.1749999999999998,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-003",
+    "type": "close",
+    "startMs": 7674,
+    "endMs": 14754,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.19,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-004",
+    "type": "close",
+    "startMs": 14754,
+    "endMs": 25017,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.16,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-005",
+    "type": "close",
+    "startMs": 25017,
+    "endMs": 27325,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.1749999999999998,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-006",
+    "type": "close",
+    "startMs": 27325,
+    "endMs": 35742,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.19,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-007",
+    "type": "close",
+    "startMs": 35742,
+    "endMs": 38779,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.16,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-008",
+    "type": "close",
+    "startMs": 38779,
+    "endMs": 48497,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.1749999999999998,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-009",
+    "type": "close",
+    "startMs": 48497,
+    "endMs": 52882,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.19,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-010",
+    "type": "close",
+    "startMs": 52882,
+    "endMs": 62264,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.16,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-011",
+    "type": "close",
+    "startMs": 62264,
+    "endMs": 64875,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.1749999999999998,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-012",
+    "type": "close",
+    "startMs": 64875,
+    "endMs": 76399,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.19,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-013",
+    "type": "close",
+    "startMs": 76399,
+    "endMs": 79906,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.16,
+    "panX": -0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-014",
+    "type": "close",
+    "startMs": 79906,
+    "endMs": 86135,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.1,
+    "zoomEnd": 1.1749999999999998,
+    "panX": 0.08,
+    "panY": -0.04
+  },
+  {
+    "id": "shot-015",
+    "type": "insert",
+    "startMs": 86135,
+    "endMs": 88263,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "霊夢",
+    "zoomStart": 1.14,
+    "zoomEnd": 1.23,
+    "panX": 0,
+    "panY": -0.06
+  },
+  {
+    "id": "shot-016",
+    "type": "insert",
+    "startMs": 88263,
+    "endMs": 89689,
+    "lineIndexes": [
+      null
+    ],
+    "focusSpeaker": "魔理沙",
+    "zoomStart": 1.14,
+    "zoomEnd": 1.2,
+    "panX": 0,
+    "panY": -0.06
+  }
+]

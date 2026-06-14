@@ -41,11 +41,17 @@ export type { DefaultWorkflowOptions } from "./defaultWorkflow";
 export { createProductionWorkflowImplementations } from "./productionWorkflow";
 export type { ProductionWorkflowOptions } from "./productionWorkflow";
 export {
+  addClip,
+  addMarker,
+  deleteClip,
+  duplicateClip,
   moveClip,
   resizeClip,
   setPlaybackRange,
+  splitClip,
   timelineToRemotionProps,
   type RemotionTimelineProps,
+  updateClip,
 } from "./timeline";
 
 export type WorkflowRunMode = "full" | "resume";

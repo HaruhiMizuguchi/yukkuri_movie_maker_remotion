@@ -12,6 +12,7 @@ const MEDIA_ROOT = path.join(WORKSPACE_ROOT, ".kamui", "movie", "media");
 const FRAME_RATE = 30;
 const WIDTH = 1920;
 const HEIGHT = 1080;
+const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const BASE_SCRIPT = {
   title: "今この環境で作れるAI動画生成フロー",
@@ -139,6 +140,7 @@ const main = async () => {
     profile: profile.id,
     renderer: "remotion",
   });
+  await prepareCreativeInputs({ projectRoot, runId, logPath, profileConfig: profile });
   await ensureAssetsExist(logPath);
 
   const scriptPath = await writeScript(projectRoot, runId, logPath, profile);
@@ -250,6 +252,42 @@ function createProfile(profileName) {
   };
 }
 
+async function prepareCreativeInputs({ projectRoot, runId, logPath, profileConfig }) {
+  const generatedScript = await generateGeminiScript(profileConfig.script.theme, profileConfig.script);
+  profileConfig.script = generatedScript;
+  profileConfig.chapters = buildGeneratedChapters(generatedScript.lines.length);
+  await writeWorkflowLog(logPath, "script_generated_with_gemini", {
+    title: generatedScript.title,
+    lineCount: generatedScript.lines.length,
+  });
+
+  const generatedImages = await generateGeminiImages({
+    projectRoot,
+    runId,
+    theme: generatedScript.theme,
+    title: generatedScript.title,
+    logPath,
+  });
+  ASSETS.cityImage = generatedImages.cityImagePath;
+  ASSETS.alleyImage = generatedImages.alleyImagePath;
+}
+
+function buildGeneratedChapters(lineCount) {
+  const titles = BASE_CHAPTERS.map((chapter) => chapter.title);
+  const indexes = titles.map((_, index) =>
+    Math.min(lineCount - 1, Math.floor((lineCount * index) / Math.max(1, titles.length)))
+  );
+  const uniqueIndexes = indexes.map((value, index) =>
+    index === 0 ? 0 : Math.max(value, indexes[index - 1] + 1)
+  );
+  return titles
+    .map((title, index) => ({
+      lineIndex: Math.min(lineCount - 1, uniqueIndexes[index]),
+      title,
+    }))
+    .filter((chapter, index, array) => chapter.lineIndex >= 0 && chapter.lineIndex < lineCount && (index === 0 || chapter.lineIndex > array[index - 1].lineIndex));
+}
+
 function createRunId() {
   const now = new Date();
   const parts = [
@@ -280,6 +318,144 @@ async function ensureAssetsExist(logPath) {
       path: toRelativeWorkspacePath(assetPath),
     });
   }
+}
+
+async function generateGeminiScript(theme, fallbackScript) {
+  const apiKey = process.env.GOOGLE_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("GOOGLE_API_KEY is required for the complete video generation flow.");
+  }
+
+  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  const prompt = [
+    "あなたはYouTube向けのゆっくり解説動画の脚本家です。",
+    "JSONのみを返してください。",
+    'schema={"title":string,"theme":string,"lines":[{"speaker":"霊夢"|"魔理沙","text":string}]}',
+    "条件:",
+    "- 16〜18行の掛け合いにする",
+    "- 1行は25〜48文字程度の自然な日本語にする",
+    "- テーマは画像生成、音声合成、字幕、映像合成、最終出力までの完全版デモ",
+    "- 動画を見た人が『このシステムでここまで作れる』と分かる構成にする",
+    `テーマ: ${theme}`,
+    `参考タイトル: ${fallbackScript.title}`,
+  ].join("\n");
+
+  const response = await fetch(
+    `${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.6,
+          responseMimeType: "application/json",
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini script generation failed: HTTP ${response.status}`);
+  }
+
+  const body = await response.json();
+  const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  const parsed = JSON.parse(extractJson(text));
+  if (!Array.isArray(parsed.lines) || parsed.lines.length < 12) {
+    throw new Error("Gemini script response did not contain enough lines.");
+  }
+
+  return {
+    title: String(parsed.title ?? fallbackScript.title),
+    theme: String(parsed.theme ?? theme),
+    lines: parsed.lines.map((line, index) => ({
+      speaker: line.speaker === "魔理沙" ? "魔理沙" : index % 2 === 0 ? "霊夢" : "魔理沙",
+      text: String(line.text ?? "").trim(),
+    })).filter((line) => line.text.length > 0),
+  };
+}
+
+async function generateGeminiImages({ projectRoot, runId, theme, title, logPath }) {
+  const apiKey = process.env.GOOGLE_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("GOOGLE_API_KEY is required for Gemini image generation.");
+  }
+
+  const imageDir = path.join(projectRoot, "input", "assets", "generated", runId);
+  await fs.mkdir(imageDir, { recursive: true });
+
+  const prompts = [
+    {
+      key: "city",
+      fileName: "gemini-city.png",
+      prompt: `Cinematic wide-angle futuristic Tokyo skyline at blue hour, neon reflections, rain-soaked streets, photorealistic, no text, 16:9, theme: ${theme}, title mood: ${title}`,
+    },
+    {
+      key: "alley",
+      fileName: "gemini-alley.png",
+      prompt: `Moody Japanese back alley at night with holographic signage, drifting rain mist, dramatic lighting, photorealistic, no text, 16:9, theme: ${theme}, title mood: ${title}`,
+    },
+  ];
+
+  const output = {};
+  for (const item of prompts) {
+    const imageBase64 = await requestGeminiImageBase64(apiKey, item.prompt);
+    const targetPath = path.join(imageDir, item.fileName);
+    await fs.writeFile(targetPath, Buffer.from(imageBase64, "base64"));
+    output[`${item.key}ImagePath`] = targetPath;
+    await writeWorkflowLog(logPath, "gemini_image_generated", {
+      key: item.key,
+      path: toRelativeWorkspacePath(targetPath),
+    });
+  }
+
+  return output;
+}
+
+async function requestGeminiImageBase64(apiKey, prompt) {
+  const response = await fetch(
+    `${GEMINI_API_BASE}/imagen-4.0-generate-001:predict?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: "16:9",
+          personGeneration: "allow_adult",
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini image generation failed: HTTP ${response.status} ${await response.text()}`);
+  }
+
+  const body = await response.json();
+  const imageBase64 =
+    body.predictions?.[0]?.bytesBase64Encoded ??
+    body.generatedImages?.[0]?.image?.imageBytes ??
+    null;
+  if (!imageBase64) {
+    throw new Error("Gemini image generation response did not contain image bytes.");
+  }
+  return imageBase64;
+}
+
+function extractJson(text) {
+  const trimmed = String(text ?? "").trim();
+  if (trimmed.startsWith("{")) {
+    return trimmed;
+  }
+  const first = trimmed.indexOf("{");
+  const last = trimmed.lastIndexOf("}");
+  if (first === -1 || last === -1 || first >= last) {
+    throw new Error("JSON block was not found in Gemini response.");
+  }
+  return trimmed.slice(first, last + 1);
 }
 
 async function writeScript(projectRoot, runId, logPath, profileConfig) {
@@ -681,7 +857,7 @@ function getShotMotion(type, index) {
 
 async function createVisualPlan({ shotPlan, chapterPlan }) {
   const assetCatalog = await buildVisualAssetCatalog();
-  const cycle = ["cityVideo", "cityImage", "alleyVideo", "alleyImage"];
+  const cycle = ["cityImage", "alleyImage", "cityImage", "alleyImage"];
   const useCounts = new Map();
   const chapterStarts = new Map(chapterPlan.chapters.map((chapter) => [chapter.startMs, chapter.id]));
 

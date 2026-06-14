@@ -102,21 +102,33 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.getByTestId("nav-timeline").click();
   await expect(page.getByTestId("screen-timeline")).toContainText("字幕");
-  await page.getByTestId("timeline-out-input").fill("9000");
+  await page.getByTestId("timeline-out-input").fill("4500");
+  await page.getByTestId("timeline-manual-subtitle-input").fill("仕上げ用の手動テロップです。");
+  await page.getByTestId("timeline-add-subtitle-button").click();
+  await page.getByTestId("timeline-clip-block-track-subtitle-sub-2").click();
+  await page.getByTestId("timeline-playhead-input").fill("2600");
+  await page.getByTestId("timeline-split-button").click();
+  await expect(page.getByTestId("timeline-selected-clip")).toContainText("sub-2-split-2");
+  await page.getByTestId("timeline-marker-label-input").fill("見せ場");
+  await page.getByTestId("timeline-marker-time-input").fill("4200");
+  await page.getByTestId("timeline-add-marker-button").click();
   await page.getByTestId("timeline-save-button").click();
   await expect(page.getByRole("status")).toContainText("タイムラインを保存しました");
   await visual.capture(page, "06-timeline", "タイムライン編集", [
-    "台本から生成された音声・字幕トラックが見える",
-    "再生範囲を編集して保存できる",
+    "視覚タイムラインからクリップ選択と分割ができる",
+    "手動テロップとマーカーを追加して保存できる",
   ]);
 
   await page.getByTestId("nav-preview").click();
   await page.getByTestId("preview-load-button").click();
   await expect(page.getByTestId("preview-summary")).toContainText("durationInFrames");
+  await expect(page.getByTestId("preview-manual-summary")).toContainText("トリム あり");
+  await expect(page.getByTestId("preview-manual-summary")).toContainText("字幕 4");
   await page.getByTestId("preview-render-button").click();
   await expect(page.getByRole("status")).toContainText("レンダリングジョブを作成しました");
   await visual.capture(page, "07-preview-render", "プレビューとレンダリング", [
     "Remotion向けプレビュー情報を確認できる",
+    "手動編集サマリーがプレビュー画面で確認できる",
     "同じ画面からレンダリングジョブを作成できる",
   ]);
 
@@ -229,17 +241,7 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       const timeline = state.timeline ?? createTimelineFromScript(state.script ?? defaultScript());
       return fulfillJson({
         timeline,
-        remotionProps: {
-          durationInFrames: Math.ceil((timeline.playbackRange.outMs / 1000) * 30),
-          subtitleTracks: timeline.tracks
-            .flatMap((track) => track.clips)
-            .filter((clip) => clip.assetType === "subtitle")
-            .map((clip) => ({
-              text: clip.text ?? "",
-              startMs: clip.startMs,
-              endMs: clip.startMs + clip.durationMs,
-            })),
-        },
+        remotionProps: buildPreviewRemotionProps(timeline),
       });
     }
 
@@ -358,6 +360,76 @@ const applyTimelineOperation = (
     };
   }
   return timeline;
+};
+
+const buildPreviewRemotionProps = (timeline: TimelineData) => {
+  const rangeIn = timeline.playbackRange.inMs;
+  const rangeOut = timeline.playbackRange.outMs;
+  const normalizeClip = (clip: TimelineClip) => {
+    const clipEnd = clip.startMs + clip.durationMs;
+    const clippedStart = Math.max(clip.startMs, rangeIn);
+    const clippedEnd = Math.min(clipEnd, rangeOut);
+    if (clippedEnd <= clippedStart) {
+      return null;
+    }
+    return {
+      ...clip,
+      startMs: clippedStart - rangeIn,
+      endMs: clippedEnd - rangeIn,
+    };
+  };
+
+  const subtitleTracks = timeline.tracks
+    .filter((track) => track.type === "subtitle")
+    .flatMap((track) =>
+      track.clips
+        .map(normalizeClip)
+        .filter((clip): clip is TimelineClip & { endMs: number } => clip !== null)
+        .map((clip) => ({
+          text: clip.text ?? "",
+          startMs: clip.startMs,
+          endMs: clip.endMs,
+        }))
+    );
+
+  const audioTracks = timeline.tracks
+    .filter((track) => track.type === "audio" || track.type === "bgm")
+    .flatMap((track) =>
+      track.clips
+        .map(normalizeClip)
+        .filter((clip): clip is TimelineClip & { endMs: number } => clip !== null)
+        .map((clip) => ({
+          clipId: clip.id,
+          startMs: clip.startMs,
+          endMs: clip.endMs,
+        }))
+    );
+
+  const markers = timeline.markers
+    .filter((marker) => marker.timeMs >= rangeIn && marker.timeMs <= rangeOut)
+    .map((marker) => ({
+      ...marker,
+      timeMs: marker.timeMs - rangeIn,
+    }));
+
+  const maxTrackEnd = Math.max(
+    0,
+    ...timeline.tracks.flatMap((track) => track.clips.map((clip) => clip.startMs + clip.durationMs))
+  );
+
+  return {
+    durationInFrames: Math.ceil(((rangeOut - rangeIn) / 1000) * 30),
+    durationMs: rangeOut - rangeIn,
+    subtitleTracks,
+    audioTracks,
+    markers,
+    manualEditSummary: {
+      subtitleClipCount: subtitleTracks.length,
+      audioClipCount: audioTracks.length,
+      markerCount: markers.length,
+      playbackRangeApplied: rangeIn > 0 || rangeOut < maxTrackEnd,
+    },
+  };
 };
 
 const createVisualEvidenceRecorder = (testInfo: TestInfo) => {

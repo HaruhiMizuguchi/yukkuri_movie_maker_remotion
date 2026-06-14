@@ -1,0 +1,243 @@
+{
+  "bgmWindows": [
+    {
+      "startMs": 0,
+      "endMs": 3011,
+      "volume": 0.14
+    },
+    {
+      "startMs": 2711,
+      "endMs": 7854,
+      "volume": 0.14
+    },
+    {
+      "startMs": 7554,
+      "endMs": 14934,
+      "volume": 0.14
+    },
+    {
+      "startMs": 14634,
+      "endMs": 25197,
+      "volume": 0.14
+    },
+    {
+      "startMs": 24897,
+      "endMs": 27505,
+      "volume": 0.14
+    },
+    {
+      "startMs": 27205,
+      "endMs": 35922,
+      "volume": 0.14
+    },
+    {
+      "startMs": 35622,
+      "endMs": 38959,
+      "volume": 0.14
+    },
+    {
+      "startMs": 38659,
+      "endMs": 48677,
+      "volume": 0.14
+    },
+    {
+      "startMs": 48377,
+      "endMs": 53062,
+      "volume": 0.14
+    },
+    {
+      "startMs": 52762,
+      "endMs": 62444,
+      "volume": 0.14
+    },
+    {
+      "startMs": 62144,
+      "endMs": 65055,
+      "volume": 0.14
+    },
+    {
+      "startMs": 64755,
+      "endMs": 76579,
+      "volume": 0.14
+    },
+    {
+      "startMs": 76279,
+      "endMs": 80086,
+      "volume": 0.14
+    },
+    {
+      "startMs": 79786,
+      "endMs": 86315,
+      "volume": 0.14
+    },
+    {
+      "startMs": 86015,
+      "endMs": 88443,
+      "volume": 0.14
+    },
+    {
+      "startMs": 88143,
+      "endMs": 89688,
+      "volume": 0.14
+    }
+  ],
+  "ambientWindows": [
+    {
+      "startMs": 0,
+      "endMs": 89688,
+      "volume": 0.08
+    }
+  ],
+  "seCues": [
+    {
+      "id": "accent-3",
+      "kind": "accent",
+      "assetKey": "accent",
+      "startMs": 7764,
+      "durationMs": 320,
+      "volume": 0.34
+    },
+    {
+      "id": "accent-6",
+      "kind": "accent",
+      "assetKey": "accent",
+      "startMs": 27415,
+      "durationMs": 320,
+      "volume": 0.34
+    },
+    {
+      "id": "accent-7",
+      "kind": "accent",
+      "assetKey": "accent",
+      "startMs": 35832,
+      "durationMs": 320,
+      "volume": 0.34
+    },
+    {
+      "id": "transition-2",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 2751,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-3",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 7594,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-4",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 14674,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-5",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 24937,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-6",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 27245,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-7",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 35662,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-8",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 38699,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-9",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 48417,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-10",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 52802,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-11",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 62184,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-12",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 64795,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-13",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 76319,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-14",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 79826,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-15",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 86055,
+      "durationMs": 420,
+      "volume": 0.28
+    },
+    {
+      "id": "transition-16",
+      "kind": "transition",
+      "assetKey": "transition",
+      "startMs": 88183,
+      "durationMs": 420,
+      "volume": 0.28
+    }
+  ],
+  "assets": {
+    "bgmPath": "projects/53f002b4-54fa-4e0a-a616-684be4f8e19d/output/video_composition/run-20260427-084057-543/bgm.wav",
+    "ambientPath": "projects/53f002b4-54fa-4e0a-a616-684be4f8e19d/output/video_composition/run-20260427-084057-543/ambient.wav",
+    "accentPath": "projects/53f002b4-54fa-4e0a-a616-684be4f8e19d/output/video_composition/run-20260427-084057-543/accent.wav",
+    "transitionPath": "projects/53f002b4-54fa-4e0a-a616-684be4f8e19d/output/video_composition/run-20260427-084057-543/transition.wav"
+  }
+}

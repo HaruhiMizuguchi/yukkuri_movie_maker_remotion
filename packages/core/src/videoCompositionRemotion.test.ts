@@ -105,6 +105,76 @@ const prepareMinimalInputs = async (projectRoot: string): Promise<void> => {
 };
 
 describe("video composition remotion", () => {
+  it("手動編集タイムラインの尺と字幕を Remotion 出力へ反映する", async () => {
+    const outputRoot = createTempRoot("timeline-remotion");
+    const projectId = `project-${Date.now()}`;
+    const ctx = createContext(projectId, "手動編集反映", outputRoot);
+    const projectRoot = path.join(outputRoot, "projects", projectId);
+    await prepareMinimalInputs(projectRoot);
+    await writeJson(path.join(projectRoot, "intermediate", "timeline.json"), {
+      playbackRange: { inMs: 900, outMs: 2400 },
+      markers: [{ id: "mk-1", timeMs: 1200, label: "手動確認" }],
+      tracks: [
+        {
+          id: "track-audio",
+          name: "音声",
+          type: "audio",
+          clips: [
+            {
+              id: "audio-main",
+              assetType: "audio",
+              assetPath: "output/tts_generation/latest/audio.wav",
+              startMs: 0,
+              durationMs: 2800,
+              inMs: 0,
+              outMs: 2800,
+              volume: 1,
+            },
+          ],
+        },
+        {
+          id: "track-subtitle",
+          name: "字幕",
+          type: "subtitle",
+          clips: [
+            {
+              id: "manual-sub-1",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 1000,
+              durationMs: 900,
+              text: "手動編集字幕",
+              style: "editor",
+            },
+          ],
+        },
+      ],
+    });
+
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+    });
+    await implementations.video_composition?.(ctx);
+
+    const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
+    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+      durationMs: number;
+      manualEditSummary?: {
+        playbackRangeApplied: boolean;
+        subtitleClipCount: number;
+        markerCount: number;
+      };
+    };
+
+    expect(composition.durationMs).toBe(1500);
+    expect(composition.manualEditSummary).toMatchObject({
+      playbackRangeApplied: true,
+      subtitleClipCount: 1,
+      markerCount: 1,
+    });
+  }, 120000);
+
   it("video_composition はデフォルトで Remotion を正規経路として使う", async () => {
     const outputRoot = createTempRoot("default-remotion");
     const projectId = `project-${Date.now()}`;

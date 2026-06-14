@@ -3,8 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 test("実API/DB/Workerで制作開始からfinal.mp4生成まで通せる", async ({ page, request }) => {
-  const health = await request.get("http://127.0.0.1:3001/health");
-  expect(health.ok()).toBe(true);
+  await waitForApiHealth(request);
 
   await page.goto("/");
   await expect(page.getByTestId("screen-dashboard")).toBeVisible();
@@ -31,9 +30,7 @@ test("実API/DB/Workerで制作開始からfinal.mp4生成まで通せる", asyn
   await expect(page.getByTestId("preview-summary")).toContainText("durationInFrames");
   await page.getByTestId("preview-render-button").click();
 
-  const message = await page.getByRole("status").innerText();
-  const jobId = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
-  expect(jobId).toBeTruthy();
+  const jobId = await waitForJobId(page);
 
   const completedJob = await waitForJobCompletion(request, jobId!);
   const finalFile = completedJob.files.find(
@@ -78,4 +75,43 @@ const waitForJobCompletion = async (request: any, jobId: string) => {
     )
     .toBe("COMPLETED");
   return latestJob;
+};
+
+const waitForApiHealth = async (request: any) => {
+  // Web起動直後は API がまだ listen 前のことがあるため、health 応答まで待つ
+  await expect
+    .poll(
+      async () => {
+        try {
+          const response = await request.get("http://127.0.0.1:3001/health");
+          return response.ok() ? response.status() : 0;
+        } catch {
+          return 0;
+        }
+      },
+      {
+        timeout: 30_000,
+        intervals: [500, 1000, 2000],
+      }
+    )
+    .toBe(200);
+};
+
+const waitForJobId = async (page: any) => {
+  // レンダリング作成メッセージが切り替わるまで待って jobId を抜き出す
+  let jobId = "";
+  await expect
+    .poll(
+      async () => {
+        const message = await page.getByRole("status").innerText();
+        jobId = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0] ?? "";
+        return jobId;
+      },
+      {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      }
+    )
+    .not.toBe("");
+  return jobId;
 };

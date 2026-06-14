@@ -1,0 +1,57 @@
+{
+  "playbackRange": {
+    "inMs": 0,
+    "outMs": 5000
+  },
+  "tracks": [
+    {
+      "id": "track-audio",
+      "name": "音声",
+      "type": "audio",
+      "clips": [
+        {
+          "id": "audio-main",
+          "assetType": "audio",
+          "assetPath": "output/tts_generation/latest/audio.wav",
+          "startMs": 0,
+          "durationMs": 5000,
+          "inMs": 0,
+          "outMs": 5000,
+          "volume": 1
+        }
+      ]
+    },
+    {
+      "id": "track-subtitle",
+      "name": "字幕",
+      "type": "subtitle",
+      "clips": [
+        {
+          "id": "sub-1",
+          "assetType": "subtitle",
+          "assetPath": "output/subtitle_generation/latest/subtitles.json",
+          "startMs": 0,
+          "durationMs": 2400,
+          "text": "実APIとDBとWorkerを通して検証します。",
+          "style": "reimu"
+        },
+        {
+          "id": "sub-2",
+          "assetType": "subtitle",
+          "assetPath": "output/subtitle_generation/latest/subtitles.json",
+          "startMs": 2400,
+          "durationMs": 1700,
+          "text": "最後にMP4の存在まで確認するぜ。",
+          "style": "marisa"
+        }
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "id": "mk-start",
+      "timeMs": 0,
+      "label": "start"
+    }
+  ]
+}

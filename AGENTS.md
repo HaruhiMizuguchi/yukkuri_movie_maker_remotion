@@ -29,3 +29,9 @@
 - Remotion Renderer は `file://` の音声・画像をそのまま `Audio` / `Img` に渡すと Windows の headless Chrome で `Not allowed to load local resource` になりやすい。生成物を描画する場合は一時HTTPサーバー経由で配信すると安定する。
 - Remotion Bundler の entry point は `registerRoot()` を呼ぶファイルでないと失敗する。`Composition` を export するだけのファイルを指定すると bundle 時に停止する。
 - pnpm ワークスペースで `node` 直実行する ESM スクリプトは、仮想ストア配下にのみ存在する依存を `import("@scope/pkg")` で解決できないことがある。CLI から確実に使う必要がある依存は `.pnpm/.../node_modules/.../dist/index.js` を解決するローダーを用意すると安定する。
+- Remotion 実レンダリング系の Vitest は `outputs/test_evidence/remotion_video/` に証跡を出す。未 ignore だとテスト実行だけで作業ツリーが汚れるため、生成証跡ディレクトリは `.gitignore` に含めておく。
+- `apps/api` / `apps/worker` を単体起動すると `process.cwd()` はリポジトリルートではなく各アプリ配下になる。repo-root 前提の `projects/`、`outputs/`、`packages/remotion/src/index.tsx` は `process.cwd()` 基準にするとずれるため、アプリ境界で `import.meta.url` から repo ルートを解決して `workspaceRoot` / `outputRoot` を明示する。
+- Playwright の実 API E2E は `webServer.url` を `3000` だけで待つと、Web 起動直後に API(`3001`) がまだ listen 前で落ちることがある。spec 冒頭で `/health` を `expect.poll` し、レンダリング作成メッセージからの `jobId` 抜き出しもポーリングすると安定する。
+- Prisma の `BigInt` を含むレコードを Fastify からそのまま返すと `Do not know how to serialize a BigInt` で 500 になる。`Job`/`Project` 系の API 応答は JSON 返却前に `BigInt` を文字列化する。
+- Remotion の `OffthreadVideo` は、短尺MP4を多数クリップへ分割して使う構成だと Windows 環境で `No frame found at position ...` を起こすことがある。完全版の安定生成を優先する場合は、生成画像中心の静止画ショットへ寄せると通しやすい。
+- Gemini API の Imagen は `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict` に `instances[].prompt` と `parameters.sampleCount` を渡すと base64 画像を返せる。OpenAI画像APIが課金上限で止まる環境では、同じ `GOOGLE_API_KEY` で画像生成まで賄える。
