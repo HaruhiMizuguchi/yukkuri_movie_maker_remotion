@@ -181,7 +181,7 @@
 
 ## 12. プロジェクト全体レビュー改善候補（2026-06-14）
 - [x] 目的・進捗・構成レビューを実施
-- [ ] `outputs/production_runs/`、`outputs/diagnostics/`、`projects/`、`apps/*/projects/` の追跡/ignore 方針を整理
+- [x] `outputs/production_runs/`、`outputs/diagnostics/`、`projects/`、`apps/*/projects/` の追跡/ignore 方針を整理
 - [ ] API の素材アップロードと設定保存で、パストラバーサル対策・APIキー保存先・権限チェックを強化
 - [ ] API の `skipSteps` を Worker と同じ step enum で検証し、不正ペイロード時も DB 上の Job を失敗状態にする
 - [ ] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
