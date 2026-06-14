@@ -8,6 +8,14 @@ import { moveClip, resizeClip, setPlaybackRange, timelineToRemotionProps } from 
 import { ScriptSchema, TimelineDataSchema } from "@ymm/shared";
 import { z } from "zod";
 import {
+  buildSafeAssetFilename,
+  canAccessProject,
+  createJobBodySchema,
+  normalizeAssetId,
+  normalizeProjectRelativePath,
+  settingsBodySchema,
+} from "./apiValidation";
+import {
   createTemplate,
   listProjectAssets,
   listTemplates,
@@ -44,12 +52,6 @@ const createProjectBodySchema = z.object({
   mode: z.string().default("full"),
   templateId: z.string().optional(),
   userId: z.string().optional(),
-});
-
-const createJobBodySchema = z.object({
-  mode: z.string().default("full"),
-  runMode: z.enum(["full", "resume"]).optional(),
-  skipSteps: z.array(z.string()).optional(),
 });
 
 const createAssetBodySchema = z.object({
@@ -163,15 +165,9 @@ app.post("/api/projects", async (req, reply) => {
 
 app.get("/api/projects/:projectId", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
-  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-
-  if (!project) {
-    return reply.code(404).send({ error: "not_found" });
-  }
-  const ownerId = await readProjectOwner(workspaceRoot, project.id);
-  if (requestUserId && ownerId && requestUserId !== ownerId) {
-    return reply.code(403).send({ error: "forbidden" });
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
   }
 
   const jobs = await prisma.job.findMany({
@@ -186,8 +182,8 @@ app.get("/api/projects/:projectId", async (req, reply) => {
   const logs = await readWorkflowLogs(projectId);
 
   return toJsonSafeValue({
-    project,
-    ownerId,
+    project: access.project,
+    ownerId: access.ownerId,
     jobs,
     script,
     timeline,
@@ -200,9 +196,9 @@ app.post("/api/projects/:projectId/jobs", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const body = createJobBodySchema.parse(req.body ?? {});
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) {
-    return reply.code(404).send({ error: "not_found" });
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
   }
 
   const job = await prisma.job.create({
@@ -231,6 +227,11 @@ app.get("/api/jobs/:jobId", async (req, reply) => {
   if (!job) {
     return reply.code(404).send({ error: "not_found" });
   }
+  const ownerId = await readProjectOwner(workspaceRoot, job.projectId);
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
+  if (!canAccessProject(ownerId, requestUserId)) {
+    return reply.code(403).send({ error: "forbidden" });
+  }
 
   return toJsonSafeValue(job);
 });
@@ -244,6 +245,8 @@ app.post("/api/jobs", async (req, reply) => {
     .parse(req.body ?? {});
 
   const project = await prisma.project.create({ data: { theme: body.theme ?? null } });
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
+  await saveProjectOwner(workspaceRoot, project.id, requestUserId ?? "default");
   const job = await prisma.job.create({
     data: {
       projectId: project.id,
@@ -257,6 +260,10 @@ app.post("/api/jobs", async (req, reply) => {
 
 app.get("/api/projects/:projectId/script", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const script = await readProjectScript(workspaceRoot, projectId);
   if (!script) {
     return reply.code(404).send({ error: "not_found" });
@@ -266,32 +273,44 @@ app.get("/api/projects/:projectId/script", async (req, reply) => {
 
 app.put("/api/projects/:projectId/script", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const script = ScriptSchema.parse(req.body ?? {});
   await saveProjectScript(workspaceRoot, projectId, script);
   return reply.code(200).send({ ok: true });
 });
 
-app.get("/api/projects/:projectId/assets", async (req) => {
+app.get("/api/projects/:projectId/assets", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   return listProjectAssets(workspaceRoot, projectId);
 });
 
 app.post("/api/projects/:projectId/assets", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const body = createAssetBodySchema.parse(req.body ?? {});
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
 
-  const assetId = body.id ?? `asset-${Date.now()}`;
-  let relativePath = body.relativePath;
+  const assetId = normalizeAssetId(body.id ?? `asset-${Date.now()}`);
+  let relativePath = body.relativePath ? normalizeProjectRelativePath(body.relativePath) : undefined;
 
   if (body.contentBase64) {
-    const extension = body.extension ?? "bin";
+    const fileName = buildSafeAssetFilename(assetId, body.extension ?? "bin");
     const filePath = path.join(
       workspaceRoot,
       "projects",
       projectId,
       "input",
       "assets",
-      `${assetId}.${extension}`
+      fileName
     );
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, Buffer.from(body.contentBase64, "base64"));
@@ -315,6 +334,10 @@ app.post("/api/projects/:projectId/assets", async (req, reply) => {
 
 app.get("/api/projects/:projectId/timeline", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const script = await readProjectScript(workspaceRoot, projectId);
   if (!script) {
     return reply.code(404).send({ error: "script_not_found" });
@@ -325,6 +348,10 @@ app.get("/api/projects/:projectId/timeline", async (req, reply) => {
 
 app.put("/api/projects/:projectId/timeline", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const timeline = TimelineDataSchema.parse(req.body ?? {});
   await saveTimeline(workspaceRoot, projectId, timeline);
   return reply.code(200).send({ ok: true });
@@ -332,6 +359,10 @@ app.put("/api/projects/:projectId/timeline", async (req, reply) => {
 
 app.post("/api/projects/:projectId/timeline/operations", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const script = await readProjectScript(workspaceRoot, projectId);
   if (!script) {
     return reply.code(404).send({ error: "script_not_found" });
@@ -366,6 +397,10 @@ app.post("/api/projects/:projectId/timeline/operations", async (req, reply) => {
 
 app.get("/api/projects/:projectId/preview", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
   const script = await readProjectScript(workspaceRoot, projectId);
   if (!script) {
     return reply.code(404).send({ error: "script_not_found" });
@@ -382,20 +417,7 @@ app.get("/api/settings", async () => {
 });
 
 app.put("/api/settings", async (req, reply) => {
-  const settings = z
-    .object({
-      apiKeys: z.object({
-        google: z.string().optional(),
-        openai: z.string().optional(),
-        stability: z.string().optional(),
-      }),
-      outputPreset: z.object({
-        width: z.number().int().positive(),
-        height: z.number().int().positive(),
-        fps: z.number().int().positive(),
-      }),
-    })
-    .parse(req.body ?? {});
+  const settings = settingsBodySchema.parse(req.body ?? {});
 
   await writeSettings(workspaceRoot, settings);
   return reply.code(200).send({ ok: true });
@@ -440,6 +462,31 @@ const getRequestUserId = (headerValue: unknown): string | null => {
   }
   const trimmed = headerValue.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const getProjectAccess = async (
+  projectId: string,
+  requestUserIdHeader: unknown
+): Promise<
+  | {
+      ok: true;
+      project: NonNullable<Awaited<ReturnType<typeof prisma.project.findUnique>>>;
+      ownerId: string | null;
+    }
+  | { ok: false; statusCode: 403 | 404; error: "forbidden" | "not_found" }
+> => {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) {
+    return { ok: false, statusCode: 404, error: "not_found" };
+  }
+
+  const ownerId = await readProjectOwner(workspaceRoot, project.id);
+  const requestUserId = getRequestUserId(requestUserIdHeader);
+  if (!canAccessProject(ownerId, requestUserId)) {
+    return { ok: false, statusCode: 403, error: "forbidden" };
+  }
+
+  return { ok: true, project, ownerId };
 };
 
 const toJsonSafeValue = (value: unknown): unknown => {

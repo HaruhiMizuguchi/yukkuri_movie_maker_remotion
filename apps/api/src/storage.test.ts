@@ -56,6 +56,11 @@ describe("api storage", () => {
     });
     const settings = await readSettings(workspaceRoot);
     expect(settings.outputPreset.width).toBe(1280);
+    expect(settings.apiKeys).toEqual({});
+    const rawSettings = JSON.parse(
+      await fs.readFile(path.join(workspaceRoot, "outputs", "system", "settings.json"), "utf-8")
+    ) as { apiKeys?: Record<string, string> };
+    expect(rawSettings.apiKeys).toEqual({});
 
     await saveProjectAsset(workspaceRoot, "project-1", {
       id: "asset-1",

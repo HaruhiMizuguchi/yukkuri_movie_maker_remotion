@@ -6,19 +6,9 @@ import {
   type Script,
   type TimelineData,
 } from "@ymm/shared";
+import { prepareSettingsForStorage, type ApiSettings } from "./apiValidation";
 
-export type AppSettings = {
-  apiKeys: {
-    google?: string;
-    openai?: string;
-    stability?: string;
-  };
-  outputPreset: {
-    width: number;
-    height: number;
-    fps: number;
-  };
-};
+export type AppSettings = ApiSettings;
 
 export type ProjectTemplate = {
   id: string;
@@ -98,7 +88,7 @@ export const readSettings = async (workspaceRoot: string): Promise<AppSettings> 
   }
   const loaded = (await readJson(settingsPath)) as Partial<AppSettings>;
   return {
-    apiKeys: loaded.apiKeys ?? {},
+    apiKeys: {},
     outputPreset: {
       width: loaded.outputPreset?.width ?? 1920,
       height: loaded.outputPreset?.height ?? 1080,
@@ -113,7 +103,7 @@ export const writeSettings = async (
 ): Promise<void> => {
   const settingsPath = getSettingsPath(workspaceRoot);
   await fs.mkdir(path.dirname(settingsPath), { recursive: true });
-  await writeJson(settingsPath, settings);
+  await writeJson(settingsPath, prepareSettingsForStorage(settings));
 };
 
 export const createTemplate = async (
