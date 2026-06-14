@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Script } from "@ymm/shared";
+import type { ArtifactMetadata, Script } from "@ymm/shared";
 import { ScriptSchema } from "@ymm/shared";
 import {
   createDefaultWorkflowImplementations,
@@ -38,6 +38,30 @@ const cacheTargets: Partial<Record<WorkflowStepName, string>> = {
   illustration_insertion: "illustration_insertion/latest/illustration.png",
   final_encoding: "final_encoding/latest/final.mp4",
   youtube_upload: "youtube_upload/latest/youtube_upload.json",
+};
+
+const cacheArtifactDescriptors: Partial<
+  Record<
+    WorkflowStepName,
+    {
+      type: ArtifactMetadata["type"];
+      fileCategory?: ArtifactMetadata["fileCategory"];
+      kind?: string;
+    }
+  >
+> = {
+  theme_selection: { type: "metadata", kind: "theme_selection" },
+  script_generation: { type: "script" },
+  title_generation: { type: "metadata", kind: "title_generation" },
+  tts_generation: { type: "audio" },
+  character_synthesis: { type: "metadata", kind: "character_motion" },
+  background_generation: { type: "image" },
+  subtitle_generation: { type: "subtitle" },
+  video_composition: { type: "video" },
+  audio_enhancement: { type: "audio" },
+  illustration_insertion: { type: "image" },
+  final_encoding: { type: "video", fileCategory: "final" },
+  youtube_upload: { type: "metadata", kind: "youtube_upload" },
 };
 
 export function createProductionWorkflowImplementations(
@@ -93,6 +117,12 @@ const withReliability = (
       await appendWorkflowLog(workflowLogPath, {
         event: "cache_hit",
         jobId: ctx.jobId,
+        stepName,
+      });
+      await registerCachedProjectFile({
+        ctx,
+        outputRoot,
+        projectRoot,
         stepName,
       });
       return {
@@ -583,6 +613,41 @@ const hasCachedOutput = async (
     return false;
   }
   return fileExists(path.join(projectRoot, "output", relativePath));
+};
+
+const registerCachedProjectFile = async ({
+  ctx,
+  outputRoot,
+  projectRoot,
+  stepName,
+}: {
+  ctx: WorkflowContext;
+  outputRoot: string;
+  projectRoot: string;
+  stepName: WorkflowStepName;
+}): Promise<void> => {
+  const relativePath = cacheTargets[stepName];
+  const descriptor = cacheArtifactDescriptors[stepName];
+  if (!relativePath || !descriptor) {
+    return;
+  }
+
+  const absolutePath = path.join(projectRoot, "output", relativePath);
+  const stat = await fs.stat(absolutePath);
+  const artifact = {
+    type: descriptor.type,
+    relativePath: toRelativePath(outputRoot, absolutePath),
+    fileCategory: descriptor.fileCategory ?? "output",
+    fileSizeBytes: stat.size,
+    ...(descriptor.kind ? { kind: descriptor.kind } : {}),
+  } as ArtifactMetadata;
+
+  await registerProjectFiles({
+    prisma: ctx.prisma,
+    jobId: ctx.jobId,
+    stepName,
+    artifacts: [artifact],
+  });
 };
 
 const appendWorkflowLog = async (

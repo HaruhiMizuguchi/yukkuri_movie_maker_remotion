@@ -41,6 +41,7 @@
 - 2026-04-27: `apps/worker` / `apps/api` 直起動時に `process.cwd()` が各アプリ配下になることで、Remotion entry point と `projects/` 出力先が repo ルートからずれていたため、両アプリで module URL ベースの `workspaceRoot` 解決へ修正し、worker では `outputRoot` も repo ルート既定へ統一、失敗ジョブ `2156b7ed-02ed-41b4-bc57-8a87c994408f` を `resume` で復旧
 - 2026-06-14: プロジェクト全体の目的・進捗・構成レビューを実施。`corepack pnpm typecheck` と代表 Vitest 21件の成功を確認し、生成物管理/API入力検証/ドキュメント同期/キャッシュ時ProjectFile再登録を改善候補として整理
 - 2026-06-15: Worker の pg-boss ペイロード処理を `renderJobHandler` に分離し、不正 `skipSteps` などでも `jobId` が読める場合は Job を `FAILED` へ更新するよう修正
+- 2026-06-15: Production Workflow の cache hit 時にも `latest` 成果物を現在の Job の `ProjectFile` として再登録するよう修正
 
 ---
 
@@ -185,6 +186,6 @@
 - [x] `outputs/production_runs/`、`outputs/diagnostics/`、`projects/`、`apps/*/projects/` の追跡/ignore 方針を整理
 - [x] API の素材アップロードと設定保存で、パストラバーサル対策・APIキー保存先・権限チェックを強化
 - [x] API の `skipSteps` を Worker と同じ step enum で検証し、不正ペイロード時も DB 上の Job を失敗状態にする
-- [ ] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
+- [x] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
 - [ ] `docs/e2e_customer_journey.md`、`docs/current_capabilities.md`、`docs/dev_tasks_breadown.md` の古い記述や重複を整理
 - [ ] `apps/web/src/ui/App.tsx` を画面・API client・timeline editor・styles に分割

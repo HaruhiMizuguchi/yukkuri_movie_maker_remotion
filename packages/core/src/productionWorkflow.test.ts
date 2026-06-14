@@ -71,5 +71,16 @@ describe("production workflow implementations", () => {
 
     const cachedOutput = updates.find((payload) => payload.data?.outputJson?.cached === true);
     expect(cachedOutput).toBeTruthy();
+    expect(prisma.projectFile.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          jobId: "job-advanced",
+          stepName: "theme_selection",
+          fileType: "metadata",
+          fileCategory: "output",
+          relativePath: expect.stringContaining("theme_selection/latest/theme.json"),
+        }),
+      ]),
+    });
   }, 120000);
 });
