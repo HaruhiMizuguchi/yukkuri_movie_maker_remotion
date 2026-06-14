@@ -42,6 +42,7 @@
 - 2026-06-14: プロジェクト全体の目的・進捗・構成レビューを実施。`corepack pnpm typecheck` と代表 Vitest 21件の成功を確認し、生成物管理/API入力検証/ドキュメント同期/キャッシュ時ProjectFile再登録を改善候補として整理
 - 2026-06-15: Worker の pg-boss ペイロード処理を `renderJobHandler` に分離し、不正 `skipSteps` などでも `jobId` が読める場合は Job を `FAILED` へ更新するよう修正
 - 2026-06-15: Production Workflow の cache hit 時にも `latest` 成果物を現在の Job の `ProjectFile` として再登録するよう修正
+- 2026-06-15: `docs/e2e_customer_journey.md` と `docs/current_capabilities.md` の実API E2E未実行記述を2026-04-26完走結果へ更新し、旧 `docs/dev_tasks_breadown.md` を正規台帳への案内に変更
 
 ---
 
@@ -187,5 +188,5 @@
 - [x] API の素材アップロードと設定保存で、パストラバーサル対策・APIキー保存先・権限チェックを強化
 - [x] API の `skipSteps` を Worker と同じ step enum で検証し、不正ペイロード時も DB 上の Job を失敗状態にする
 - [x] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
-- [ ] `docs/e2e_customer_journey.md`、`docs/current_capabilities.md`、`docs/dev_tasks_breadown.md` の古い記述や重複を整理
+- [x] `docs/e2e_customer_journey.md`、`docs/current_capabilities.md`、`docs/dev_tasks_breadown.md` の古い記述や重複を整理
 - [ ] `apps/web/src/ui/App.tsx` を画面・API client・timeline editor・styles に分割

@@ -14,10 +14,11 @@ GUIの主要導線を「制作を始めるユーザーの一連の体験」と�
 5. 素材を登録する
 6. タイムラインの再生範囲を調整して保存する
 7. プレビュー情報を取得し、レンダリングジョブを作成する
-8. APIキーと出力プリセットを保存する
+8. 設定画面でAPIキー入力欄と出力プリセット保存を確認する
 
 このE2EはGUIの顧客導線を安定して検証するため、APIレスポンスはPlaywrightの `page.route` で固定している。
-実API接続と成果物生成は、既存の `task3FullRunReal.test.ts` や `realApiConnectivity.test.ts` が担う。
+実API/DB/Workerを使う成果物生成は `e2e/realApiWorkerJourney.spec.ts` が担う。
+APIキーはローカル設定ファイルへ永続化せず、実API利用時は `.env` の環境変数を使う。
 
 ## 実行方法
 初回のみChromiumを導入する。
@@ -79,7 +80,7 @@ Playwrightの標準成果物は以下に出力される。
 
 - CIでPlaywrightブラウザ導入とE2E実行を行う設定がまだない
 - AI視覚レビュー結果を機械判定としてCIの合否へ反映する仕組みはまだない
-- 実API E2Eは追加済みだが、実行にはPostgreSQLまたはDocker daemonの起動が必要
+- 実API E2Eの実行にはPostgreSQLまたはDocker daemonの起動が必要
 - E2E用DBのテストデータ破棄はまだ自動化していない
 
 ## 実API/DB/Worker E2E
@@ -110,8 +111,16 @@ corepack pnpm db:push
 corepack pnpm test:e2e:real
 ```
 
-このマシンでは 2026-04-17 時点で `postgres_tcp` がNG、Docker daemonも未起動だったため、実API E2Eは実行前提不足で未実行。
 診断結果は `outputs/test_evidence/real_api_e2e/preflight.json` に保存される。
+
+2026-04-26 にこの端末で以下を確認済み。
+
+- Preflight: 成功
+- 顧客導線E2E: 成功（desktop/mobile 2 project）
+- 実API/DB/Worker E2E: 成功（`final.mp4` 生成まで確認）
+- Visual Regression: 3チェックポイントで差分検知（timeline desktop/mobile、preview mobile）
+
+実行証跡は `outputs/test_evidence/` 配下に出力される。生成物ディレクトリは `.gitignore` 対象で、必要な要約はコミット対象ドキュメントへ転記する。
 
 ## 次の拡張候補
 - `visual-regression-manifest.json` と前回良品を比較するAIレビュー用スクリプトを追加する

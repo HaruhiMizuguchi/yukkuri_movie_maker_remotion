@@ -6,5 +6,4 @@ outputs/*
 projects/
 apps/api/projects/
 apps/worker/projects/
-docs/current_capabilities.md
 logs/
