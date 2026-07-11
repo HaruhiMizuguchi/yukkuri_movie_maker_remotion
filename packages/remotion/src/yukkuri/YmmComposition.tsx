@@ -132,6 +132,11 @@ export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
+  outputPreset?: {
+    width: number;
+    height: number;
+    fps: number;
+  };
   audioTracks?: ManualAudioTrack[];
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;
@@ -143,6 +148,7 @@ export type YmmCompositionProps = Record<string, unknown> & {
   audioPath?: string;
   backgroundImagePath?: string;
   characterImagePath?: string;
+  illustrationImagePath?: string;
 };
 
 export const YmmComposition: React.FC<YmmCompositionProps> = ({
@@ -181,6 +187,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   audioPath,
   backgroundImagePath,
   characterImagePath,
+  illustrationImagePath,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -189,80 +196,101 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   const currentSubtitle = useMemo(
     () =>
       subtitleTracks.find(
-        (track) => currentMs >= track.startMs && currentMs < track.endMs
+        (track) => currentMs >= track.startMs && currentMs < track.endMs,
       ) ?? null,
-    [currentMs, subtitleTracks]
+    [currentMs, subtitleTracks],
   );
   const currentShot = useMemo(
-    () => shotPlan.find((shot) => currentMs >= shot.startMs && currentMs < shot.endMs) ?? null,
-    [currentMs, shotPlan]
+    () =>
+      shotPlan.find(
+        (shot) => currentMs >= shot.startMs && currentMs < shot.endMs,
+      ) ?? null,
+    [currentMs, shotPlan],
   );
   const currentMouthCue = useMemo(
     () =>
       characterPerformance.mouthCues.find(
-        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs,
       ) ?? null,
-    [characterPerformance.mouthCues, currentMs]
+    [characterPerformance.mouthCues, currentMs],
   );
   const currentBlinkCue = useMemo(
     () =>
       characterPerformance.blinkCues.find(
-        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs,
       ) ?? null,
-    [characterPerformance.blinkCues, currentMs]
+    [characterPerformance.blinkCues, currentMs],
   );
   const currentExpressionCue = useMemo(
     () =>
       characterPerformance.expressionCues.find(
-        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs
+        (cue) => currentMs >= cue.startMs && currentMs < cue.endMs,
       ) ?? null,
-    [characterPerformance.expressionCues, currentMs]
+    [characterPerformance.expressionCues, currentMs],
   );
   const currentSubtitlePresentation = useMemo(
     () =>
       subtitlePresentation.items.find(
-        (item) => currentMs >= item.startMs && currentMs < item.endMs
+        (item) => currentMs >= item.startMs && currentMs < item.endMs,
       ) ?? null,
-    [currentMs, subtitlePresentation.items]
+    [currentMs, subtitlePresentation.items],
   );
   const currentChapter = useMemo(
-    () => chapterPlan.chapters.find((chapter) => currentMs >= chapter.startMs && currentMs < chapter.endMs) ?? null,
-    [chapterPlan.chapters, currentMs]
+    () =>
+      chapterPlan.chapters.find(
+        (chapter) => currentMs >= chapter.startMs && currentMs < chapter.endMs,
+      ) ?? null,
+    [chapterPlan.chapters, currentMs],
   );
   const currentTransition = useMemo(
     () =>
       chapterPlan.chapters.find(
         (chapter) =>
           currentMs >= chapter.startMs &&
-          currentMs < chapter.startMs + chapter.transitionDurationMs
+          currentMs < chapter.startMs + chapter.transitionDurationMs,
       ) ?? null,
-    [chapterPlan.chapters, currentMs]
+    [chapterPlan.chapters, currentMs],
   );
   const shotProgress = currentShot
-    ? Math.min(1, Math.max(0, (currentMs - currentShot.startMs) / Math.max(1, currentShot.endMs - currentShot.startMs)))
+    ? Math.min(
+        1,
+        Math.max(
+          0,
+          (currentMs - currentShot.startMs) /
+            Math.max(1, currentShot.endMs - currentShot.startMs),
+        ),
+      )
     : 0;
   const visualAssetMap = useMemo(
     () => new Map(visualPlan.assets.map((asset) => [asset.id, asset])),
-    [visualPlan.assets]
+    [visualPlan.assets],
   );
   const backgroundScale = currentShot
-    ? currentShot.zoomStart + (currentShot.zoomEnd - currentShot.zoomStart) * shotProgress
+    ? currentShot.zoomStart +
+      (currentShot.zoomEnd - currentShot.zoomStart) * shotProgress
     : 1;
   const backgroundTranslateX = currentShot ? currentShot.panX * 240 : 0;
   const backgroundTranslateY = currentShot ? currentShot.panY * 200 : 0;
   const characterScale =
-    currentShot?.type === "close" ? 1.08 : currentShot?.type === "wide" ? 0.96 : 1.02;
+    currentShot?.type === "close"
+      ? 1.08
+      : currentShot?.type === "wide"
+        ? 0.96
+        : 1.02;
   const characterTranslateX = currentShot ? currentShot.panX * 120 : 0;
   const speakingBounce = currentMouthCue ? -8 : 0;
   const mouthScale = currentMouthCue ? 0.5 + currentMouthCue.openness : 0;
-  const expressionStyle = getExpressionStyle(currentExpressionCue?.expression ?? "normal");
+  const expressionStyle = getExpressionStyle(
+    currentExpressionCue?.expression ?? "normal",
+  );
   const transitionProgress = currentTransition
     ? Math.min(
         1,
         Math.max(
           0,
-          (currentMs - currentTransition.startMs) / Math.max(1, currentTransition.transitionDurationMs)
-        )
+          (currentMs - currentTransition.startMs) /
+            Math.max(1, currentTransition.transitionDurationMs),
+        ),
       )
     : 0;
 
@@ -283,7 +311,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
                 from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
                 durationInFrames={Math.max(
                   1,
-                  Math.ceil(((track.endMs - track.startMs) / 1000) * fps)
+                  Math.ceil(((track.endMs - track.startMs) / 1000) * fps),
                 )}
               >
                 <VisualTrackLayer asset={asset} track={track} />
@@ -309,6 +337,21 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           }}
         />
       )}
+      {illustrationImagePath && currentShot?.type === "insert" ? (
+        <Img
+          src={illustrationImagePath}
+          style={{
+            position: "absolute",
+            inset: "12% 14% 20%",
+            width: "72%",
+            height: "68%",
+            objectFit: "cover",
+            borderRadius: 28,
+            border: "4px solid rgba(255,255,255,0.82)",
+            boxShadow: "0 24px 70px rgba(0,0,0,0.48)",
+          }}
+        />
+      ) : null}
       {currentTransition ? (
         <>
           <div
@@ -513,7 +556,10 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         <Audio
           src={audioMixPlan.assets.ambientPath}
           volume={(audioFrame) =>
-            getWindowVolume(audioMixPlan.ambientWindows, (audioFrame / fps) * 1000)
+            getWindowVolume(
+              audioMixPlan.ambientWindows,
+              (audioFrame / fps) * 1000,
+            )
           }
         />
       ) : null}
@@ -537,34 +583,40 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           <Sequence
             key={cue.id}
             from={Math.max(0, Math.floor((cue.startMs / 1000) * fps))}
-            durationInFrames={Math.max(1, Math.ceil((cue.durationMs / 1000) * fps))}
+            durationInFrames={Math.max(
+              1,
+              Math.ceil((cue.durationMs / 1000) * fps),
+            )}
           >
             <Audio src={cuePath} volume={cue.volume} />
           </Sequence>
         );
       })}
-      {hasManualAudioTracks
-        ? audioTracks.map((track) => (
-            <Sequence
-              key={track.clipId}
-              from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
-              durationInFrames={Math.max(
-                1,
-                Math.ceil(((track.endMs - track.startMs) / 1000) * fps)
+      {hasManualAudioTracks ? (
+        audioTracks.map((track) => (
+          <Sequence
+            key={track.clipId}
+            from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
+            durationInFrames={Math.max(
+              1,
+              Math.ceil(((track.endMs - track.startMs) / 1000) * fps),
+            )}
+          >
+            <Audio
+              src={track.assetPath}
+              trimBefore={Math.max(
+                0,
+                Math.floor((track.trimBeforeMs / 1000) * fps),
               )}
-            >
-              <Audio
-                src={track.assetPath}
-                trimBefore={Math.max(0, Math.floor((track.trimBeforeMs / 1000) * fps))}
-                volume={(audioFrame) =>
-                  getManualAudioTrackVolume(track, (audioFrame / fps) * 1000)
-                }
-              />
-            </Sequence>
-          ))
-        : audioPath
-          ? <Audio src={audioPath} />
-          : null}
+              volume={(audioFrame) =>
+                getManualAudioTrackVolume(track, (audioFrame / fps) * 1000)
+              }
+            />
+          </Sequence>
+        ))
+      ) : audioPath ? (
+        <Audio src={audioPath} />
+      ) : null}
     </AbsoluteFill>
   );
 };
@@ -575,7 +627,10 @@ const VisualTrackLayer: React.FC<{
 }> = ({ asset, track }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const durationFrames = Math.max(1, Math.ceil(((track.endMs - track.startMs) / 1000) * fps));
+  const durationFrames = Math.max(
+    1,
+    Math.ceil(((track.endMs - track.startMs) / 1000) * fps),
+  );
   const progress = durationFrames <= 1 ? 0 : frame / (durationFrames - 1);
   const scale = track.zoomStart + (track.zoomEnd - track.zoomStart) * progress;
   const translateX = track.panX * 240;
@@ -597,7 +652,10 @@ const VisualTrackLayer: React.FC<{
         <OffthreadVideo
           src={asset.path}
           muted
-          trimBefore={Math.max(0, Math.floor((track.sourceStartMs / 1000) * fps))}
+          trimBefore={Math.max(
+            0,
+            Math.floor((track.sourceStartMs / 1000) * fps),
+          )}
           style={style}
         />
       ) : (
@@ -626,7 +684,9 @@ const VisualTrackLayer: React.FC<{
   );
 };
 
-const getExpressionStyle = (expression: "normal" | "happy" | "serious" | "surprised") => {
+const getExpressionStyle = (
+  expression: "normal" | "happy" | "serious" | "surprised",
+) => {
   if (expression === "happy") {
     return {
       filter: "saturate(1.08) brightness(1.02)",
@@ -673,18 +733,27 @@ const getSubtitleTokenStyle = (kind: "plain" | "emphasis" | "secondary") => {
 
 const getWindowVolume = (
   windows: Array<{ startMs: number; endMs: number; volume: number }>,
-  currentMs: number
+  currentMs: number,
 ) => {
-  const matched = windows.find((window) => currentMs >= window.startMs && currentMs < window.endMs);
+  const matched = windows.find(
+    (window) => currentMs >= window.startMs && currentMs < window.endMs,
+  );
   return matched?.volume ?? 0;
 };
 
-const getManualAudioTrackVolume = (track: ManualAudioTrack, relativeMs: number) => {
+const getManualAudioTrackVolume = (
+  track: ManualAudioTrack,
+  relativeMs: number,
+) => {
   const durationMs = Math.max(1, track.endMs - track.startMs);
   const fadeInRatio =
-    track.fadeInMs > 0 ? Math.min(1, Math.max(0, relativeMs / track.fadeInMs)) : 1;
+    track.fadeInMs > 0
+      ? Math.min(1, Math.max(0, relativeMs / track.fadeInMs))
+      : 1;
   const remainingMs = Math.max(0, durationMs - relativeMs);
   const fadeOutRatio =
-    track.fadeOutMs > 0 ? Math.min(1, Math.max(0, remainingMs / track.fadeOutMs)) : 1;
+    track.fadeOutMs > 0
+      ? Math.min(1, Math.max(0, remainingMs / track.fadeOutMs))
+      : 1;
   return track.volume * Math.min(fadeInRatio, fadeOutRatio);
 };

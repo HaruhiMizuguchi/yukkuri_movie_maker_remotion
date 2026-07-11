@@ -12,15 +12,15 @@
 
 ```yaml
 # 使用するLLMプロバイダー
-primary_provider: "google"  # google, openai, anthropic
+primary_provider: "google" # google, openai, anthropic
 
 # モデル設定
 models:
   google:
-    model_name: "gemini-2.0-flash-preview-image-generation"
+    model_name: "gemini-3.5-flash"
     temperature: 0.7
     max_tokens: 2000
-  
+
   openai:
     model_name: "gpt-4"
     temperature: 0.7
@@ -46,7 +46,7 @@ characters:
     pitch: 1.0
     speed: 1.0
     volume: 1.0
-  
+
   marisa:
     voice_id: "marisa_voice_001"
     pitch: 0.9
@@ -60,13 +60,13 @@ characters:
 
 ```yaml
 # 使用する画像生成プロバイダー
-primary_provider: "google"  # google, openai, stability
+primary_provider: "google" # google, openai, stability
 
 # 画像設定
 image_settings:
   resolution: "1920x1080"
   quality: "high"
-  style: "anime"  # anime, realistic, artistic
+  style: "anime" # anime, realistic, artistic
 
 # 開発時制限
 development:
@@ -95,7 +95,7 @@ development:
        name: "新キャラ"
        display_name: "新しいキャラクター"
        voice_id: "voice_id_here"
-       position: "left"  # left, center, right
+       position: "left" # left, center, right
    ```
 
 ---
@@ -112,7 +112,7 @@ development:
    ```yaml
    bgm:
      default: "assets/audio/bgm/default_bgm.mp3"
-     volume: 0.3  # 0.0 ~ 1.0
+     volume: 0.3 # 0.0 ~ 1.0
    ```
 
 ### 3.2 効果音の追加
@@ -135,14 +135,14 @@ styles:
   reimu:
     font_name: "Yu Gothic"
     font_size: 48
-    primary_color: "&H00FFFFFF"  # 白
-    outline_color: "&H00000000"  # 黒
+    primary_color: "&H00FFFFFF" # 白
+    outline_color: "&H00000000" # 黒
     position: "bottom"
-  
+
   marisa:
     font_name: "Yu Gothic"
     font_size: 48
-    primary_color: "&H0000FFFF"  # 黄色
+    primary_color: "&H0000FFFF" # 黄色
     outline_color: "&H00000000"
     position: "bottom"
 ```
@@ -156,16 +156,17 @@ styles:
 ```yaml
 # エンコード設定
 encoding:
-  resolution: "1920x1080"  # 1280x720, 1920x1080, 3840x2160
+  resolution: "1920x1080" # 1280x720, 1920x1080, 3840x2160
   fps: 30
   video_codec: "libx264"
   video_bitrate: "5000k"
   audio_codec: "aac"
   audio_bitrate: "192k"
-  preset: "medium"  # ultrafast, fast, medium, slow, veryslow
+  preset: "medium" # ultrafast, fast, medium, slow, veryslow
 ```
 
 **品質とファイルサイズのバランス**:
+
 - `preset: "fast"` + `video_bitrate: "3000k"` → 軽量・高速
 - `preset: "slow"` + `video_bitrate: "8000k"` → 高品質・低速
 
@@ -187,6 +188,7 @@ LLMに送るプロンプトを変更することで、生成される台本や�
 `config/llm_config.yaml` の `prompts` セクションを編集してください。
 
 **例: より面白い台本を生成する**
+
 ```yaml
 prompts:
   script_generation: |
@@ -195,7 +197,7 @@ prompts:
     - 冗談やユーモアを適度に入れる
     - 視聴者に問いかける形式を使う
     - 意外性のある展開を入れる
-    
+
     テーマ: {theme}
 ```
 

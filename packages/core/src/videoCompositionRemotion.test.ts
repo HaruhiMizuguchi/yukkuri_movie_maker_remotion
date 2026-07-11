@@ -287,6 +287,46 @@ describe("video composition remotion", () => {
     expect(codecName).toBe("h264");
   }, 120000);
 
+  it("出力プリセットを合成メタデータへ反映する", async () => {
+    const outputRoot = createTempRoot("preset-remotion");
+    const projectId = `project-${Date.now()}`;
+    const ctx = createContext(projectId, "出力プリセット", outputRoot);
+    const projectRoot = path.join(outputRoot, "projects", projectId);
+    await prepareMinimalInputs(projectRoot);
+
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+      disableRemotion: true,
+      outputPreset: { width: 640, height: 360, fps: 24 },
+    });
+    await implementations.video_composition?.(ctx);
+
+    const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
+    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+      outputPreset?: { width: number; height: number; fps: number };
+    };
+    expect(composition.outputPreset).toEqual({ width: 640, height: 360, fps: 24 });
+
+    const previewPath = path.join(projectRoot, "output", "video_composition", "latest", "preview.mp4");
+    const dimensions = await runCommand(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height,r_frame_rate",
+        "-of",
+        "csv=p=0",
+        previewPath,
+      ],
+      process.cwd()
+    );
+    expect(dimensions).toContain("640,360,24/1");
+  }, 120000);
+
   it("Remotion 描画が失敗した場合は暗黙に FFmpeg へ逃がさずエラーにする", async () => {
     const outputRoot = createTempRoot("remotion-required");
     const projectId = `project-${Date.now()}`;

@@ -1,5 +1,33 @@
 import { z } from "zod";
 
+export const WORKFLOW_STEPS = [
+  "theme_selection",
+  "script_generation",
+  "title_generation",
+  "tts_generation",
+  "audio_enhancement",
+  "character_synthesis",
+  "background_generation",
+  "background_animation",
+  "illustration_insertion",
+  "subtitle_generation",
+  "video_composition",
+  "final_encoding",
+  "youtube_upload",
+] as const;
+
+export type WorkflowStepName = (typeof WORKFLOW_STEPS)[number];
+export const WorkflowStepNameSchema = z.enum(WORKFLOW_STEPS);
+
+export const AUTOMATION_MODES = [
+  "full",
+  "scriptOnly",
+  "renderOnly",
+  "custom",
+] as const;
+export type AutomationMode = (typeof AUTOMATION_MODES)[number];
+export const AutomationModeSchema = z.enum(AUTOMATION_MODES);
+
 export const ScriptLineSchema = z.object({
   speaker: z.string(),
   text: z.string(),
@@ -14,7 +42,12 @@ export const ScriptSchema = z.object({
 
 export type Script = z.infer<typeof ScriptSchema>;
 
-export const FileCategorySchema = z.enum(["input", "output", "intermediate", "final"]);
+export const FileCategorySchema = z.enum([
+  "input",
+  "output",
+  "intermediate",
+  "final",
+]);
 
 export const ArtifactTypeSchema = z.enum([
   "audio",
@@ -194,4 +227,3 @@ export type TimelineTrack = z.infer<typeof TimelineTrackSchema>;
 export type TimelineMarker = z.infer<typeof TimelineMarkerSchema>;
 export type TimelinePlaybackRange = z.infer<typeof TimelinePlaybackRangeSchema>;
 export type TimelineData = z.infer<typeof TimelineDataSchema>;
-

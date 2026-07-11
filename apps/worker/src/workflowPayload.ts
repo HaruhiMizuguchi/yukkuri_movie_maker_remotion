@@ -6,15 +6,17 @@ import {
   type WorkflowStepName,
 } from "@ymm/core";
 
-const workflowStepSchema = z.enum(
-  [...WORKFLOW_STEPS] as [WorkflowStepName, ...WorkflowStepName[]]
-);
+const workflowStepSchema = z.enum([...WORKFLOW_STEPS] as [
+  WorkflowStepName,
+  ...WorkflowStepName[],
+]);
 const runModeSchema = z.enum(["full", "resume"] as const);
 
 const workflowPayloadSchema = z.object({
   jobId: z.string().uuid(),
   runMode: runModeSchema.optional(),
   skipSteps: z.array(workflowStepSchema).optional(),
+  forceSteps: z.array(workflowStepSchema).optional(),
 });
 
 export type WorkflowPayload = z.infer<typeof workflowPayloadSchema>;
@@ -34,6 +36,9 @@ export function parseWorkflowPayload(input: unknown): WorkflowPayloadResult {
 
   if (payload.skipSteps && payload.skipSteps.length > 0) {
     runOptions.skipSteps = [...new Set(payload.skipSteps)];
+  }
+  if (payload.forceSteps && payload.forceSteps.length > 0) {
+    runOptions.forceSteps = [...new Set(payload.forceSteps)];
   }
 
   return {

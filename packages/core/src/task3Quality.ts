@@ -93,8 +93,16 @@ export const prepareTask3VisualAssets = async ({
   const characterRenderPath = path.join(runDir, "character.png");
 
   const backgroundSourcePath =
-    (await findFirstImage(path.join(projectRoot, "input", "assets", "backgrounds"))) ??
-    (await findNamedImage(path.join(projectRoot, "input", "assets"), ["background", "bg"])) ??
+    (await findFirstImage(
+      path.join(projectRoot, "input", "assets", "backgrounds"),
+    )) ??
+    (await findNamedImage(path.join(projectRoot, "input", "assets"), [
+      "background",
+      "bg",
+    ])) ??
+    (await findFirstImage(
+      path.join(projectRoot, "output", "background_generation", "latest"),
+    )) ??
     (await findFirstImage(path.join(workspaceRoot, "assets", "backgrounds")));
   if (backgroundSourcePath) {
     await fs.copyFile(backgroundSourcePath, backgroundRenderPath);
@@ -103,7 +111,9 @@ export const prepareTask3VisualAssets = async ({
   }
 
   const characterSourcePath =
-    (await findFirstImage(path.join(projectRoot, "input", "assets", "characters"))) ??
+    (await findFirstImage(
+      path.join(projectRoot, "input", "assets", "characters"),
+    )) ??
     (await findNamedImage(path.join(projectRoot, "input", "assets"), [
       "character",
       "standing",
@@ -124,11 +134,11 @@ export const prepareTask3VisualAssets = async ({
     characterRenderPath,
     backgroundSourceRelativePath: toRelativePath(
       outputRoot,
-      backgroundSourcePath ?? backgroundRenderPath
+      backgroundSourcePath ?? backgroundRenderPath,
     ),
     characterSourceRelativePath: toRelativePath(
       outputRoot,
-      characterSourcePath ?? characterRenderPath
+      characterSourcePath ?? characterRenderPath,
     ),
   };
 };
@@ -136,7 +146,7 @@ export const prepareTask3VisualAssets = async ({
 const synthesizeByMock = async (
   script: Script,
   runDir: string,
-  audioPath: string
+  audioPath: string,
 ): Promise<Task3TtsResult> => {
   const clipsDir = path.join(runDir, "clips");
   await fs.mkdir(clipsDir, { recursive: true });
@@ -150,7 +160,10 @@ const synthesizeByMock = async (
     const durationSec = Math.max(0.9, line.text.length * 0.09);
     const durationMs = Math.round(durationSec * 1000);
     const frequency = line.speaker.toLowerCase().includes("marisa") ? 510 : 410;
-    const clipPath = path.join(clipsDir, `line-${String(index + 1).padStart(3, "0")}.wav`);
+    const clipPath = path.join(
+      clipsDir,
+      `line-${String(index + 1).padStart(3, "0")}.wav`,
+    );
 
     await runCommand(
       "ffmpeg",
@@ -164,7 +177,7 @@ const synthesizeByMock = async (
         "pcm_s16le",
         clipPath,
       ],
-      runDir
+      runDir,
     );
 
     timestamps.push({
@@ -204,7 +217,10 @@ const synthesizeByAivis = async ({
   }
 
   const baseUrl = aivisBaseUrl.replace(/\/$/, "");
-  const speakers = (await fetchJson(fetchFn, `${baseUrl}/speakers`)) as AivisSpeaker[];
+  const speakers = (await fetchJson(
+    fetchFn,
+    `${baseUrl}/speakers`,
+  )) as AivisSpeaker[];
   if (!Array.isArray(speakers) || speakers.length === 0) {
     throw new Error("Aivis speakers are unavailable.");
   }
@@ -214,7 +230,7 @@ const synthesizeByAivis = async ({
       styleId: style.id,
       styleName: style.name,
       speakerName: speaker.name,
-    }))
+    })),
   );
   if (styleCatalog.length === 0) {
     throw new Error("Aivis styles are unavailable.");
@@ -234,7 +250,7 @@ const synthesizeByAivis = async ({
     const query = (await fetchJson(
       fetchFn,
       `${baseUrl}/audio_query?speaker=${styleId}&text=${encodeURIComponent(line.text)}`,
-      { method: "POST" }
+      { method: "POST" },
     )) as Record<string, unknown>;
 
     const normalizedQuery: Record<string, unknown> = {
@@ -244,12 +260,19 @@ const synthesizeByAivis = async ({
       volumeScale: 1,
     };
 
-    const binary = await fetchBinary(fetchFn, `${baseUrl}/synthesis?speaker=${styleId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(normalizedQuery),
-    });
-    const clipPath = path.join(clipsDir, `line-${String(index + 1).padStart(3, "0")}.wav`);
+    const binary = await fetchBinary(
+      fetchFn,
+      `${baseUrl}/synthesis?speaker=${styleId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(normalizedQuery),
+      },
+    );
+    const clipPath = path.join(
+      clipsDir,
+      `line-${String(index + 1).padStart(3, "0")}.wav`,
+    );
     await fs.writeFile(clipPath, binary);
 
     const durationMs = await probeAudioDurationMs(clipPath);
@@ -276,7 +299,7 @@ const synthesizeByAivis = async ({
 const selectAivisStyleId = (
   catalog: AivisStyleCatalogItem[],
   speakerName: string,
-  index: number
+  index: number,
 ): number => {
   const normalized = speakerName.toLowerCase();
   const envStyleId = normalized.includes("marisa")
@@ -288,7 +311,8 @@ const selectAivisStyleId = (
     return envStyleId;
   }
 
-  const isMarisa = normalized.includes("marisa") || speakerName.includes("魔理沙");
+  const isMarisa =
+    normalized.includes("marisa") || speakerName.includes("魔理沙");
   const isReimu = normalized.includes("reimu") || speakerName.includes("霊夢");
   const preferredStyles = isMarisa
     ? ["テンション高め", "上機嫌", "通常", "ノーマル"]
@@ -317,7 +341,7 @@ const parseStyleId = (value: string | undefined): number | null => {
 const concatAudioClips = async (
   clipPaths: string[],
   outputPath: string,
-  runDir: string
+  runDir: string,
 ): Promise<void> => {
   const concatPath = path.join(runDir, "clips", "concat.txt");
   const text = clipPaths
@@ -328,8 +352,19 @@ const concatAudioClips = async (
   try {
     await runCommand(
       "ffmpeg",
-      ["-y", "-f", "concat", "-safe", "0", "-i", concatPath, "-c", "copy", outputPath],
-      runDir
+      [
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        concatPath,
+        "-c",
+        "copy",
+        outputPath,
+      ],
+      runDir,
     );
   } catch {
     await runCommand(
@@ -350,7 +385,7 @@ const concatAudioClips = async (
         "pcm_s16le",
         outputPath,
       ],
-      runDir
+      runDir,
     );
   }
 };
@@ -367,7 +402,7 @@ const probeAudioDurationMs = async (audioPath: string): Promise<number> => {
       "default=noprint_wrappers=1:nokey=1",
       audioPath,
     ],
-    path.dirname(audioPath)
+    path.dirname(audioPath),
   );
   const durationSec = Number(output.trim());
   if (!Number.isFinite(durationSec) || durationSec <= 0) {
@@ -379,9 +414,12 @@ const probeAudioDurationMs = async (audioPath: string): Promise<number> => {
 const fetchJson = async (
   fetchFn: typeof fetch,
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<unknown> => {
-  const response = await fetchFn(url, init);
+  const response = await fetchFn(url, {
+    ...init,
+    signal: init?.signal ?? AbortSignal.timeout(30_000),
+  });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
@@ -391,9 +429,12 @@ const fetchJson = async (
 const fetchBinary = async (
   fetchFn: typeof fetch,
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Buffer> => {
-  const response = await fetchFn(url, init);
+  const response = await fetchFn(url, {
+    ...init,
+    signal: init?.signal ?? AbortSignal.timeout(60_000),
+  });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
@@ -401,7 +442,9 @@ const fetchBinary = async (
   return Buffer.from(arrayBuffer);
 };
 
-const findFirstImage = async (directoryPath: string): Promise<string | null> => {
+const findFirstImage = async (
+  directoryPath: string,
+): Promise<string | null> => {
   try {
     const entries = await fs.readdir(directoryPath, { withFileTypes: true });
     for (const entry of entries) {
@@ -425,7 +468,7 @@ const findFirstImage = async (directoryPath: string): Promise<string | null> => 
 
 const findNamedImage = async (
   directoryPath: string,
-  preferredNames: string[]
+  preferredNames: string[],
 ): Promise<string | null> => {
   try {
     const entries = await fs.readdir(directoryPath, { withFileTypes: true });
@@ -466,7 +509,7 @@ const createFallbackBackground = async (outputPath: string): Promise<void> => {
       "1",
       outputPath,
     ],
-    path.dirname(outputPath)
+    path.dirname(outputPath),
   );
 };
 
@@ -485,7 +528,7 @@ const createFallbackCharacter = async (outputPath: string): Promise<void> => {
       "1",
       outputPath,
     ],
-    path.dirname(outputPath)
+    path.dirname(outputPath),
   );
 };
 
@@ -495,7 +538,7 @@ const toRelativePath = (outputRoot: string, absolutePath: string): string =>
 const runCommand = async (
   command: string,
   args: string[],
-  cwd: string
+  cwd: string,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, {

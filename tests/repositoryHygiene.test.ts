@@ -25,11 +25,12 @@ describe("repository hygiene", () => {
       expect.arrayContaining([
         "outputs/*",
         "!outputs/.gitkeep",
-        "projects/",
+        "projects/*",
+        "!projects/.gitkeep",
         "apps/api/projects/",
         "apps/worker/projects/",
         "logs/",
-      ])
+      ]),
     );
   });
 
@@ -37,5 +38,10 @@ describe("repository hygiene", () => {
     const trackedOutputs = gitLsFiles("outputs");
 
     expect(trackedOutputs).toEqual(["outputs/.gitkeep"]);
+  });
+
+  it("projects配下は.gitkeep以外の生成物を追跡しない", () => {
+    const trackedProjects = gitLsFiles("projects");
+    expect(trackedProjects).toEqual(["projects/.gitkeep"]);
   });
 });

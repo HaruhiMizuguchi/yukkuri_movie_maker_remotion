@@ -8,16 +8,17 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.1",
+    "@fastify/multipart": "^10.1.0",
+    "@prisma/client": "^6.19.3",
     "@ymm/core": "workspace:^",
     "@ymm/shared": "workspace:^",
     "dotenv": "^16.4.7",
-    "fastify": "^5.2.1",
+    "fastify": "^5.10.0",
     "pg-boss": "^9.0.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "prisma": "^6.2.1",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.2"
   }
 }

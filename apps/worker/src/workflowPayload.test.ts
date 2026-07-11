@@ -4,7 +4,9 @@ import { parseWorkflowPayload } from "./workflowPayload";
 
 describe("parseWorkflowPayload", () => {
   it("jobIdのみならrunOptionsは空で返す", () => {
-    const result = parseWorkflowPayload({ jobId: "11111111-1111-1111-1111-111111111111" });
+    const result = parseWorkflowPayload({
+      jobId: "11111111-1111-1111-1111-111111111111",
+    });
 
     expect(result).toEqual({
       jobId: "11111111-1111-1111-1111-111111111111",
@@ -17,6 +19,7 @@ describe("parseWorkflowPayload", () => {
       jobId: "22222222-2222-2222-2222-222222222222",
       runMode: "full",
       skipSteps: ["tts_generation", "subtitle_generation"],
+      forceSteps: ["video_composition", "final_encoding"],
     });
 
     expect(result).toEqual({
@@ -24,6 +27,7 @@ describe("parseWorkflowPayload", () => {
       runOptions: {
         mode: "full",
         skipSteps: ["tts_generation", "subtitle_generation"],
+        forceSteps: ["video_composition", "final_encoding"],
       },
     });
   });
@@ -33,7 +37,7 @@ describe("parseWorkflowPayload", () => {
       parseWorkflowPayload({
         jobId: "33333333-3333-3333-3333-333333333333",
         skipSteps: ["invalid_step"],
-      })
+      }),
     ).toThrow();
   });
 });

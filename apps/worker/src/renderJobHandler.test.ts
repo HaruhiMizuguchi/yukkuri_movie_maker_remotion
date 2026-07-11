@@ -8,8 +8,15 @@ const createPrismaMock = () => ({
     upsert: vi.fn().mockResolvedValue({}),
   },
   job: {
+    findUnique: vi.fn().mockResolvedValue({ projectId: "project-1" }),
     update: vi.fn().mockResolvedValue({}),
   },
+  project: {
+    update: vi.fn().mockResolvedValue({}),
+  },
+  $transaction: vi
+    .fn()
+    .mockImplementation(async (operations) => Promise.all(operations)),
 });
 
 describe("handleRenderJobPayload", () => {
@@ -25,7 +32,7 @@ describe("handleRenderJobPayload", () => {
         prisma: prisma as any,
         implementations: {},
         runWorkflowImpl: vi.fn(),
-      })
+      }),
     ).rejects.toThrow();
 
     expect(prisma.workflowStep.upsert).not.toHaveBeenCalled();
@@ -49,7 +56,9 @@ describe("handleRenderJobPayload", () => {
       runWorkflowImpl,
     });
 
-    expect(prisma.workflowStep.upsert).toHaveBeenCalledTimes(WORKFLOW_STEPS.length);
+    expect(prisma.workflowStep.upsert).toHaveBeenCalledTimes(
+      WORKFLOW_STEPS.length,
+    );
     expect(prisma.workflowStep.upsert).toHaveBeenCalledWith({
       where: {
         jobId_stepName: {
@@ -67,6 +76,14 @@ describe("handleRenderJobPayload", () => {
     expect(runWorkflowImpl).toHaveBeenCalled();
     expect(prisma.job.update).toHaveBeenLastCalledWith({
       where: { id: "22222222-2222-2222-2222-222222222222" },
+      data: {
+        status: JobStatus.COMPLETED,
+        error: null,
+        completedAt: expect.any(Date),
+      },
+    });
+    expect(prisma.project.update).toHaveBeenLastCalledWith({
+      where: { id: "project-1" },
       data: { status: JobStatus.COMPLETED },
     });
   });

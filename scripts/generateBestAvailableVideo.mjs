@@ -7,34 +7,90 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const WORKSPACE_ROOT = process.cwd();
-const DEFAULT_OUTPUT_ROOT = path.join(WORKSPACE_ROOT, "outputs", "production_runs");
+const DEFAULT_OUTPUT_ROOT = path.join(
+  WORKSPACE_ROOT,
+  "outputs",
+  "production_runs",
+);
 const MEDIA_ROOT = path.join(WORKSPACE_ROOT, ".kamui", "movie", "media");
 const FRAME_RATE = 30;
 const WIDTH = 1920;
 const HEIGHT = 1080;
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+const GEMINI_API_BASE =
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
 const BASE_SCRIPT = {
   title: "今この環境で作れるAI動画生成フロー",
   theme: "AivisSpeech実音声とRemotion演出で作る自動生成デモ",
   lines: [
-    { speaker: "霊夢", text: "今日は、この環境で今できる動画生成を、一本の完成品として見せます。" },
-    { speaker: "魔理沙", text: "テスト用の確認じゃなく、台本、音声、字幕、映像、最終エンコードまで通すぜ。" },
-    { speaker: "霊夢", text: "使える強みは、AivisSpeech、Remotion、そして既存の高解像度素材です。" },
-    { speaker: "魔理沙", text: "外部LLMがクォータで止まっても、制作そのものは止めない構成にするんだ。" },
-    { speaker: "霊夢", text: "台本は、結論、素材、音声、検証の順に並べ、視聴者が迷わない流れにします。" },
-    { speaker: "魔理沙", text: "一画面一メッセージを守る。情報を詰め込みすぎないのがコツだぜ。" },
-    { speaker: "霊夢", text: "音声はAivisSpeechへ実接続し、話者スタイルを自動で選んで生成します。" },
-    { speaker: "魔理沙", text: "一つの話者でも、通常とテンション高めを使えば、掛け合いの役割を分けられるぜ。" },
-    { speaker: "霊夢", text: "生成した音声は一行ごとに保存し、実測した長さを字幕タイミングへ反映します。" },
-    { speaker: "霊夢", text: "映像はサイバーパンク都市と雨の路地を切り替え、ショット単位でテンポを作ります。" },
-    { speaker: "魔理沙", text: "BGMは小さく混ぜる。主役はナレーションだから、ダッキングの優先順位を守るぜ。" },
-    { speaker: "霊夢", text: "字幕はキーワードを強調し、章タイトルで今の工程が分かるようにします。" },
-    { speaker: "霊夢", text: "運用で重要なのは、完成動画だけでなく、中間成果物とログを残すことです。" },
-    { speaker: "魔理沙", text: "失敗しても、どの音声行か、どのショットか、後から追える状態にするわけだな。" },
-    { speaker: "魔理沙", text: "最後はH.264とAACで再エンコードし、長さ、解像度、コーデックまで検証するぜ。" },
-    { speaker: "霊夢", text: "結論です。今この環境だけでも、一分台の解説動画を実音声つきで最後まで生成できます。" },
-    { speaker: "霊夢", text: "次は専用立ち絵と画像生成APIを足せば、さらに完成度を上げられます。" },
+    {
+      speaker: "霊夢",
+      text: "今日は、この環境で今できる動画生成を、一本の完成品として見せます。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "テスト用の確認じゃなく、台本、音声、字幕、映像、最終エンコードまで通すぜ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "使える強みは、AivisSpeech、Remotion、そして既存の高解像度素材です。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "外部LLMがクォータで止まっても、制作そのものは止めない構成にするんだ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "台本は、結論、素材、音声、検証の順に並べ、視聴者が迷わない流れにします。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "一画面一メッセージを守る。情報を詰め込みすぎないのがコツだぜ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "音声はAivisSpeechへ実接続し、話者スタイルを自動で選んで生成します。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "一つの話者でも、通常とテンション高めを使えば、掛け合いの役割を分けられるぜ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "生成した音声は一行ごとに保存し、実測した長さを字幕タイミングへ反映します。",
+    },
+    {
+      speaker: "霊夢",
+      text: "映像はサイバーパンク都市と雨の路地を切り替え、ショット単位でテンポを作ります。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "BGMは小さく混ぜる。主役はナレーションだから、ダッキングの優先順位を守るぜ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "字幕はキーワードを強調し、章タイトルで今の工程が分かるようにします。",
+    },
+    {
+      speaker: "霊夢",
+      text: "運用で重要なのは、完成動画だけでなく、中間成果物とログを残すことです。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "失敗しても、どの音声行か、どのショットか、後から追える状態にするわけだな。",
+    },
+    {
+      speaker: "魔理沙",
+      text: "最後はH.264とAACで再エンコードし、長さ、解像度、コーデックまで検証するぜ。",
+    },
+    {
+      speaker: "霊夢",
+      text: "結論です。今この環境だけでも、一分台の解説動画を実音声つきで最後まで生成できます。",
+    },
+    {
+      speaker: "霊夢",
+      text: "次は専用立ち絵と画像生成APIを足せば、さらに完成度を上げられます。",
+    },
   ],
 };
 
@@ -116,11 +172,13 @@ if (cliOptions.dryRun) {
         steps: STEP_NAMES,
         planArtifacts: PLAN_ARTIFACTS,
         richFeatures: RICH_FEATURES,
-        requiredAssets: Object.values(ASSETS).map((assetPath) => toRelativeWorkspacePath(assetPath)),
+        requiredAssets: Object.values(ASSETS).map((assetPath) =>
+          toRelativeWorkspacePath(assetPath),
+        ),
       },
       null,
-      2
-    )
+      2,
+    ),
   );
   process.exit(0);
 }
@@ -140,22 +198,47 @@ const main = async () => {
     profile: profile.id,
     renderer: "remotion",
   });
-  await prepareCreativeInputs({ projectRoot, runId, logPath, profileConfig: profile });
+  await prepareCreativeInputs({
+    projectRoot,
+    runId,
+    logPath,
+    profileConfig: profile,
+  });
   await ensureAssetsExist(logPath);
 
   const scriptPath = await writeScript(projectRoot, runId, logPath, profile);
-  const ttsResult = await synthesizeNarration(projectRoot, runId, logPath, profile);
-  const subtitleResult = await writeSubtitles(projectRoot, runId, ttsResult.timestamps, logPath, profile);
+  const ttsResult = await synthesizeNarration(
+    projectRoot,
+    runId,
+    logPath,
+    profile,
+  );
+  const subtitleResult = await writeSubtitles(
+    projectRoot,
+    runId,
+    ttsResult.timestamps,
+    logPath,
+    profile,
+  );
   const compositionResult = await composeVideo(
     projectRoot,
     runId,
     ttsResult,
     subtitleResult,
     logPath,
-    profile
+    profile,
   );
-  const finalResult = await encodeFinal(projectRoot, runId, compositionResult.previewPath, logPath);
-  const verification = await verifyFinal(finalResult.finalPath, logPath, profile);
+  const finalResult = await encodeFinal(
+    projectRoot,
+    runId,
+    compositionResult.previewPath,
+    logPath,
+  );
+  const verification = await verifyFinal(
+    finalResult.finalPath,
+    logPath,
+    profile,
+  );
 
   const summary = {
     runId,
@@ -194,7 +277,9 @@ const main = async () => {
 };
 
 main().catch(async (error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  console.error(
+    error instanceof Error ? (error.stack ?? error.message) : String(error),
+  );
   process.exit(1);
 });
 
@@ -225,7 +310,9 @@ function parseCliOptions(argv) {
       if (!value) {
         throw new Error("--output-root requires a value.");
       }
-      options.outputRoot = path.isAbsolute(value) ? value : path.resolve(WORKSPACE_ROOT, value);
+      options.outputRoot = path.isAbsolute(value)
+        ? value
+        : path.resolve(WORKSPACE_ROOT, value);
       index += 1;
       continue;
     }
@@ -248,12 +335,22 @@ function createProfile(profileName) {
       ...BASE_SCRIPT,
       lines,
     },
-    chapters: BASE_CHAPTERS.filter((chapter) => chapter.lineIndex < lines.length),
+    chapters: BASE_CHAPTERS.filter(
+      (chapter) => chapter.lineIndex < lines.length,
+    ),
   };
 }
 
-async function prepareCreativeInputs({ projectRoot, runId, logPath, profileConfig }) {
-  const generatedScript = await generateGeminiScript(profileConfig.script.theme, profileConfig.script);
+async function prepareCreativeInputs({
+  projectRoot,
+  runId,
+  logPath,
+  profileConfig,
+}) {
+  const generatedScript = await generateGeminiScript(
+    profileConfig.script.theme,
+    profileConfig.script,
+  );
   profileConfig.script = generatedScript;
   profileConfig.chapters = buildGeneratedChapters(generatedScript.lines.length);
   await writeWorkflowLog(logPath, "script_generated_with_gemini", {
@@ -275,17 +372,25 @@ async function prepareCreativeInputs({ projectRoot, runId, logPath, profileConfi
 function buildGeneratedChapters(lineCount) {
   const titles = BASE_CHAPTERS.map((chapter) => chapter.title);
   const indexes = titles.map((_, index) =>
-    Math.min(lineCount - 1, Math.floor((lineCount * index) / Math.max(1, titles.length)))
+    Math.min(
+      lineCount - 1,
+      Math.floor((lineCount * index) / Math.max(1, titles.length)),
+    ),
   );
   const uniqueIndexes = indexes.map((value, index) =>
-    index === 0 ? 0 : Math.max(value, indexes[index - 1] + 1)
+    index === 0 ? 0 : Math.max(value, indexes[index - 1] + 1),
   );
   return titles
     .map((title, index) => ({
       lineIndex: Math.min(lineCount - 1, uniqueIndexes[index]),
       title,
     }))
-    .filter((chapter, index, array) => chapter.lineIndex >= 0 && chapter.lineIndex < lineCount && (index === 0 || chapter.lineIndex > array[index - 1].lineIndex));
+    .filter(
+      (chapter, index, array) =>
+        chapter.lineIndex >= 0 &&
+        chapter.lineIndex < lineCount &&
+        (index === 0 || chapter.lineIndex > array[index - 1].lineIndex),
+    );
 }
 
 function createRunId() {
@@ -304,9 +409,9 @@ function createRunId() {
 
 async function ensureProjectLayout(projectRoot) {
   await Promise.all(
-    ["input/assets", "output", "intermediate", "final", "logs", "tmp"].map((dir) =>
-      fs.mkdir(path.join(projectRoot, dir), { recursive: true })
-    )
+    ["input/assets", "output", "intermediate", "final", "logs", "tmp"].map(
+      (dir) => fs.mkdir(path.join(projectRoot, dir), { recursive: true }),
+    ),
   );
 }
 
@@ -323,10 +428,12 @@ async function ensureAssetsExist(logPath) {
 async function generateGeminiScript(theme, fallbackScript) {
   const apiKey = process.env.GOOGLE_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("GOOGLE_API_KEY is required for the complete video generation flow.");
+    throw new Error(
+      "GOOGLE_API_KEY is required for the complete video generation flow.",
+    );
   }
 
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const prompt = [
     "あなたはYouTube向けのゆっくり解説動画の脚本家です。",
     "JSONのみを返してください。",
@@ -352,7 +459,7 @@ async function generateGeminiScript(theme, fallbackScript) {
           responseMimeType: "application/json",
         },
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -360,7 +467,10 @@ async function generateGeminiScript(theme, fallbackScript) {
   }
 
   const body = await response.json();
-  const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  const text =
+    body.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("") ?? "";
   const parsed = JSON.parse(extractJson(text));
   if (!Array.isArray(parsed.lines) || parsed.lines.length < 12) {
     throw new Error("Gemini script response did not contain enough lines.");
@@ -369,20 +479,39 @@ async function generateGeminiScript(theme, fallbackScript) {
   return {
     title: String(parsed.title ?? fallbackScript.title),
     theme: String(parsed.theme ?? theme),
-    lines: parsed.lines.map((line, index) => ({
-      speaker: line.speaker === "魔理沙" ? "魔理沙" : index % 2 === 0 ? "霊夢" : "魔理沙",
-      text: String(line.text ?? "").trim(),
-    })).filter((line) => line.text.length > 0),
+    lines: parsed.lines
+      .map((line, index) => ({
+        speaker:
+          line.speaker === "魔理沙"
+            ? "魔理沙"
+            : index % 2 === 0
+              ? "霊夢"
+              : "魔理沙",
+        text: String(line.text ?? "").trim(),
+      }))
+      .filter((line) => line.text.length > 0),
   };
 }
 
-async function generateGeminiImages({ projectRoot, runId, theme, title, logPath }) {
+async function generateGeminiImages({
+  projectRoot,
+  runId,
+  theme,
+  title,
+  logPath,
+}) {
   const apiKey = process.env.GOOGLE_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("GOOGLE_API_KEY is required for Gemini image generation.");
   }
 
-  const imageDir = path.join(projectRoot, "input", "assets", "generated", runId);
+  const imageDir = path.join(
+    projectRoot,
+    "input",
+    "assets",
+    "generated",
+    runId,
+  );
   await fs.mkdir(imageDir, { recursive: true });
 
   const prompts = [
@@ -427,11 +556,13 @@ async function requestGeminiImageBase64(apiKey, prompt) {
           personGeneration: "allow_adult",
         },
       }),
-    }
+    },
   );
 
   if (!response.ok) {
-    throw new Error(`Gemini image generation failed: HTTP ${response.status} ${await response.text()}`);
+    throw new Error(
+      `Gemini image generation failed: HTTP ${response.status} ${await response.text()}`,
+    );
   }
 
   const body = await response.json();
@@ -440,7 +571,9 @@ async function requestGeminiImageBase64(apiKey, prompt) {
     body.generatedImages?.[0]?.image?.imageBytes ??
     null;
   if (!imageBase64) {
-    throw new Error("Gemini image generation response did not contain image bytes.");
+    throw new Error(
+      "Gemini image generation response did not contain image bytes.",
+    );
   }
   return imageBase64;
 }
@@ -476,10 +609,9 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
   const clipsDir = path.join(runDir, "clips");
   await fs.mkdir(clipsDir, { recursive: true });
 
-  const baseUrl = (process.env.AIVIS_SPEECH_BASE_URL || "http://127.0.0.1:10101").replace(
-    /\/$/,
-    ""
-  );
+  const baseUrl = (
+    process.env.AIVIS_SPEECH_BASE_URL || "http://127.0.0.1:10101"
+  ).replace(/\/$/, "");
   await waitForAivisReady(baseUrl, logPath);
   const speakers = await fetchJson(`${baseUrl}/speakers`);
   const catalog = speakers.flatMap((speaker) =>
@@ -487,7 +619,7 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
       speakerName: speaker.name,
       styleName: style.name,
       styleId: style.id,
-    }))
+    })),
   );
   if (catalog.length === 0) {
     throw new Error("AivisSpeech styles are unavailable.");
@@ -501,10 +633,13 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
   for (let index = 0; index < profileConfig.script.lines.length; index += 1) {
     const line = profileConfig.script.lines[index];
     const styleId = selectStyleId(catalog, line.speaker);
-    const clipPath = path.join(clipsDir, `line-${String(index + 1).padStart(3, "0")}.wav`);
+    const clipPath = path.join(
+      clipsDir,
+      `line-${String(index + 1).padStart(3, "0")}.wav`,
+    );
     const query = await fetchJson(
       `${baseUrl}/audio_query?speaker=${styleId}&text=${encodeURIComponent(line.text)}`,
-      { method: "POST" }
+      { method: "POST" },
     );
 
     const tunedQuery = {
@@ -515,11 +650,14 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
       prePhonemeLength: 0.08,
       postPhonemeLength: 0.16,
     };
-    const binary = await fetchBinary(`${baseUrl}/synthesis?speaker=${styleId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(tunedQuery),
-    });
+    const binary = await fetchBinary(
+      `${baseUrl}/synthesis?speaker=${styleId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tunedQuery),
+      },
+    );
     await fs.writeFile(clipPath, binary);
 
     const durationMs = Math.round((await probeDurationSec(clipPath)) * 1000);
@@ -546,20 +684,38 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
   await fs.writeFile(
     concatPath,
     `${concatEntries.map((clipPath) => `file '${toFfmpegPath(clipPath)}'`).join("\n")}\n`,
-    "utf-8"
+    "utf-8",
   );
 
   const rawNarrationPath = path.join(runDir, "narration.raw.wav");
   const narrationPath = path.join(runDir, "narration.wav");
   await runCommand(
     "ffmpeg",
-    ["-y", "-f", "concat", "-safe", "0", "-i", concatPath, "-c", "copy", rawNarrationPath],
-    runDir
+    [
+      "-y",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      concatPath,
+      "-c",
+      "copy",
+      rawNarrationPath,
+    ],
+    runDir,
   );
   await runCommand(
     "ffmpeg",
-    ["-y", "-i", rawNarrationPath, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", narrationPath],
-    runDir
+    [
+      "-y",
+      "-i",
+      rawNarrationPath,
+      "-af",
+      "loudnorm=I=-16:TP=-1.5:LRA=11",
+      narrationPath,
+    ],
+    runDir,
   );
 
   const timestampsPath = path.join(runDir, "timestamps.json");
@@ -582,8 +738,18 @@ async function synthesizeNarration(projectRoot, runId, logPath, profileConfig) {
   };
 }
 
-async function writeSubtitles(projectRoot, runId, timestamps, logPath, profileConfig) {
-  const runDir = await prepareStepDir(projectRoot, "subtitle_generation", runId);
+async function writeSubtitles(
+  projectRoot,
+  runId,
+  timestamps,
+  logPath,
+  profileConfig,
+) {
+  const runDir = await prepareStepDir(
+    projectRoot,
+    "subtitle_generation",
+    runId,
+  );
   const assPath = path.join(runDir, "subtitles.ass");
   const subtitlesJsonPath = path.join(runDir, "subtitles.json");
   const assText = createAss(timestamps, profileConfig);
@@ -596,7 +762,7 @@ async function writeSubtitles(projectRoot, runId, timestamps, logPath, profileCo
       text,
       startMs,
       endMs,
-    }))
+    })),
   );
   await syncLatest(runDir);
   await writeWorkflowLog(logPath, "step_completed", {
@@ -607,15 +773,22 @@ async function writeSubtitles(projectRoot, runId, timestamps, logPath, profileCo
   return { runDir, assPath, subtitlesJsonPath };
 }
 
-async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPath, profileConfig) {
+async function composeVideo(
+  projectRoot,
+  runId,
+  ttsResult,
+  subtitleResult,
+  logPath,
+  profileConfig,
+) {
   const runDir = await prepareStepDir(projectRoot, "video_composition", runId);
   const durationMs = Math.max(
     profileConfig.durationRangeSec.min * 1000,
-    Math.ceil(ttsResult.durationSec * 1000 + profileConfig.narrationPaddingMs)
+    Math.ceil(ttsResult.durationSec * 1000 + profileConfig.narrationPaddingMs),
   );
   if (durationMs > profileConfig.durationRangeSec.max * 1000) {
     throw new Error(
-      `Narration is too long for ${profileConfig.id}: ${ttsResult.durationSec.toFixed(3)}s`
+      `Narration is too long for ${profileConfig.id}: ${ttsResult.durationSec.toFixed(3)}s`,
     );
   }
 
@@ -623,7 +796,10 @@ async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPa
   const assCopyPath = path.join(runDir, "subtitles.ass");
   const shotPlanPath = path.join(runDir, "shot-plan.json");
   const visualPlanPath = path.join(runDir, "visual-plan.json");
-  const subtitlePresentationPath = path.join(runDir, "subtitle-presentation.json");
+  const subtitlePresentationPath = path.join(
+    runDir,
+    "subtitle-presentation.json",
+  );
   const audioMixPlanPath = path.join(runDir, "audio-mix-plan.json");
   const chapterPlanPath = path.join(runDir, "chapter-plan.json");
   const compositionPath = path.join(runDir, "composition.json");
@@ -677,7 +853,9 @@ async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPa
         bgmPath: toRelativeWorkspacePath(audioMixPlan.assets.bgmPath),
         ambientPath: toRelativeWorkspacePath(audioMixPlan.assets.ambientPath),
         accentPath: toRelativeWorkspacePath(audioMixPlan.assets.accentPath),
-        transitionPath: toRelativeWorkspacePath(audioMixPlan.assets.transitionPath),
+        transitionPath: toRelativeWorkspacePath(
+          audioMixPlan.assets.transitionPath,
+        ),
       },
     }),
     writeJson(chapterPlanPath, chapterPlan),
@@ -705,7 +883,10 @@ async function composeVideo(projectRoot, runId, ttsResult, subtitleResult, logPa
     height: HEIGHT,
     targetDurationSec: Number((durationMs / 1000).toFixed(3)),
     assets: Object.fromEntries(
-      Object.entries(ASSETS).map(([key, assetPath]) => [key, toRelativeWorkspacePath(assetPath)])
+      Object.entries(ASSETS).map(([key, assetPath]) => [
+        key,
+        toRelativeWorkspacePath(assetPath),
+      ]),
     ),
     shotCount: shotPlan.length,
     visualTrackCount: visualPlan.tracks.length,
@@ -761,19 +942,27 @@ function createChapterPlan({ timestamps, chapters, durationMs }) {
 }
 
 function createShotPlan({ timestamps, chapters, maxShotDurationMs }) {
-  const chapterStartIndexes = new Set(chapters.map((chapter) => chapter.lineIndex));
+  const chapterStartIndexes = new Set(
+    chapters.map((chapter) => chapter.lineIndex),
+  );
   const shots = [];
 
   for (const item of timestamps) {
-    const segmentCount = Math.max(1, Math.ceil((item.endMs - item.startMs) / maxShotDurationMs));
+    const segmentCount = Math.max(
+      1,
+      Math.ceil((item.endMs - item.startMs) / maxShotDurationMs),
+    );
     for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
       const startMs =
-        item.startMs + Math.floor(((item.endMs - item.startMs) * segmentIndex) / segmentCount);
+        item.startMs +
+        Math.floor(((item.endMs - item.startMs) * segmentIndex) / segmentCount);
       const endMs =
         segmentIndex === segmentCount - 1
           ? item.endMs
           : item.startMs +
-            Math.floor(((item.endMs - item.startMs) * (segmentIndex + 1)) / segmentCount);
+            Math.floor(
+              ((item.endMs - item.startMs) * (segmentIndex + 1)) / segmentCount,
+            );
       const type = pickShotType({
         text: item.text,
         speaker: item.speaker,
@@ -806,7 +995,13 @@ function createShotPlan({ timestamps, chapters, maxShotDurationMs }) {
   return shots;
 }
 
-function pickShotType({ text, speaker, segmentIndex, segmentCount, chapterStart }) {
+function pickShotType({
+  text,
+  speaker,
+  segmentIndex,
+  segmentCount,
+  chapterStart,
+}) {
   if (chapterStart) {
     return "wide";
   }
@@ -859,7 +1054,9 @@ async function createVisualPlan({ shotPlan, chapterPlan }) {
   const assetCatalog = await buildVisualAssetCatalog();
   const cycle = ["cityImage", "alleyImage", "cityImage", "alleyImage"];
   const useCounts = new Map();
-  const chapterStarts = new Map(chapterPlan.chapters.map((chapter) => [chapter.startMs, chapter.id]));
+  const chapterStarts = new Map(
+    chapterPlan.chapters.map((chapter) => [chapter.startMs, chapter.id]),
+  );
 
   const tracks = shotPlan.map((shot, index) => {
     const preferredAssetId =
@@ -872,9 +1069,14 @@ async function createVisualPlan({ shotPlan, chapterPlan }) {
     const useCount = useCounts.get(asset.id) ?? 0;
     useCounts.set(asset.id, useCount + 1);
     const trackDurationMs = shot.endMs - shot.startMs;
-    const availableStartMs = Math.max(0, (asset.durationMs ?? 0) - trackDurationMs - 80);
+    const availableStartMs = Math.max(
+      0,
+      (asset.durationMs ?? 0) - trackDurationMs - 80,
+    );
     const sourceStartMs =
-      asset.sourceType === "video" && availableStartMs > 0 ? (useCount * 700) % availableStartMs : 0;
+      asset.sourceType === "video" && availableStartMs > 0
+        ? (useCount * 700) % availableStartMs
+        : 0;
     return {
       id: `visual-${String(index + 1).padStart(3, "0")}`,
       shotId: shot.id,
@@ -887,7 +1089,9 @@ async function createVisualPlan({ shotPlan, chapterPlan }) {
       zoomEnd: shot.zoomEnd,
       panX: shot.panX,
       panY: shot.panY,
-      accentColor: chapterStarts.has(shot.startMs) ? "rgba(245,158,11,0.85)" : asset.accentColor,
+      accentColor: chapterStarts.has(shot.startMs)
+        ? "rgba(245,158,11,0.85)"
+        : asset.accentColor,
     };
   });
 
@@ -957,7 +1161,8 @@ function createSubtitlePresentation(timestamps) {
 }
 
 function createSubtitleTokens(text) {
-  const emphasisPattern = /(AivisSpeech|Remotion|FFmpeg|H\.264|AAC|API|[0-9]+(?:\.[0-9]+)?|[ァ-ヶー]{2,})/g;
+  const emphasisPattern =
+    /(AivisSpeech|Remotion|FFmpeg|H\.264|AAC|API|[0-9]+(?:\.[0-9]+)?|[ァ-ヶー]{2,})/g;
   const tokens = [];
   let cursor = 0;
 
@@ -980,18 +1185,30 @@ function createSubtitleTokens(text) {
 }
 
 function pickKeywordBadge(tokens) {
-  const candidate = tokens.find((token) => token.kind === "emphasis" && token.text.length >= 2);
+  const candidate = tokens.find(
+    (token) => token.kind === "emphasis" && token.text.length >= 2,
+  );
   return candidate?.text ?? null;
 }
 
-function createAudioMixPlan({ durationMs, timestamps, chapters, subtitlePresentation, audioMixAssets }) {
+function createAudioMixPlan({
+  durationMs,
+  timestamps,
+  chapters,
+  subtitlePresentation,
+  audioMixAssets,
+}) {
   const bgmWindows = [];
   let cursor = 0;
   for (const item of timestamps) {
     if (cursor < item.startMs) {
       bgmWindows.push({ startMs: cursor, endMs: item.startMs, volume: 0.14 });
     }
-    bgmWindows.push({ startMs: item.startMs, endMs: item.endMs, volume: 0.075 });
+    bgmWindows.push({
+      startMs: item.startMs,
+      endMs: item.endMs,
+      volume: 0.075,
+    });
     cursor = item.endMs;
   }
   if (cursor < durationMs) {
@@ -1012,7 +1229,9 @@ function createAudioMixPlan({ durationMs, timestamps, chapters, subtitlePresenta
     });
   }
 
-  const emphasisItems = subtitlePresentation.items.filter((item) => item.keywordBadge).slice(0, 4);
+  const emphasisItems = subtitlePresentation.items
+    .filter((item) => item.keywordBadge)
+    .slice(0, 4);
   for (const [index, item] of emphasisItems.entries()) {
     seCues.push({
       id: `se-accent-${String(index + 1).padStart(2, "0")}`,
@@ -1058,7 +1277,7 @@ async function prepareRemotionAudioAssets({ runDir, durationMs }) {
       "pcm_s16le",
       ambientPath,
     ],
-    runDir
+    runDir,
   );
   await runCommand(
     "ffmpeg",
@@ -1074,7 +1293,7 @@ async function prepareRemotionAudioAssets({ runDir, durationMs }) {
       "pcm_s16le",
       accentPath,
     ],
-    runDir
+    runDir,
   );
   await runCommand(
     "ffmpeg",
@@ -1090,7 +1309,7 @@ async function prepareRemotionAudioAssets({ runDir, durationMs }) {
       "pcm_s16le",
       transitionPath,
     ],
-    runDir
+    runDir,
   );
 
   return { ambientPath, accentPath, transitionPath };
@@ -1126,7 +1345,13 @@ async function renderWithRemotion({
       importWorkspacePackage("@remotion/bundler"),
       importWorkspacePackage("@remotion/renderer"),
     ]);
-    const entryPoint = path.join(WORKSPACE_ROOT, "packages", "remotion", "src", "index.tsx");
+    const entryPoint = path.join(
+      WORKSPACE_ROOT,
+      "packages",
+      "remotion",
+      "src",
+      "index.tsx",
+    );
     const serveUrl = await bundle({
       entryPoint,
       onProgress: () => undefined,
@@ -1141,7 +1366,9 @@ async function renderWithRemotion({
       visualPlan: {
         assets: visualPlan.assets.map((asset) => ({
           ...asset,
-          path: assetServer.urls[`/visual/${asset.id}${path.extname(asset.path)}`],
+          path: assetServer.urls[
+            `/visual/${asset.id}${path.extname(asset.path)}`
+          ],
         })),
         tracks: visualPlan.tracks,
       },
@@ -1209,7 +1436,7 @@ async function encodeFinal(projectRoot, runId, previewPath, logPath) {
       "192k",
       finalPath,
     ],
-    runDir
+    runDir,
   );
   await fs.copyFile(finalPath, finalCopyPath);
   await syncLatest(runDir);
@@ -1240,18 +1467,24 @@ async function verifyFinal(finalPath, logPath, profileConfig) {
     verification.durationSec < profileConfig.durationRangeSec.min ||
     verification.durationSec > profileConfig.durationRangeSec.max
   ) {
-    throw new Error(`Final duration is out of range: ${verification.durationSec}s`);
+    throw new Error(
+      `Final duration is out of range: ${verification.durationSec}s`,
+    );
   }
   if (verification.videoCodec !== "h264" || verification.audioCodec !== "aac") {
     throw new Error(
-      `Unexpected codecs: video=${verification.videoCodec}, audio=${verification.audioCodec}`
+      `Unexpected codecs: video=${verification.videoCodec}, audio=${verification.audioCodec}`,
     );
   }
   if (verification.width !== WIDTH || verification.height !== HEIGHT) {
-    throw new Error(`Unexpected resolution: ${verification.width}x${verification.height}`);
+    throw new Error(
+      `Unexpected resolution: ${verification.width}x${verification.height}`,
+    );
   }
   if (verification.sizeBytes < profileConfig.minimumSizeBytes) {
-    throw new Error(`Final video is too small: ${verification.sizeBytes} bytes`);
+    throw new Error(
+      `Final video is too small: ${verification.sizeBytes} bytes`,
+    );
   }
   await writeWorkflowLog(logPath, "verification_completed", verification);
   return verification;
@@ -1275,7 +1508,9 @@ async function waitForAivisReady(baseUrl, logPath) {
     }
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
-  throw new Error(`AivisSpeech did not become ready within ${deadlineMs}ms: ${baseUrl}`);
+  throw new Error(
+    `AivisSpeech did not become ready within ${deadlineMs}ms: ${baseUrl}`,
+  );
 }
 
 async function prepareStepDir(projectRoot, stepName, runId) {
@@ -1313,7 +1548,7 @@ function createAss(timestamps, profileConfig) {
       endMs: 5400,
       style: "Title",
       text: `${profileConfig.script.title}\\N{\\fs50}${profileConfig.script.theme}`,
-    })
+    }),
   );
   events.push(
     dialogue({
@@ -1322,7 +1557,7 @@ function createAss(timestamps, profileConfig) {
       endMs: 5400,
       style: "Note",
       text: "台本  音声  字幕  Remotion  検証",
-    })
+    }),
   );
 
   for (const chapter of profileConfig.chapters) {
@@ -1334,7 +1569,7 @@ function createAss(timestamps, profileConfig) {
         endMs: startMs + 3200,
         style: "Chapter",
         text: chapter.title,
-      })
+      }),
     );
   }
 
@@ -1346,7 +1581,7 @@ function createAss(timestamps, profileConfig) {
         endMs: item.endMs,
         style: item.speaker === "魔理沙" ? "Marisa" : "Reimu",
         text: `${item.speaker}: ${wrapJapanese(item.text, 25)}`,
-      })
+      }),
     );
   }
 
@@ -1384,7 +1619,7 @@ function toAssTime(ms) {
   const minutes = totalMinutes % 60;
   const hours = Math.floor(totalMinutes / 60);
   return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(
-    cs
+    cs,
   ).padStart(2, "0")}`;
 }
 
@@ -1436,7 +1671,7 @@ async function probeDurationSec(targetPath) {
       "default=noprint_wrappers=1:nokey=1",
       targetPath,
     ],
-    WORKSPACE_ROOT
+    WORKSPACE_ROOT,
   );
   const duration = Number(stdout.trim());
   if (!Number.isFinite(duration) || duration <= 0) {
@@ -1454,7 +1689,7 @@ async function probeMedia(targetPath) {
   const stdout = await runCommand(
     "ffprobe",
     ["-v", "error", "-print_format", "json", "-show_streams", targetPath],
-    WORKSPACE_ROOT
+    WORKSPACE_ROOT,
   );
   return JSON.parse(stdout);
 }
@@ -1464,13 +1699,17 @@ async function writeWorkflowLog(logPath, event, data = {}) {
   await fs.appendFile(
     logPath,
     `${JSON.stringify({ at: new Date().toISOString(), event, ...data })}\n`,
-    "utf-8"
+    "utf-8",
   );
 }
 
 async function writeJson(targetPath, payload) {
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    targetPath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 }
 
 function toFfmpegPath(targetPath) {
@@ -1486,7 +1725,7 @@ async function importWorkspacePackage(packageName) {
   const packagePrefix = `${packageName.replace("/", "+")}@`;
   const entries = await fs.readdir(pnpmRoot, { withFileTypes: true });
   const matched = entries.find(
-    (entry) => entry.isDirectory() && entry.name.startsWith(packagePrefix)
+    (entry) => entry.isDirectory() && entry.name.startsWith(packagePrefix),
   );
   if (!matched) {
     throw new Error(`Package was not found in pnpm store: ${packageName}`);
@@ -1497,7 +1736,7 @@ async function importWorkspacePackage(packageName) {
     "node_modules",
     ...packageName.split("/"),
     "dist",
-    "index.js"
+    "index.js",
   );
   return import(pathToFileURL(entryPath).href);
 }
@@ -1534,7 +1773,10 @@ async function startAssetServer(assetRoutes) {
 
   return {
     urls: Object.fromEntries(
-      Object.keys(assetRoutes).map((routePath) => [routePath, `${baseUrl}${routePath}`])
+      Object.keys(assetRoutes).map((routePath) => [
+        routePath,
+        `${baseUrl}${routePath}`,
+      ]),
     ),
     close: async () =>
       new Promise((resolve, reject) => {
@@ -1572,7 +1814,12 @@ async function serveStaticAsset({ request, response, targetPath }) {
 
   const start = Number(match[1]);
   const end = match[2] ? Number(match[2]) : stat.size - 1;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || end >= stat.size) {
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start > end ||
+    end >= stat.size
+  ) {
     response.statusCode = 416;
     response.end();
     return;
@@ -1633,9 +1880,9 @@ async function runCommand(command, commandArgs, cwd) {
       reject(
         new Error(
           `${command} exited with code ${code} after ${elapsedMs}ms\nargs=${JSON.stringify(
-            commandArgs
-          )}\n${stderr}`
-        )
+            commandArgs,
+          )}\n${stderr}`,
+        ),
       );
     });
   });

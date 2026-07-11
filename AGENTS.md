@@ -10,6 +10,7 @@
 - Observabilityに注意して開発すること
 
 ## 知見・失敗事例メモ
+
 - Windows PowerShell では環境によって `cmd1 && cmd2` のような `&&` 連結が構文エラーになることがある。連続実行は `;` と `$LASTEXITCODE` で制御する。
 - `remotion` パッケージだけでは `remotion` CLI コマンドは使えない。CLI 実行には `@remotion/cli` か `@remotion/renderer` を別途導入する必要がある。
 - `pnpm add --filter ...` 実行時に `node_modules is present. Lockfile only installation` と表示された場合、実体の依存が展開されないことがある。続けて `pnpm install` を実行すると不足依存が解決される。
@@ -35,3 +36,7 @@
 - Prisma の `BigInt` を含むレコードを Fastify からそのまま返すと `Do not know how to serialize a BigInt` で 500 になる。`Job`/`Project` 系の API 応答は JSON 返却前に `BigInt` を文字列化する。
 - Remotion の `OffthreadVideo` は、短尺MP4を多数クリップへ分割して使う構成だと Windows 環境で `No frame found at position ...` を起こすことがある。完全版の安定生成を優先する場合は、生成画像中心の静止画ショットへ寄せると通しやすい。
 - Gemini API の Imagen は `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict` に `instances[].prompt` と `parameters.sampleCount` を渡すと base64 画像を返せる。OpenAI画像APIが課金上限で止まる環境では、同じ `GOOGLE_API_KEY` で画像生成まで賄える。
+- Vitestで `test.exclude` を明示すると既定の `node_modules` 除外が置き換わる。pnpm workspaceのsymlink先まで依存パッケージのテストを拾うため、`**/node_modules/**` を必ず明示する。
+- `pnpm audit` のtransitive dependency overrideは、脆弱性表示を消せてもESLint等の利用側が要求するAPI互換性を壊すことがある。直接依存の更新を優先し、override後はauditだけでなく実際のlint/testも通す。
+- Windowsでは生成物ディレクトリのrenameがDefender等に一時的に `EPERM` / `EBUSY` で拒否されることがある。原子的latest切替は限定回数の短い指数backoffを入れると安定する。
+- Gemini 2.0 Flashは2026-06-01に停止されたため、このプロジェクトの既定モデルは `gemini-3.5-flash` を使う。実接続テストではモデル廃止の404とクォータ不足の429を分けて記録する。

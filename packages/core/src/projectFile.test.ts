@@ -60,6 +60,7 @@ describe("registerProjectFiles", () => {
           fileSizeBytes: BigInt(42),
         },
       ],
+      skipDuplicates: true,
     });
   });
 
