@@ -5,6 +5,8 @@ import {
   normalizeProjectRelativePath,
   parseCreateJobBody,
   prepareSettingsForStorage,
+  resolveSafeChildPath,
+  resolveWorkflowJobRequest,
 } from "./apiValidation";
 
 describe("api validation", () => {
@@ -26,6 +28,41 @@ describe("api validation", () => {
     ).toThrow();
   });
 
+  it("生成モードを実行ステップ計画へ変換する", () => {
+    expect(resolveWorkflowJobRequest({ mode: "full" })).toEqual({
+      mode: "full",
+      runMode: undefined,
+      skipSteps: undefined,
+    });
+
+    expect(resolveWorkflowJobRequest({ mode: "scriptOnly" }).skipSteps).toEqual([
+      "tts_generation",
+      "character_synthesis",
+      "background_generation",
+      "background_animation",
+      "subtitle_generation",
+      "video_composition",
+      "audio_enhancement",
+      "illustration_insertion",
+      "final_encoding",
+      "youtube_upload",
+    ]);
+
+    expect(resolveWorkflowJobRequest({ mode: "renderOnly" }).skipSteps).toEqual([
+      "theme_selection",
+      "script_generation",
+      "title_generation",
+      "youtube_upload",
+    ]);
+
+    expect(
+      resolveWorkflowJobRequest({
+        mode: "custom",
+        skipSteps: ["subtitle_generation", "subtitle_generation", "youtube_upload"],
+      }).skipSteps
+    ).toEqual(["subtitle_generation", "youtube_upload"]);
+  });
+
   it("アップロード保存用ファイル名のパストラバーサルを拒否する", () => {
     expect(buildSafeAssetFilename("asset-1", "png")).toBe("asset-1.png");
     expect(buildSafeAssetFilename("asset_2", ".jpg")).toBe("asset_2.jpg");
@@ -42,6 +79,13 @@ describe("api validation", () => {
     expect(() => normalizeProjectRelativePath("../.env")).toThrow();
     expect(() => normalizeProjectRelativePath("C:/secret/key.txt")).toThrow();
     expect(() => normalizeProjectRelativePath("/tmp/key.txt")).toThrow();
+  });
+
+  it("成果物配信パスを指定ルート配下に制限する", () => {
+    const root = "C:/workspace/output-root";
+    expect(resolveSafeChildPath(root, "projects/p1/final/final.mp4")).toContain("projects");
+    expect(() => resolveSafeChildPath(root, "../.env")).toThrow();
+    expect(() => resolveSafeChildPath(root, "C:/secret/key.txt")).toThrow();
   });
 
   it("APIキーをローカル設定ファイルへ保存しない", () => {

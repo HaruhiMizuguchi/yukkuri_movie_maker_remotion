@@ -7,7 +7,14 @@ const DEFAULT_FPS = 30;
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 
+const readOutputPreset = (props: YmmCompositionProps) => ({
+  fps: Math.max(1, Math.floor(Number(props.outputPreset?.fps ?? DEFAULT_FPS))),
+  width: Math.max(320, Math.floor(Number(props.outputPreset?.width ?? DEFAULT_WIDTH))),
+  height: Math.max(180, Math.floor(Number(props.outputPreset?.height ?? DEFAULT_HEIGHT))),
+});
+
 const calculateYmmMetadata = ({ props }: { props: YmmCompositionProps }) => {
+  const outputPreset = readOutputPreset(props);
   const subtitleDurationMs = props.subtitleTracks.reduce(
     (max, track) => Math.max(max, track.endMs),
     0
@@ -19,12 +26,12 @@ const calculateYmmMetadata = ({ props }: { props: YmmCompositionProps }) => {
   );
   return {
     durationInFrames: Math.max(
-      DEFAULT_FPS,
-      Math.ceil((effectiveDurationMs / 1000) * DEFAULT_FPS)
+      outputPreset.fps,
+      Math.ceil((effectiveDurationMs / 1000) * outputPreset.fps)
     ),
-    fps: DEFAULT_FPS,
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
+    fps: outputPreset.fps,
+    width: outputPreset.width,
+    height: outputPreset.height,
   };
 };
 

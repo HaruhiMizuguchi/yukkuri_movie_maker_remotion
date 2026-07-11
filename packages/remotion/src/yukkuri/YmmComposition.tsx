@@ -132,6 +132,11 @@ export type YmmCompositionProps = Record<string, unknown> & {
   title: string;
   theme: string;
   subtitleTracks: SubtitleTrack[];
+  outputPreset?: {
+    width: number;
+    height: number;
+    fps: number;
+  };
   audioTracks?: ManualAudioTrack[];
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;

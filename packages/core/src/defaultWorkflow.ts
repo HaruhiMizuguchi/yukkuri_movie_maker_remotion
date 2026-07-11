@@ -36,6 +36,13 @@ export type DefaultWorkflowOptions = {
   aivisBaseUrl?: string;
   allowMockTtsFallback?: boolean;
   requireCharacterAsset?: boolean;
+  outputPreset?: OutputPreset;
+};
+
+export type OutputPreset = {
+  width: number;
+  height: number;
+  fps: number;
 };
 
 type JobDetails = {
@@ -61,6 +68,8 @@ const defaultLogger: Logger = {
   warn: () => undefined,
   error: () => undefined,
 };
+
+const defaultOutputPreset: OutputPreset = { width: 1920, height: 1080, fps: 30 };
 
 export function createDefaultWorkflowImplementations(
   options: DefaultWorkflowOptions = {}
@@ -272,6 +281,7 @@ export function createDefaultWorkflowImplementations(
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
       const workspaceRoot = resolveWorkspaceRoot(options);
+      const outputPreset = resolveOutputPreset(options.outputPreset);
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
@@ -395,6 +405,7 @@ export function createDefaultWorkflowImplementations(
           },
           chapterPlan,
           durationMs,
+          outputPreset,
           title: "ゆっくり解説MVP",
           theme: details.theme,
           logger,
@@ -405,6 +416,7 @@ export function createDefaultWorkflowImplementations(
           backgroundPath: path.basename(visualAssets.backgroundRenderPath),
           characterPath: path.basename(visualAssets.characterRenderPath),
           subtitlesPath: path.basename(subtitlesCopyPath),
+          outputPreset,
         });
       }
 
@@ -415,6 +427,7 @@ export function createDefaultWorkflowImplementations(
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
+        outputPreset,
         shotCount: shotPlan.length,
         characterCueCount:
           characterPerformance.mouthCues.length +
@@ -454,9 +467,9 @@ export function createDefaultWorkflowImplementations(
             relativePath: toRelativePath(outputRoot, previewPath),
             fileCategory: "output",
             fileSizeBytes: previewStat.size,
-            width: 1920,
-            height: 1080,
-            frameRate: 30,
+            width: outputPreset.width,
+            height: outputPreset.height,
+            frameRate: outputPreset.fps,
           },
           {
             type: "metadata",
@@ -507,6 +520,7 @@ export function createDefaultWorkflowImplementations(
         renderer: usingRemotion ? "remotion" : "ffmpeg",
         characterImagePath: visualAssets.characterSourceRelativePath,
         durationMs,
+        outputPreset,
         shotCount: shotPlan.length,
         characterCueCount:
           characterPerformance.mouthCues.length +
@@ -551,6 +565,7 @@ export function createDefaultWorkflowImplementations(
       const logger = options.logger ?? defaultLogger;
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
+      const outputPreset = resolveOutputPreset(options.outputPreset);
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
@@ -567,7 +582,7 @@ export function createDefaultWorkflowImplementations(
       const finalPath = path.join(stepDir.runDir, "final.mp4");
       const finalCopyPath = path.join(projectRoot, "final", "final.mp4");
 
-      await reencodeYoutubeCompatible(previewPath, finalPath);
+      await reencodeYoutubeCompatible(previewPath, finalPath, outputPreset);
       await fs.copyFile(finalPath, finalCopyPath);
       await syncLatest(stepDir);
 
@@ -586,18 +601,18 @@ export function createDefaultWorkflowImplementations(
             relativePath: toRelativePath(outputRoot, finalPath),
             fileCategory: "final",
             fileSizeBytes: finalStat.size,
-            width: 1920,
-            height: 1080,
-            frameRate: 30,
+            width: outputPreset.width,
+            height: outputPreset.height,
+            frameRate: outputPreset.fps,
           },
           {
             type: "video",
             relativePath: toRelativePath(outputRoot, finalCopyPath),
             fileCategory: "final",
             fileSizeBytes: finalCopyStat.size,
-            width: 1920,
-            height: 1080,
-            frameRate: 30,
+            width: outputPreset.width,
+            height: outputPreset.height,
+            frameRate: outputPreset.fps,
           },
         ],
       });
@@ -626,6 +641,12 @@ const resolveOutputRoot = (
   const contextRoot = (ctx as WorkflowContext & { outputRoot?: string }).outputRoot;
   return options.outputRoot ?? contextRoot ?? process.cwd();
 };
+
+const resolveOutputPreset = (preset?: OutputPreset): OutputPreset => ({
+  width: Number.isFinite(preset?.width) ? Math.max(320, Math.floor(preset!.width)) : defaultOutputPreset.width,
+  height: Number.isFinite(preset?.height) ? Math.max(180, Math.floor(preset!.height)) : defaultOutputPreset.height,
+  fps: Number.isFinite(preset?.fps) ? Math.max(1, Math.floor(preset!.fps)) : defaultOutputPreset.fps,
+});
 
 const defaultRunIdFactory = (): string => {
   const now = new Date();
@@ -838,11 +859,13 @@ const composeVideoWithFfmpeg = async ({
   backgroundPath,
   characterPath,
   subtitlesPath,
+  outputPreset,
 }: {
   runDir: string;
   backgroundPath: string;
   characterPath: string;
   subtitlesPath: string;
+  outputPreset: OutputPreset;
 }): Promise<void> => {
   await runCommand(
     "ffmpeg",
@@ -859,14 +882,17 @@ const composeVideoWithFfmpeg = async ({
       "-i",
       "audio.wav",
       "-filter_complex",
-      `[0:v][1:v]overlay=x=W-w-80:y=H-h-20,ass=${subtitlesPath}`,
+      `[0:v]scale=${outputPreset.width}:${outputPreset.height},setsar=1[bg];[1:v]scale=-1:${Math.max(
+        120,
+        Math.round(outputPreset.height * 0.78)
+      )}[ch];[bg][ch]overlay=x=W-w-80:y=H-h-20,ass=${subtitlesPath}`,
       "-shortest",
       "-c:v",
       "libx264",
       "-pix_fmt",
       "yuv420p",
       "-r",
-      "30",
+      String(outputPreset.fps),
       "-c:a",
       "aac",
       "-b:a",
@@ -904,6 +930,7 @@ const renderWithRemotion = async ({
   audioMixPlan,
   chapterPlan,
   durationMs,
+  outputPreset,
   title,
   theme,
   logger,
@@ -980,6 +1007,7 @@ const renderWithRemotion = async ({
     }>;
   };
   durationMs: number;
+  outputPreset: OutputPreset;
   title: string;
   theme: string;
   logger: Logger;
@@ -1043,6 +1071,7 @@ const renderWithRemotion = async ({
       })),
       chapterPlan,
       durationMs,
+      outputPreset,
       audioPath: assetServer.urls["/audio.wav"],
       backgroundImagePath: assetServer.urls["/background.png"],
       characterImagePath: assetServer.urls["/character.png"],
@@ -1346,7 +1375,8 @@ const probeMediaDurationMs = async (targetPath: string): Promise<number> => {
 
 const reencodeYoutubeCompatible = async (
   inputPath: string,
-  outputPath: string
+  outputPath: string,
+  outputPreset: OutputPreset
 ): Promise<void> => {
   await runCommand(
     "ffmpeg",
@@ -1354,6 +1384,8 @@ const reencodeYoutubeCompatible = async (
       "-y",
       "-i",
       inputPath,
+      "-vf",
+      `scale=${outputPreset.width}:${outputPreset.height},fps=${outputPreset.fps}`,
       "-c:v",
       "libx264",
       "-preset",

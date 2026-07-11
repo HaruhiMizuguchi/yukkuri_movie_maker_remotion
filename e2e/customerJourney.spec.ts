@@ -34,6 +34,7 @@ type ProjectAsset = {
   type: string;
   name: string;
   relativePath: string;
+  usage?: string;
   createdAt: string;
 };
 
@@ -91,8 +92,16 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   ]);
 
   await page.getByTestId("nav-assets").click();
+  await page.getByTestId("asset-usage-select").selectOption("background");
   await page.getByTestId("asset-name-input").fill("検証背景");
-  await page.getByTestId("asset-path-input").fill("projects/demo/input/assets/background.png");
+  await page.getByTestId("asset-file-input").setInputFiles({
+    name: "background.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64"
+    ),
+  });
   await page.getByTestId("asset-add-button").click();
   await expect(page.getByTestId("asset-list")).toContainText("検証背景");
   await visual.capture(page, "05-assets", "素材管理", [
@@ -126,6 +135,7 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("preview-manual-summary")).toContainText("字幕 4");
   await page.getByTestId("preview-render-button").click();
   await expect(page.getByRole("status")).toContainText("レンダリングジョブを作成しました");
+  await expect(page.getByTestId("preview-summary")).toContainText("durationInFrames");
   await visual.capture(page, "07-preview-render", "プレビューとレンダリング", [
     "Remotion向けプレビュー情報を確認できる",
     "手動編集サマリーがプレビュー画面で確認できる",
@@ -133,14 +143,15 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   ]);
 
   await page.getByTestId("nav-settings").click();
-  await page.getByTestId("settings-google-input").fill("dummy-google-key-for-e2e");
+  await page.getByTestId("settings-diagnostics-button").click();
+  await expect(page.getByTestId("settings-google-status")).toContainText("設定済み");
   await page.getByTestId("settings-width-input").fill("1280");
   await page.getByTestId("settings-height-input").fill("720");
   await page.getByTestId("settings-save-button").click();
   await expect(page.getByRole("status")).toContainText("設定を保存しました");
   await visual.capture(page, "08-settings", "設定", [
-    "APIキーと出力プリセットを保存できる",
-    "制作導線の最後に外部連携前提を確認できる",
+    "環境変数ベースのAPI接続状態を確認できる",
+    "出力プリセットを保存できる",
   ]);
 
   await visual.writeManifest();
@@ -220,11 +231,25 @@ const installCustomerJourneyApiMock = async (page: Page) => {
         id: "asset-customer-journey-1",
         type: String(body.type ?? "image"),
         name: String(body.name ?? "asset"),
-        relativePath: String(body.relativePath ?? "projects/demo/input/assets/background.png"),
+        usage: String(body.usage ?? "background"),
+        relativePath: String(
+          body.relativePath ?? `projects/${projectId}/input/assets/backgrounds/background.png`
+        ),
         createdAt,
       };
       state.assets = [asset];
       return fulfillJson({ ok: true, assetId: asset.id, relativePath: asset.relativePath }, 201);
+    }
+
+    if (url.pathname === `/api/projects/${projectId}/assets/asset-customer-journey-1/file` && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          "base64"
+        ),
+      });
     }
 
     if (url.pathname === `/api/projects/${projectId}/timeline/operations` && method === "POST") {
@@ -241,6 +266,7 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       const timeline = state.timeline ?? createTimelineFromScript(state.script ?? defaultScript());
       return fulfillJson({
         timeline,
+        outputPreset: state.settings.outputPreset,
         remotionProps: buildPreviewRemotionProps(timeline),
       });
     }
@@ -250,6 +276,14 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       return fulfillJson({ projectId, jobId }, 201);
     }
 
+    if (url.pathname.startsWith(`/api/jobs/${jobId}/files/`) && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "video/mp4",
+        body: Buffer.from([]),
+      });
+    }
+
     if (url.pathname === "/api/settings" && method === "GET") {
       return fulfillJson(state.settings);
     }
@@ -257,6 +291,13 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     if (url.pathname === "/api/settings" && method === "PUT") {
       state.settings = body;
       return fulfillJson({ ok: true });
+    }
+
+    if (url.pathname === "/api/settings/diagnostics" && method === "GET") {
+      return fulfillJson({
+        googleApiKey: { configured: true },
+        aivisSpeech: { configured: true, reachable: true, status: 200 },
+      });
     }
 
     if (url.pathname === "/api/templates" && method === "GET") {
@@ -282,8 +323,25 @@ const createProjectDetail = (state: {
   ownerId: "e2e-user",
   jobs: state.jobs.map((job) => ({
     ...job,
-    steps: [],
-    files: [],
+    steps: [
+      { stepName: "script_generation", status: "COMPLETED", completedAt: createdAt },
+      { stepName: "video_composition", status: "COMPLETED", completedAt: createdAt },
+      { stepName: "final_encoding", status: "COMPLETED", completedAt: createdAt },
+    ],
+    files: [
+      {
+        id: "00000000-0000-4000-8000-000000000201",
+        relativePath: `projects/${projectId}/output/video_composition/latest/preview.mp4`,
+        fileType: "video",
+        fileCategory: "output",
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000202",
+        relativePath: `projects/${projectId}/final/final.mp4`,
+        fileType: "video",
+        fileCategory: "final",
+      },
+    ],
   })),
   script: state.script,
   timeline: state.timeline,

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { promises as fs } from "node:fs";
+import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
 import Fastify from "fastify";
 import PgBoss from "pg-boss";
@@ -13,6 +13,8 @@ import {
   createJobBodySchema,
   normalizeAssetId,
   normalizeProjectRelativePath,
+  resolveSafeChildPath,
+  resolveWorkflowJobRequest,
   settingsBodySchema,
 } from "./apiValidation";
 import {
@@ -29,6 +31,7 @@ import {
   saveTimeline,
   writeSettings,
 } from "./storage";
+import { buildSettingsDiagnostics } from "./settingsDiagnostics";
 import { resolveApiWorkspaceRoot } from "./workspaceRoot";
 
 const envSchema = z.object({
@@ -39,6 +42,7 @@ const env = envSchema.parse(process.env);
 const prisma = new PrismaClient();
 const boss = new PgBoss({ connectionString: env.DATABASE_URL });
 const workspaceRoot = resolveApiWorkspaceRoot(import.meta.url);
+const workflowOutputRoot = process.env.YMM_WORKFLOW_OUTPUT_ROOT ?? workspaceRoot;
 
 const app = Fastify({ logger: true });
 
@@ -58,9 +62,19 @@ const createAssetBodySchema = z.object({
   id: z.string().optional(),
   type: z.enum(["audio", "subtitle", "image", "video", "script", "metadata"]),
   name: z.string(),
+  usage: z.enum(["background", "character", "bgm", "se", "reference", "other"]).optional(),
   relativePath: z.string().optional(),
   contentBase64: z.string().optional(),
   extension: z.string().optional(),
+});
+
+const templateAssetSchema = z.object({
+  id: z.string(),
+  type: z.enum(["audio", "subtitle", "image", "video", "script", "metadata"]),
+  name: z.string(),
+  usage: z.enum(["background", "character", "bgm", "se", "reference", "other"]).optional(),
+  relativePath: z.string(),
+  createdAt: z.string(),
 });
 
 const updateTimelineOperationSchema = z.discriminatedUnion("operation", [
@@ -152,6 +166,13 @@ app.post("/api/projects", async (req, reply) => {
         ],
       });
       await saveTimeline(workspaceRoot, project.id, template.timelinePreset);
+      await applyTemplateAssets(project.id, template.assets ?? []);
+      if (template.outputPreset) {
+        await writeSettings(workspaceRoot, {
+          apiKeys: {},
+          outputPreset: template.outputPreset,
+        });
+      }
     }
   }
 
@@ -195,6 +216,7 @@ app.get("/api/projects/:projectId", async (req, reply) => {
 app.post("/api/projects/:projectId/jobs", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const body = createJobBodySchema.parse(req.body ?? {});
+  const workflowRequest = resolveWorkflowJobRequest(body);
 
   const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
   if (!access.ok) {
@@ -204,14 +226,14 @@ app.post("/api/projects/:projectId/jobs", async (req, reply) => {
   const job = await prisma.job.create({
     data: {
       projectId,
-      mode: body.mode,
+      mode: workflowRequest.mode,
     },
   });
 
   await boss.send("yukkuri.render", {
     jobId: job.id,
-    runMode: body.runMode,
-    skipSteps: body.skipSteps,
+    runMode: workflowRequest.runMode,
+    skipSteps: workflowRequest.skipSteps,
   });
 
   return reply.code(201).send({ projectId, jobId: job.id });
@@ -236,13 +258,34 @@ app.get("/api/jobs/:jobId", async (req, reply) => {
   return toJsonSafeValue(job);
 });
 
+app.get("/api/jobs/:jobId/files/:fileId", async (req, reply) => {
+  const { jobId } = jobIdParamSchema.parse(req.params);
+  const { fileId } = z.object({ fileId: z.string().uuid() }).parse(req.params);
+  const file = await prisma.projectFile.findUnique({
+    where: { id: fileId },
+    include: { job: true },
+  });
+  if (!file || file.jobId !== jobId) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+  const ownerId = await readProjectOwner(workspaceRoot, file.job.projectId);
+  const requestUserId = getRequestUserId(req.headers["x-user-id"]);
+  if (!canAccessProject(ownerId, requestUserId)) {
+    return reply.code(403).send({ error: "forbidden" });
+  }
+  const targetPath = resolveSafeChildPath(workflowOutputRoot, file.relativePath);
+  if (!(await fileExists(targetPath))) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+  return reply.type(guessContentType(targetPath)).send(createReadStream(targetPath));
+});
+
 app.post("/api/jobs", async (req, reply) => {
   const body = z
-    .object({
-      theme: z.string().optional(),
-      mode: z.string().optional().default("full"),
-    })
+    .object({ theme: z.string().optional() })
+    .merge(createJobBodySchema)
     .parse(req.body ?? {});
+  const workflowRequest = resolveWorkflowJobRequest(body);
 
   const project = await prisma.project.create({ data: { theme: body.theme ?? null } });
   const requestUserId = getRequestUserId(req.headers["x-user-id"]);
@@ -250,11 +293,15 @@ app.post("/api/jobs", async (req, reply) => {
   const job = await prisma.job.create({
     data: {
       projectId: project.id,
-      mode: body.mode,
+      mode: workflowRequest.mode,
     },
   });
 
-  await boss.send("yukkuri.render", { jobId: job.id });
+  await boss.send("yukkuri.render", {
+    jobId: job.id,
+    runMode: workflowRequest.runMode,
+    skipSteps: workflowRequest.skipSteps,
+  });
   return reply.code(201).send({ projectId: project.id, jobId: job.id });
 });
 
@@ -291,6 +338,26 @@ app.get("/api/projects/:projectId/assets", async (req, reply) => {
   return listProjectAssets(workspaceRoot, projectId);
 });
 
+app.get("/api/projects/:projectId/assets/:assetId/file", async (req, reply) => {
+  const { projectId, assetId } = z
+    .object({ projectId: z.string().uuid(), assetId: z.string() })
+    .parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
+  const assets = await listProjectAssets(workspaceRoot, projectId);
+  const asset = assets.find((candidate) => candidate.id === assetId);
+  if (!asset) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+  const targetPath = resolveSafeChildPath(workspaceRoot, asset.relativePath);
+  if (!(await fileExists(targetPath))) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+  return reply.type(guessContentType(targetPath)).send(createReadStream(targetPath));
+});
+
 app.post("/api/projects/:projectId/assets", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const body = createAssetBodySchema.parse(req.body ?? {});
@@ -304,12 +371,14 @@ app.post("/api/projects/:projectId/assets", async (req, reply) => {
 
   if (body.contentBase64) {
     const fileName = buildSafeAssetFilename(assetId, body.extension ?? "bin");
+    const usageDirectory = assetUsageDirectory(body.usage);
     const filePath = path.join(
       workspaceRoot,
       "projects",
       projectId,
       "input",
       "assets",
+      usageDirectory,
       fileName
     );
     await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -326,6 +395,7 @@ app.post("/api/projects/:projectId/assets", async (req, reply) => {
     type: body.type,
     name: body.name,
     relativePath,
+    usage: body.usage ?? "other",
     createdAt: new Date().toISOString(),
   });
 
@@ -406,9 +476,11 @@ app.get("/api/projects/:projectId/preview", async (req, reply) => {
     return reply.code(404).send({ error: "script_not_found" });
   }
   const timeline = await readOrCreateTimeline(workspaceRoot, projectId, script);
+  const settings = await readSettings(workspaceRoot);
   return {
     timeline,
-    remotionProps: timelineToRemotionProps(timeline),
+    outputPreset: settings.outputPreset,
+    remotionProps: timelineToRemotionProps(timeline, settings.outputPreset.fps),
   };
 });
 
@@ -423,6 +495,8 @@ app.put("/api/settings", async (req, reply) => {
   return reply.code(200).send({ ok: true });
 });
 
+app.get("/api/settings/diagnostics", async () => buildSettingsDiagnostics());
+
 app.get("/api/templates", async () => {
   return listTemplates(workspaceRoot);
 });
@@ -435,6 +509,14 @@ app.post("/api/templates", async (req, reply) => {
       description: z.string().optional(),
       scriptSeed: z.record(z.unknown()),
       timelinePreset: TimelineDataSchema,
+      assets: z.array(templateAssetSchema).optional(),
+      outputPreset: settingsBodySchema.shape.outputPreset.optional(),
+      automationProfile: z
+        .object({
+          mode: z.enum(["full", "scriptOnly", "renderOnly", "custom"]),
+          skipSteps: z.array(z.string()).optional(),
+        })
+        .optional(),
     })
     .parse(req.body ?? {});
 
@@ -453,6 +535,96 @@ const readWorkflowLogs = async (projectId: string): Promise<string[]> => {
       .slice(-200);
   } catch {
     return [];
+  }
+};
+
+const assetUsageDirectory = (usage?: string): string => {
+  if (usage === "background") {
+    return "backgrounds";
+  }
+  if (usage === "character") {
+    return "characters";
+  }
+  if (usage === "bgm" || usage === "se") {
+    return "audio";
+  }
+  return "misc";
+};
+
+const guessContentType = (targetPath: string): string => {
+  const extension = path.extname(targetPath).toLowerCase();
+  if (extension === ".mp4") {
+    return "video/mp4";
+  }
+  if (extension === ".webm") {
+    return "video/webm";
+  }
+  if (extension === ".wav") {
+    return "audio/wav";
+  }
+  if (extension === ".mp3") {
+    return "audio/mpeg";
+  }
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  return "application/octet-stream";
+};
+
+const applyTemplateAssets = async (
+  projectId: string,
+  assets: Array<{
+    id: string;
+    type: "audio" | "subtitle" | "image" | "video" | "script" | "metadata";
+    name: string;
+    relativePath: string;
+    usage?: "background" | "character" | "bgm" | "se" | "reference" | "other";
+    createdAt: string;
+  }>
+): Promise<void> => {
+  for (const asset of assets) {
+    const sourceRelativePath = normalizeProjectRelativePath(asset.relativePath);
+    const sourcePath = path.resolve(workspaceRoot, sourceRelativePath);
+    const usageDirectory = assetUsageDirectory(asset.usage);
+    const targetRelativePath = path
+      .join(
+        "projects",
+        projectId,
+        "input",
+        "assets",
+        usageDirectory,
+        path.basename(sourceRelativePath)
+      )
+      .replaceAll("\\", "/");
+    const targetPath = path.resolve(workspaceRoot, targetRelativePath);
+
+    try {
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.copyFile(sourcePath, targetPath);
+    } catch {
+      // テンプレート元の実ファイルが無い場合でも、素材台帳は保持して利用者が差し替えられるようにする。
+    }
+
+    await saveProjectAsset(workspaceRoot, projectId, {
+      ...asset,
+      id: normalizeAssetId(asset.id),
+      relativePath: (await fileExists(targetPath)) ? targetRelativePath : sourceRelativePath,
+    });
+  }
+};
+
+const fileExists = async (targetPath: string): Promise<boolean> => {
+  try {
+    await fs.stat(targetPath);
+    return true;
+  } catch {
+    return false;
   }
 };
 

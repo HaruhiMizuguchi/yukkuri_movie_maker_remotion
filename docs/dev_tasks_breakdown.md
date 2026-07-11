@@ -44,6 +44,9 @@
 - 2026-06-15: Production Workflow の cache hit 時にも `latest` 成果物を現在の Job の `ProjectFile` として再登録するよう修正
 - 2026-06-15: `docs/e2e_customer_journey.md` と `docs/current_capabilities.md` の実API E2E未実行記述を2026-04-26完走結果へ更新し、旧 `docs/dev_tasks_breadown.md` を正規台帳への案内に変更
 - 2026-06-15: `apps/web/src/ui/App.tsx` から API client、画面定義、styles、timeline editor ロジックを分離し、タイムライン編集ロジックの単体テストを追加
+- 2026-06-16: 目的「カスタマイズ性が高く、自動化の段階を選べる、自動ゆっくり動画生成」に対するユーザーストーリー適合性を再調査。GUI導線E2Eは成功したが、モード選択の実行反映、成果物プレビュー/ダウンロード、設定と実レンダリングの接続、ステップ単位の再実行/スキップUIが不足
+- 2026-06-16: ユーザーストーリー適合性レビューの課題を実装。自動化モードをWorkerペイロードへ反映し、ステップ単位再実行/skip、成果物配信、プレビュー動画/ダウンロード、接続診断、素材アップロード/用途割当、テンプレート拡張、出力プリセットの実レンダリング反映、顧客導線E2E拡張を追加
+- 2026-07-11: 設計・実装・セキュリティ・UX・テスト・運用性の全体レビューを実施。型検査/Webビルド/モックGUI E2Eは成功、lint設定欠落、既定Vitestの失敗、実API E2E前提未充足、依存脆弱性18件を確認し、優先改善項目をセクション14へ追加
 
 ---
 
@@ -191,3 +194,51 @@
 - [x] Production Workflow のキャッシュヒット時に、現在の Job へ `ProjectFile` を再登録する
 - [x] `docs/e2e_customer_journey.md`、`docs/current_capabilities.md`、`docs/dev_tasks_breadown.md` の古い記述や重複を整理
 - [x] `apps/web/src/ui/App.tsx` を画面・API client・timeline editor・styles に分割
+
+---
+
+## 13. ユーザーストーリー適合性レビュー改善候補（2026-06-16）
+- [x] `full` / `scriptOnly` / `renderOnly` を実際の `skipSteps`・再開条件・必要入力に変換し、GUI上で「どこまで自動化するか」を選べるようにする
+- [x] プロジェクト詳細の主操作を初回実行・再実行・失敗ステップ再実行に分け、ステップ単位のスキップ/再生成をGUIから指定できるようにする
+- [x] プレビュー画面で実際の `preview.mp4` / `final.mp4` を再生・確認・ダウンロードできるようにし、レンダリング実行後もプレビューサマリーを保持する
+- [x] 設定画面のAPIキー欄を `.env` 前提の接続診断に変更するか、安全な秘密情報保存方式を用意し、出力プリセットを実レンダリング設定へ接続する
+- [x] 素材管理を手入力の `relativePath` だけでなく、アップロード、サムネイル、用途割当（背景/立ち絵/BGM/SE）、差し替え確認まで扱えるようにする
+- [x] テンプレートに台本シードとタイムラインだけでなく、素材セット、出力プリセット、声/話者、ステップ自動化プロファイルを含める
+- [x] 顧客導線E2Eを、モード別実行、成果物再生/ダウンロード、API接続診断、失敗ジョブ復旧、テンプレート再利用まで拡張する
+
+---
+
+## 14. プロジェクト全体レビュー改善候補（2026-07-11）
+
+### P0: 安全性・生成結果の正しさ
+- [ ] テンプレートIDを安全なトークンへ制限し、`outputs/system/templates` 外へ書き込めないことを実パス検証とテストで保証する
+- [ ] 既存素材の `relativePath` を対象プロジェクト配下または明示許可した素材領域に限定し、`.env` や別プロジェクトのファイルを配信・複製できないようにする
+- [ ] 成果物の存在だけで判定するキャッシュを廃止し、台本・素材・タイムライン・設定・依存成果物のfingerprintで無効化する
+- [ ] Theme/Title/Background/Character/Audio Enhancement/Illustrationの各出力を後続合成へ実際に接続し、未接続ステップを完了扱いにしない
+- [ ] `youtube_upload` を実アップロードとして実装するか、現状の認証確認を別名へ変更して「投稿完了」と誤認させない
+
+### P1: 実行モデル・データ整合性
+- [ ] Job作成時に自動化モード、skip、入力revision、出力プリセット、音声設定をsnapshot保存し、「同じ設定で再実行」を再現可能にする
+- [ ] `Project.status` をJob状態から導出するかWorkerで同期し、GUIでジョブをポーリング/SSE購読して完了・失敗・成果物を自動更新する
+- [ ] 同一プロジェクトの同時レンダリングを直列化し、`latest` 更新を原子的にして削除→コピー競合を防ぐ
+- [ ] Job投入をDB状態と整合するoutbox/補償処理にし、キュー送信失敗でPENDING Jobが残らないようにする
+- [ ] 設定をグローバルJSONではなくプロジェクト単位にし、テンプレート適用やジョブ待機中の設定変更が他プロジェクトへ波及しないようにする
+- [ ] 所有者情報をDBへ移し、認証済み主体を必須化する。ローカル単一ユーザー専用なら未実装の複数ユーザー対応表記を外す
+- [ ] Prisma migrationと削除時cascade/保持期間を整備し、`db push` 依存と無制限のrun成果物蓄積を解消する
+
+### P1: 品質ゲート・セキュリティ保守
+- [ ] ESLint 9用 `eslint.config.*` を追加し、`pnpm lint` を実際に成功する品質ゲートへ戻す
+- [ ] VitestからPlaywright specと実API/実動画生成テストを分離し、既定テストを決定的・高速にする。実接続テストは未接続時に黙って成功させずskip理由を記録する
+- [ ] 5秒でタイムアウトする動画品質テストと、404になったGeminiモデル既定値/実生成テストを更新する
+- [ ] `pnpm audit --prod` で検出した high 7 / moderate 8 / low 3件を、Fastify・Remotion・Prisma・pg-bossを中心に解消する
+- [ ] base64 JSONアップロードをmultipart/streamingへ変更し、1MiB body limit、MIME/拡張子不一致、サイズ上限、保存途中失敗を扱う
+- [ ] MP4配信でHTTP Range、Content-Length、Content-Dispositionを扱い、プレビューのシークと大容量ダウンロードを安定させる
+
+### P2: UX・保守性・可観測性
+- [ ] Web/API/Workerで重複するworkflow step・mode・API DTOを共有schemaへ統合し、1694行の`App.tsx`と1444行の`defaultWorkflow.ts`を責務別に分割する
+- [ ] タイムラインへドラッグ移動/リサイズ、スナップ、Undo/Redo、キーボード操作、未保存表示、動画プレビューとの再生ヘッド同期を追加する
+- [ ] APIエラーを画面内に表示し、処理中disable、再試行、破壊操作確認、空状態の次アクション、技術ステータスの日本語化を行う
+- [ ] health checkへDB/queue/Worker/Aivis/Gemini readinessを追加し、job/stepの構造化ログ、所要時間、cache fingerprint、retry backoff、失敗分類を記録する
+- [ ] `projects/` 配下で追跡済みの生成物約238MBを履歴・配布方針ごと整理し、repository hygieneテストで再混入を検出する
+- [ ] `start_yukkuri_movie_maker.ps1` をUTF-8化し、ユーザー名固定パス、サーバー起動前のブラウザ表示、DB手動起動前提を解消する
+- [ ] README・reproduction kit・完了チェックを実装実態に合わせ、CLI雛形、未接続AI拡張、未実装YouTube投稿を明示する

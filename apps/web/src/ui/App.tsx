@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { fetchJson } from "./apiClient";
+import {
+  automationModeLabels,
+  buildJobRequest,
+  workflowStepLabels,
+  workflowSteps,
+  type AutomationMode,
+  type WorkflowStepName,
+} from "./automationProfiles";
 import { screens, type ScreenId } from "./screenConfig";
 import { styleText, styles } from "./styles";
 import {
@@ -61,6 +69,7 @@ type ProjectAsset = {
   type: string;
   name: string;
   relativePath: string;
+  usage?: string;
   createdAt: string;
 };
 
@@ -76,7 +85,12 @@ type ProjectDetail = {
     mode: string;
     createdAt: string;
     steps: Array<{ stepName: string; status: string; completedAt?: string }>;
-    files: Array<{ relativePath: string; fileType: string; fileCategory: string }>;
+    files: Array<{
+      id: string;
+      relativePath: string;
+      fileType: string;
+      fileCategory: string;
+    }>;
   }>;
   script: ScriptData | null;
   timeline: TimelineData | null;
@@ -101,9 +115,11 @@ type Template = {
   id: string;
   name: string;
   description?: string;
+  automationProfile?: { mode: AutomationMode; skipSteps?: WorkflowStepName[] };
 };
 
 type PreviewResponse = {
+  outputPreset?: { width: number; height: number; fps: number };
   remotionProps: {
     durationInFrames: number;
     durationMs: number;
@@ -119,6 +135,11 @@ type PreviewResponse = {
   };
 };
 
+type SettingsDiagnostics = {
+  googleApiKey: { configured: boolean };
+  aivisSpeech: { configured: boolean; reachable: boolean; status?: number; error?: string };
+};
+
 const initialScript: ScriptData = {
   title: "",
   theme: "",
@@ -127,6 +148,23 @@ const initialScript: ScriptData = {
     { speaker: "marisa", text: "" },
   ],
 };
+
+const buildJobFileUrl = (jobId: string, fileId: string) =>
+  `/api/jobs/${jobId}/files/${fileId}`;
+
+const readFileAsBase64 = async (file: File): Promise<{ contentBase64: string; extension: string }> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("file_read_failed"));
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      resolve({
+        contentBase64: result.includes(",") ? result.split(",").at(-1) ?? "" : result,
+        extension: file.name.split(".").pop() ?? "bin",
+      });
+    };
+    reader.readAsDataURL(file);
+  });
 
 export function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
@@ -141,15 +179,23 @@ export function App() {
   const [scriptDraft, setScriptDraft] = useState<ScriptData>(initialScript);
   const [timelineDraft, setTimelineDraft] = useState<TimelineData | null>(null);
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
-  const [assetForm, setAssetForm] = useState({ type: "image", name: "", relativePath: "" });
+  const [assetForm, setAssetForm] = useState({
+    type: "image",
+    usage: "background",
+    name: "",
+    relativePath: "",
+  });
+  const [assetUploadFile, setAssetUploadFile] = useState<File | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
     apiKeys: {},
     outputPreset: { width: 1920, height: 1080, fps: 30 },
   });
+  const [settingsDiagnostics, setSettingsDiagnostics] = useState<SettingsDiagnostics | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [wizardTheme, setWizardTheme] = useState("ゆっくり解説");
-  const [wizardMode, setWizardMode] = useState("full");
+  const [wizardMode, setWizardMode] = useState<AutomationMode>("full");
+  const [customSkipSteps, setCustomSkipSteps] = useState<WorkflowStepName[]>([]);
   const [wizardTemplateId, setWizardTemplateId] = useState("");
   const [manualSubtitleText, setManualSubtitleText] = useState("");
   const [manualMarkerLabel, setManualMarkerLabel] = useState("調整ポイント");
@@ -167,6 +213,23 @@ export function App() {
     () => findTimelineClip(timelineDraft, selectedTimelineClip),
     [selectedTimelineClip, timelineDraft]
   );
+  const latestJob = projectDetail?.jobs[0] ?? null;
+  const previewFile = useMemo(
+    () =>
+      latestJob?.files.find(
+        (file) => file.fileType === "video" && file.relativePath.endsWith("preview.mp4")
+      ) ?? null,
+    [latestJob]
+  );
+  const finalFile = useMemo(
+    () =>
+      latestJob?.files.find(
+        (file) => file.fileType === "video" && file.fileCategory === "final"
+      ) ?? null,
+    [latestJob]
+  );
+  const previewVideoUrl = latestJob && previewFile ? buildJobFileUrl(latestJob.id, previewFile.id) : null;
+  const finalVideoUrl = latestJob && finalFile ? buildJobFileUrl(latestJob.id, finalFile.id) : null;
   const timelineViewport = useMemo(
     () =>
       timelineDraft
@@ -222,14 +285,16 @@ export function App() {
     setDashboardStats(stats);
   };
 
-  const loadProjectDetail = async (projectId: string) => {
+  const loadProjectDetail = async (projectId: string, options: { preservePreview?: boolean } = {}) => {
     const detail = await fetchJson<ProjectDetail>(`/api/projects/${projectId}`);
     setSelectedProjectId(projectId);
     setProjectDetail(detail);
     setScriptDraft(detail.script ?? initialScript);
     setTimelineDraft(detail.timeline);
     setAssets(detail.assets ?? []);
-    setPreview(null);
+    if (!options.preservePreview) {
+      setPreview(null);
+    }
     setSelectedTimelineClip(null);
     setTimelinePlayheadMs(detail.timeline?.playbackRange.inMs ?? 0);
     setTimelineZoomWindowMs(
@@ -265,10 +330,42 @@ export function App() {
     const created = await fetchJson<{ jobId: string }>(`/api/projects/${selectedProjectId}/jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: wizardMode, runMode: "resume" }),
+      body: JSON.stringify(buildJobRequest(wizardMode, customSkipSteps)),
     });
     setMessage(`レンダリングジョブを作成しました: ${created.jobId}`);
-    await loadProjectDetail(selectedProjectId);
+    await loadProjectDetail(selectedProjectId, { preservePreview: true });
+  };
+
+  const createRenderJobFromStep = async (stepName: WorkflowStepName) => {
+    if (!selectedProjectId) return;
+    const startIndex = workflowSteps.indexOf(stepName);
+    if (startIndex < 0) {
+      setMessage("未知のステップは再実行できません");
+      return;
+    }
+    const skipSteps = workflowSteps.slice(0, startIndex);
+    const created = await fetchJson<{ jobId: string }>(`/api/projects/${selectedProjectId}/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildJobRequest("custom", skipSteps)),
+    });
+    setMessage(`${workflowStepLabels[stepName]} から再実行しました: ${created.jobId}`);
+    await loadProjectDetail(selectedProjectId, { preservePreview: true });
+  };
+
+  const createRenderJobSkippingStep = async (stepName: WorkflowStepName) => {
+    if (!selectedProjectId) return;
+    if (!workflowSteps.includes(stepName)) {
+      setMessage("未知のステップはスキップできません");
+      return;
+    }
+    const created = await fetchJson<{ jobId: string }>(`/api/projects/${selectedProjectId}/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildJobRequest("custom", [stepName])),
+    });
+    setMessage(`${workflowStepLabels[stepName]} をスキップして実行しました: ${created.jobId}`);
+    await loadProjectDetail(selectedProjectId, { preservePreview: true });
   };
 
   const saveScript = async () => {
@@ -284,12 +381,23 @@ export function App() {
 
   const addAsset = async () => {
     if (!selectedProjectId) return;
+    const uploadPayload = assetUploadFile ? await readFileAsBase64(assetUploadFile) : null;
     await fetchJson(`/api/projects/${selectedProjectId}/assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(assetForm),
+      body: JSON.stringify({
+        ...assetForm,
+        name: assetForm.name || assetUploadFile?.name || "asset",
+        ...(uploadPayload
+          ? {
+              contentBase64: uploadPayload.contentBase64,
+              extension: uploadPayload.extension,
+            }
+          : {}),
+      }),
     });
-    setAssetForm({ type: "image", name: "", relativePath: "" });
+    setAssetForm({ type: "image", usage: "background", name: "", relativePath: "" });
+    setAssetUploadFile(null);
     const nextAssets = await fetchJson<ProjectAsset[]>(`/api/projects/${selectedProjectId}/assets`);
     setAssets(nextAssets);
     setMessage("素材を登録しました");
@@ -432,11 +540,17 @@ export function App() {
     setSettings(loaded);
   };
 
+  const loadSettingsDiagnostics = async () => {
+    const diagnostics = await fetchJson<SettingsDiagnostics>("/api/settings/diagnostics");
+    setSettingsDiagnostics(diagnostics);
+    setMessage("接続状態を確認しました");
+  };
+
   const saveSettings = async () => {
     await fetchJson("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+      body: JSON.stringify({ apiKeys: {}, outputPreset: settings.outputPreset }),
     });
     setMessage("設定を保存しました");
   };
@@ -458,6 +572,12 @@ export function App() {
         description: "Web GUIから作成",
         scriptSeed: { theme: scriptDraft.theme || wizardTheme },
         timelinePreset: timelineDraft,
+        assets,
+        outputPreset: settings.outputPreset,
+        automationProfile: {
+          mode: wizardMode,
+          skipSteps: wizardMode === "custom" ? customSkipSteps : undefined,
+        },
       }),
     });
     await loadTemplates();
@@ -546,17 +666,48 @@ export function App() {
               data-testid="wizard-mode-select"
               style={styles.input}
               value={wizardMode}
-              onChange={(event) => setWizardMode(event.target.value)}
+              onChange={(event) => setWizardMode(event.target.value as AutomationMode)}
             >
-              <option value="full">full</option>
-              <option value="scriptOnly">scriptOnly</option>
-              <option value="renderOnly">renderOnly</option>
+              {Object.entries(automationModeLabels).map(([mode, label]) => (
+                <option key={mode} value={mode}>
+                  {label}
+                </option>
+              ))}
             </select>
+            {wizardMode === "custom" ? (
+              <div style={styles.checkGrid} data-testid="wizard-custom-steps">
+                {workflowSteps.map((stepName) => (
+                  <label key={stepName} style={styles.checkItem}>
+                    <input
+                      type="checkbox"
+                      checked={customSkipSteps.includes(stepName)}
+                      onChange={(event) => {
+                        setCustomSkipSteps((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, stepName])]
+                            : current.filter((step) => step !== stepName)
+                        );
+                      }}
+                    />
+                    <span>{workflowStepLabels[stepName]}</span>
+                    <small>skip</small>
+                  </label>
+                ))}
+              </div>
+            ) : null}
             <label style={styles.label}>テンプレート</label>
             <select
               style={styles.input}
               value={wizardTemplateId}
-              onChange={(event) => setWizardTemplateId(event.target.value)}
+              onChange={(event) => {
+                const templateId = event.target.value;
+                setWizardTemplateId(templateId);
+                const template = templates.find((candidate) => candidate.id === templateId);
+                if (template?.automationProfile) {
+                  setWizardMode(template.automationProfile.mode);
+                  setCustomSkipSteps(template.automationProfile.skipSteps ?? []);
+                }
+              }}
             >
               <option value="">なし</option>
               {templates.map((template) => (
@@ -587,7 +738,7 @@ export function App() {
                   <InfoCard label="ジョブ数" value={String(projectDetail.jobs.length)} />
                 </div>
                 <button style={styles.primaryButton} onClick={() => void createRenderJob()}>
-                  再実行
+                  {projectDetail.jobs.length === 0 ? "この設定で生成" : "同じ設定で再実行"}
                 </button>
                 <h3 style={styles.subTitle}>ジョブ履歴</h3>
                 {projectDetail.jobs.map((job) => (
@@ -595,12 +746,43 @@ export function App() {
                     <strong>{job.id}</strong>
                     <div>{job.status}</div>
                     <div style={styles.stepWrap}>
-                      {job.steps.map((step) => (
-                        <span key={`${job.id}-${step.stepName}`} style={styles.stepBadge}>
-                          {step.stepName}: {step.status}
-                        </span>
-                      ))}
+                      {job.steps.map((step) => {
+                        const stepName = step.stepName as WorkflowStepName;
+                        const label = workflowStepLabels[stepName] ?? step.stepName;
+                        return (
+                          <span key={`${job.id}-${step.stepName}`} style={styles.stepBadge}>
+                            {label}: {step.status}
+                            <button
+                              style={styles.inlineButton}
+                              onClick={() => void createRenderJobFromStep(stepName)}
+                            >
+                              ここから
+                            </button>
+                            <button
+                              style={styles.inlineButton}
+                              onClick={() => void createRenderJobSkippingStep(stepName)}
+                            >
+                              skip
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
+                    {job.files.length > 0 ? (
+                      <div style={styles.fileGrid}>
+                        {job.files.map((file) => (
+                          <a
+                            key={file.id}
+                            style={styles.fileLink}
+                            href={buildJobFileUrl(job.id, file.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {file.fileCategory}/{file.fileType}: {file.relativePath.split("/").at(-1)}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
                 <h3 style={styles.subTitle}>ログ</h3>
@@ -685,6 +867,19 @@ export function App() {
                 <option value="video">video</option>
                 <option value="subtitle">subtitle</option>
               </select>
+              <select
+                data-testid="asset-usage-select"
+                style={styles.inputSmall}
+                value={assetForm.usage}
+                onChange={(event) => setAssetForm({ ...assetForm, usage: event.target.value })}
+              >
+                <option value="background">背景</option>
+                <option value="character">立ち絵</option>
+                <option value="bgm">BGM</option>
+                <option value="se">SE</option>
+                <option value="reference">参考素材</option>
+                <option value="other">その他</option>
+              </select>
               <input
                 data-testid="asset-name-input"
                 style={styles.inputSmall}
@@ -693,9 +888,15 @@ export function App() {
                 onChange={(event) => setAssetForm({ ...assetForm, name: event.target.value })}
               />
               <input
+                data-testid="asset-file-input"
+                style={styles.input}
+                type="file"
+                onChange={(event) => setAssetUploadFile(event.target.files?.[0] ?? null)}
+              />
+              <input
                 data-testid="asset-path-input"
                 style={styles.input}
-                placeholder="relativePath"
+                placeholder="既存relativePath"
                 value={assetForm.relativePath}
                 onChange={(event) => setAssetForm({ ...assetForm, relativePath: event.target.value })}
               />
@@ -706,8 +907,17 @@ export function App() {
             <div style={styles.list} data-testid="asset-list">
               {assets.map((asset) => (
                 <div key={asset.id} style={styles.assetRow}>
+                  {selectedProjectId && asset.type === "image" ? (
+                    <img
+                      src={`/api/projects/${selectedProjectId}/assets/${asset.id}/file`}
+                      alt={asset.name}
+                      style={styles.assetThumb}
+                    />
+                  ) : null}
                   <strong>{asset.name}</strong>
-                  <span>{asset.type}</span>
+                  <span>
+                    {asset.type} / {asset.usage ?? "other"}
+                  </span>
                   <small>{asset.relativePath}</small>
                 </div>
               ))}
@@ -1334,20 +1544,41 @@ export function App() {
         {activeScreen === "preview" ? (
           <section style={styles.panel} data-testid="screen-preview">
             <h2 style={styles.panelTitle}>プレビュー & レンダリング</h2>
-            <button style={styles.secondaryButton} data-testid="preview-load-button" onClick={() => void loadPreview()}>
-              プレビュー情報を取得
-            </button>
-            <button
-              style={styles.primaryButton}
-              data-testid="preview-render-button"
-              onClick={() => void createRenderJob()}
-            >
-              レンダリング実行
-            </button>
+            <div style={styles.actionBar}>
+              <button style={styles.secondaryButton} data-testid="preview-load-button" onClick={() => void loadPreview()}>
+                プレビュー情報を取得
+              </button>
+              <button
+                style={styles.primaryButton}
+                data-testid="preview-render-button"
+                onClick={() => void createRenderJob()}
+              >
+                レンダリング実行
+              </button>
+              {finalVideoUrl ? (
+                <a style={styles.downloadButton} href={finalVideoUrl} download>
+                  final.mp4
+                </a>
+              ) : null}
+            </div>
+            {previewVideoUrl ? (
+              <video
+                data-testid="preview-video"
+                style={styles.videoPlayer}
+                src={previewVideoUrl}
+                controls
+              />
+            ) : null}
             {preview ? (
               <div style={styles.previewCard} data-testid="preview-summary">
                 <div>durationInFrames: {preview.remotionProps.durationInFrames}</div>
                 <div>durationMs: {preview.remotionProps.durationMs}</div>
+                {preview.outputPreset ? (
+                  <div>
+                    出力: {preview.outputPreset.width}x{preview.outputPreset.height} /{" "}
+                    {preview.outputPreset.fps}fps
+                  </div>
+                ) : null}
                 <div>字幕クリップ数: {preview.remotionProps.subtitleTracks.length}</div>
                 <div>音声クリップ数: {preview.remotionProps.audioTracks.length}</div>
                 <div data-testid="preview-manual-summary">
@@ -1364,19 +1595,29 @@ export function App() {
         {activeScreen === "settings" ? (
           <section style={styles.panel} data-testid="screen-settings">
             <h2 style={styles.panelTitle}>設定</h2>
-            <div style={styles.lineRow}>
-              <label style={styles.labelInline}>Google API Key</label>
-              <input
-                data-testid="settings-google-input"
-                style={styles.input}
-                value={settings.apiKeys.google ?? ""}
-                onChange={(event) =>
-                  setSettings({
-                    ...settings,
-                    apiKeys: { ...settings.apiKeys, google: event.target.value },
-                  })
-                }
-              />
+            <div style={styles.actionBar}>
+              <button
+                style={styles.secondaryButton}
+                data-testid="settings-diagnostics-button"
+                onClick={() => void loadSettingsDiagnostics()}
+              >
+                接続診断
+              </button>
+              {settingsDiagnostics ? (
+                <>
+                  <span style={styles.stepBadge} data-testid="settings-google-status">
+                    Gemini: {settingsDiagnostics.googleApiKey.configured ? "設定済み" : "未設定"}
+                  </span>
+                  <span style={styles.stepBadge} data-testid="settings-aivis-status">
+                    Aivis:{" "}
+                    {settingsDiagnostics.aivisSpeech.reachable
+                      ? "接続OK"
+                      : settingsDiagnostics.aivisSpeech.configured
+                        ? "未接続"
+                        : "未設定"}
+                  </span>
+                </>
+              ) : null}
             </div>
             <div style={styles.lineRow}>
               <label style={styles.labelInline}>Width</label>

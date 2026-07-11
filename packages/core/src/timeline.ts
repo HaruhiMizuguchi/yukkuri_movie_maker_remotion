@@ -249,7 +249,7 @@ export const addMarker = (timeline: TimelineData, marker: AddMarkerInput): Timel
   ]),
 });
 
-export const timelineToRemotionProps = (timeline: TimelineData): RemotionTimelineProps => {
+export const timelineToRemotionProps = (timeline: TimelineData, fps = 30): RemotionTimelineProps => {
   const playbackRange = sanitizePlaybackRange(timeline.playbackRange);
   const durationMs = Math.max(playbackRange.outMs - playbackRange.inMs, 1000);
   const subtitleTracks = collectSubtitleTracks(timeline.tracks, playbackRange);
@@ -262,7 +262,7 @@ export const timelineToRemotionProps = (timeline: TimelineData): RemotionTimelin
     )
   );
   return {
-    durationInFrames: Math.ceil((durationMs / 1000) * 30),
+    durationInFrames: Math.ceil((durationMs / 1000) * Math.max(1, Math.floor(fps))),
     durationMs,
     playbackRange,
     subtitleTracks,

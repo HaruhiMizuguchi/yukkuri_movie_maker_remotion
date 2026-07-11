@@ -16,6 +16,12 @@ export type ProjectTemplate = {
   description?: string;
   scriptSeed: Record<string, unknown>;
   timelinePreset: TimelineData;
+  assets?: ProjectAsset[];
+  outputPreset?: ApiSettings["outputPreset"];
+  automationProfile?: {
+    mode: "full" | "scriptOnly" | "renderOnly" | "custom";
+    skipSteps?: string[];
+  };
 };
 
 export type ProjectAsset = {
@@ -23,6 +29,7 @@ export type ProjectAsset = {
   type: "audio" | "subtitle" | "image" | "video" | "script" | "metadata";
   name: string;
   relativePath: string;
+  usage?: "background" | "character" | "bgm" | "se" | "reference" | "other";
   createdAt: string;
 };
 

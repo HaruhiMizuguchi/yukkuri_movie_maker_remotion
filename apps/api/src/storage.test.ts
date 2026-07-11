@@ -67,10 +67,12 @@ describe("api storage", () => {
       type: "image",
       name: "bg",
       relativePath: "input/assets/bg.png",
+      usage: "background",
       createdAt: new Date().toISOString(),
     });
     const assets = await listProjectAssets(workspaceRoot, "project-1");
     expect(assets).toHaveLength(1);
+    expect(assets[0]?.usage).toBe("background");
 
     await createTemplate(workspaceRoot, {
       id: "tpl-1",
@@ -78,8 +80,16 @@ describe("api storage", () => {
       description: "ニュース系テンプレ",
       scriptSeed: { theme: "ニュース", tone: "hard" },
       timelinePreset: loadedTimeline,
+      assets,
+      outputPreset: { width: 1280, height: 720, fps: 30 },
+      automationProfile: {
+        mode: "renderOnly",
+        skipSteps: ["theme_selection", "script_generation", "title_generation", "youtube_upload"],
+      },
     });
     const templates = await listTemplates(workspaceRoot);
     expect(templates).toHaveLength(1);
+    expect(templates[0]?.assets).toHaveLength(1);
+    expect(templates[0]?.automationProfile?.mode).toBe("renderOnly");
   });
 });
