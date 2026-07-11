@@ -5,6 +5,7 @@
 将来の拡張や運用まで見失わない構成にしています。
 
 ## 更新メモ
+
 - 2026-02-01: `master` の内容を `main` に統合（履歴が別扱いだったため `--allow-unrelated-histories` を使用。`README.md` の衝突を解消）
 - 2026-02-01: 失敗時の再実行・スキップ設計を追加し、ProjectFile 登録ユーティリティの実装反映
 - 2026-02-01: ワーカーのジョブペイロードに再実行/スキップ指定を追加
@@ -47,10 +48,12 @@
 - 2026-06-16: 目的「カスタマイズ性が高く、自動化の段階を選べる、自動ゆっくり動画生成」に対するユーザーストーリー適合性を再調査。GUI導線E2Eは成功したが、モード選択の実行反映、成果物プレビュー/ダウンロード、設定と実レンダリングの接続、ステップ単位の再実行/スキップUIが不足
 - 2026-06-16: ユーザーストーリー適合性レビューの課題を実装。自動化モードをWorkerペイロードへ反映し、ステップ単位再実行/skip、成果物配信、プレビュー動画/ダウンロード、接続診断、素材アップロード/用途割当、テンプレート拡張、出力プリセットの実レンダリング反映、顧客導線E2E拡張を追加
 - 2026-07-11: 設計・実装・セキュリティ・UX・テスト・運用性の全体レビューを実施。型検査/Webビルド/モックGUI E2Eは成功、lint設定欠落、既定Vitestの失敗、実API E2E前提未充足、依存脆弱性18件を確認し、優先改善項目をセクション14へ追加
+- 2026-07-11: セクション14を実装。パス境界、fingerprint cache、全ステップ接続、YouTube実投稿、Job snapshot/排他/原子的latest、per-project設定、migration、multipart/Range、依存更新、UI自動更新/Undo/Redo/エラー回復、readiness/heartbeat、CLI、テスト分離とリポジトリ衛生を整備
 
 ---
 
 ## 0. 前提整備
+
 - [x] `.env` と `config/` のテンプレ整理（必要キー一覧の明文化）
 - [x] Prisma `schema.prisma` の見直し（成果物管理の拡張余地確認）
 - [x] ローカル開発起動フローの整理（`pnpm dev` の役割確認）
@@ -58,11 +61,13 @@
 - [x] `pnpm dev` の標準出力/標準エラーを `logs/dev/*.log` に記録し、PowerShell実行時のトラブル調査を容易化
 
 ## 1. データモデル / 共有型
+
 - [x] `packages/shared` に台本（Script）型定義を追加
 - [x] 生成物（音声/字幕/画像/動画）メタデータ型の追加
 - [x] ワークフロー入出力の共通インターフェース定義
 
 ## 2. ワークフロー基盤（MVP）
+
 - [x] `packages/core` のステップ実装フック整理
 - [x] `projects/[id]/` の出力ディレクトリ規約の明文化
 - [x] `ProjectFile` への成果物登録ユーティリティ
@@ -74,33 +79,39 @@
 ## 3. MVPの縦串（まず動画が出る最小構成）
 
 ### 3-1. Script Generation（簡易実装）
+
 - [x] 台本をLLM最小実装で作成
 - [x] `script.json` を保存
 - [x] DBに出力ファイルを登録
 
 ### 3-2. TTS Generation（簡易実装）
+
 - [x] 台本JSONからセリフを読み込み
 - [x] ダミー音声 or 既存音声を結合して出力
 - [x] タイムスタンプJSONを作成（簡易で可）
 - [x] DBに出力ファイルを登録
 
 ### 3-3. Subtitle Generation（簡易実装）
+
 - [x] タイムスタンプ情報から字幕生成
 - [x] ASSまたはJSON形式で出力
 - [x] DBに登録
 
 ### 3-4. Video Composition（最低限）
+
 - [x] Remotionで背景/立ち絵/字幕/音声を合成
 - [x] MP4出力
 - [x] DBに出力ファイルを登録
 
 ### 3-5. Final Encoding（最低限）
+
 - [x] YouTube向け最小設定で再エンコード
 - [x] 最終成果物の出力確認
 
 ---
 
 ## 4. Web GUI（初期版）
+
 - [x] ダッシュボード（プロジェクト一覧）
 - [x] プロジェクト作成ウィザード
 - [x] プロジェクト詳細（進捗/ログ/成果物）
@@ -113,6 +124,7 @@
 ---
 
 ## 5. タイムライン編集の段階的実装
+
 - [x] タイムラインデータ構造の設計（Track / Clip / Marker）
 - [x] 再生範囲の指定（in/out）
 - [x] クリップのドラッグ移動（開始位置変更）
@@ -126,6 +138,7 @@
 ---
 
 ## 6. AI連携の拡張
+
 - [x] Theme Selection（トレンド取得/評価ロジック）
 - [x] Title Generation（CTR最適化）
 - [x] Background / Illustration Generation
@@ -134,6 +147,7 @@
 ---
 
 ## 7. 運用性 / 安定性
+
 - [x] ステップごとのリトライ方針
 - [x] 生成物のキャッシュ/再利用
 - [x] 監視ログ（失敗原因の集計）
@@ -141,6 +155,7 @@
 ---
 
 ## 8. 将来拡張（任意）
+
 - [x] YouTube Upload（API連携）
 - [x] プロジェクトのテンプレ化
 - [x] 複数ユーザー対応（将来）
@@ -148,6 +163,7 @@
 ---
 
 ## 9. カスタマージャーニーE2E / ビジュアル回帰
+
 - [x] Playwright を導入し、GUIの主要画面を顧客導線として通すE2Eを追加
 - [x] 各導線チェックポイントのスクリーンショットとメタデータを `outputs/test_evidence/` に保存
 - [x] AI視覚レビューに渡せるビジュアル回帰用マニフェストを生成
@@ -162,6 +178,7 @@
 ---
 
 ## 10. 実生成ショーケース
+
 - [x] 生成前に利用可能なAPI/素材/FFmpegを確認（AivisSpeechは手動起動後に `/speakers` がHTTP 200、GeminiはHTTP 429クォータ枯渇、OpenAIはHTTP 401）
 - [x] 1〜2分の本番寄り動画を生成する `scripts/generateBestAvailableVideo.mjs` を追加
 - [x] ドライラン計画のVitestを追加し、台本行数・縦串ステップ・必須素材を検証
@@ -175,6 +192,7 @@
 ---
 
 ## 11. リッチ動画化（Remotion優先）
+
 - [x] リッチ動画化の設計メモを追加し、機能別の設計・テスト方針・実装順を整理
 - [x] `video_composition` を Remotion 優先の正規経路へ移行し、演出ロジックを Remotion props 化
 - [x] 台本と字幕タイミングから自動ショット割りを生成し、`shot-plan.json` として保存
@@ -187,6 +205,7 @@
 ---
 
 ## 12. プロジェクト全体レビュー改善候補（2026-06-14）
+
 - [x] 目的・進捗・構成レビューを実施
 - [x] `outputs/production_runs/`、`outputs/diagnostics/`、`projects/`、`apps/*/projects/` の追跡/ignore 方針を整理
 - [x] API の素材アップロードと設定保存で、パストラバーサル対策・APIキー保存先・権限チェックを強化
@@ -198,6 +217,7 @@
 ---
 
 ## 13. ユーザーストーリー適合性レビュー改善候補（2026-06-16）
+
 - [x] `full` / `scriptOnly` / `renderOnly` を実際の `skipSteps`・再開条件・必要入力に変換し、GUI上で「どこまで自動化するか」を選べるようにする
 - [x] プロジェクト詳細の主操作を初回実行・再実行・失敗ステップ再実行に分け、ステップ単位のスキップ/再生成をGUIから指定できるようにする
 - [x] プレビュー画面で実際の `preview.mp4` / `final.mp4` を再生・確認・ダウンロードできるようにし、レンダリング実行後もプレビューサマリーを保持する
@@ -211,34 +231,38 @@
 ## 14. プロジェクト全体レビュー改善候補（2026-07-11）
 
 ### P0: 安全性・生成結果の正しさ
-- [ ] テンプレートIDを安全なトークンへ制限し、`outputs/system/templates` 外へ書き込めないことを実パス検証とテストで保証する
-- [ ] 既存素材の `relativePath` を対象プロジェクト配下または明示許可した素材領域に限定し、`.env` や別プロジェクトのファイルを配信・複製できないようにする
-- [ ] 成果物の存在だけで判定するキャッシュを廃止し、台本・素材・タイムライン・設定・依存成果物のfingerprintで無効化する
-- [ ] Theme/Title/Background/Character/Audio Enhancement/Illustrationの各出力を後続合成へ実際に接続し、未接続ステップを完了扱いにしない
-- [ ] `youtube_upload` を実アップロードとして実装するか、現状の認証確認を別名へ変更して「投稿完了」と誤認させない
+
+- [x] テンプレートIDを安全なトークンへ制限し、`outputs/system/templates` 外へ書き込めないことを実パス検証とテストで保証する
+- [x] 既存素材の `relativePath` を対象プロジェクト配下または明示許可した素材領域に限定し、`.env` や別プロジェクトのファイルを配信・複製できないようにする
+- [x] 成果物の存在だけで判定するキャッシュを廃止し、台本・素材・タイムライン・設定・依存成果物のfingerprintで無効化する
+- [x] Theme/Title/Background/Character/Audio Enhancement/Illustrationの各出力を後続合成へ実際に接続し、未接続ステップを完了扱いにしない
+- [x] `youtube_upload` を実アップロードとして実装するか、現状の認証確認を別名へ変更して「投稿完了」と誤認させない
 
 ### P1: 実行モデル・データ整合性
-- [ ] Job作成時に自動化モード、skip、入力revision、出力プリセット、音声設定をsnapshot保存し、「同じ設定で再実行」を再現可能にする
-- [ ] `Project.status` をJob状態から導出するかWorkerで同期し、GUIでジョブをポーリング/SSE購読して完了・失敗・成果物を自動更新する
-- [ ] 同一プロジェクトの同時レンダリングを直列化し、`latest` 更新を原子的にして削除→コピー競合を防ぐ
-- [ ] Job投入をDB状態と整合するoutbox/補償処理にし、キュー送信失敗でPENDING Jobが残らないようにする
-- [ ] 設定をグローバルJSONではなくプロジェクト単位にし、テンプレート適用やジョブ待機中の設定変更が他プロジェクトへ波及しないようにする
-- [ ] 所有者情報をDBへ移し、認証済み主体を必須化する。ローカル単一ユーザー専用なら未実装の複数ユーザー対応表記を外す
-- [ ] Prisma migrationと削除時cascade/保持期間を整備し、`db push` 依存と無制限のrun成果物蓄積を解消する
+
+- [x] Job作成時に自動化モード、skip、入力revision、出力プリセット、音声設定をsnapshot保存し、「同じ設定で再実行」を再現可能にする
+- [x] `Project.status` をJob状態から導出するかWorkerで同期し、GUIでジョブをポーリング/SSE購読して完了・失敗・成果物を自動更新する
+- [x] 同一プロジェクトの同時レンダリングを直列化し、`latest` 更新を原子的にして削除→コピー競合を防ぐ
+- [x] Job投入をDB状態と整合するoutbox/補償処理にし、キュー送信失敗でPENDING Jobが残らないようにする
+- [x] 設定をグローバルJSONではなくプロジェクト単位にし、テンプレート適用やジョブ待機中の設定変更が他プロジェクトへ波及しないようにする
+- [x] 所有者情報をDBへ移し、認証済み主体を必須化する。ローカル単一ユーザー専用なら未実装の複数ユーザー対応表記を外す
+- [x] Prisma migrationと削除時cascade/保持期間を整備し、`db push` 依存と無制限のrun成果物蓄積を解消する
 
 ### P1: 品質ゲート・セキュリティ保守
-- [ ] ESLint 9用 `eslint.config.*` を追加し、`pnpm lint` を実際に成功する品質ゲートへ戻す
-- [ ] VitestからPlaywright specと実API/実動画生成テストを分離し、既定テストを決定的・高速にする。実接続テストは未接続時に黙って成功させずskip理由を記録する
-- [ ] 5秒でタイムアウトする動画品質テストと、404になったGeminiモデル既定値/実生成テストを更新する
-- [ ] `pnpm audit --prod` で検出した high 7 / moderate 8 / low 3件を、Fastify・Remotion・Prisma・pg-bossを中心に解消する
-- [ ] base64 JSONアップロードをmultipart/streamingへ変更し、1MiB body limit、MIME/拡張子不一致、サイズ上限、保存途中失敗を扱う
-- [ ] MP4配信でHTTP Range、Content-Length、Content-Dispositionを扱い、プレビューのシークと大容量ダウンロードを安定させる
+
+- [x] ESLint 9用 `eslint.config.*` を追加し、`pnpm lint` を実際に成功する品質ゲートへ戻す
+- [x] VitestからPlaywright specと実API/実動画生成テストを分離し、既定テストを決定的・高速にする。実接続テストは未接続時に黙って成功させずskip理由を記録する
+- [x] 5秒でタイムアウトする動画品質テストと、404になったGeminiモデル既定値/実生成テストを更新する
+- [x] `pnpm audit --prod` で検出した high 7 / moderate 8 / low 3件を、Fastify・Remotion・Prisma・pg-bossを中心に解消する
+- [x] base64 JSONアップロードをmultipart/streamingへ変更し、1MiB body limit、MIME/拡張子不一致、サイズ上限、保存途中失敗を扱う
+- [x] MP4配信でHTTP Range、Content-Length、Content-Dispositionを扱い、プレビューのシークと大容量ダウンロードを安定させる
 
 ### P2: UX・保守性・可観測性
-- [ ] Web/API/Workerで重複するworkflow step・mode・API DTOを共有schemaへ統合し、1694行の`App.tsx`と1444行の`defaultWorkflow.ts`を責務別に分割する
-- [ ] タイムラインへドラッグ移動/リサイズ、スナップ、Undo/Redo、キーボード操作、未保存表示、動画プレビューとの再生ヘッド同期を追加する
-- [ ] APIエラーを画面内に表示し、処理中disable、再試行、破壊操作確認、空状態の次アクション、技術ステータスの日本語化を行う
-- [ ] health checkへDB/queue/Worker/Aivis/Gemini readinessを追加し、job/stepの構造化ログ、所要時間、cache fingerprint、retry backoff、失敗分類を記録する
-- [ ] `projects/` 配下で追跡済みの生成物約238MBを履歴・配布方針ごと整理し、repository hygieneテストで再混入を検出する
-- [ ] `start_yukkuri_movie_maker.ps1` をUTF-8化し、ユーザー名固定パス、サーバー起動前のブラウザ表示、DB手動起動前提を解消する
-- [ ] README・reproduction kit・完了チェックを実装実態に合わせ、CLI雛形、未接続AI拡張、未実装YouTube投稿を明示する
+
+- [x] Web/API/Workerで重複するworkflow step・mode・API DTOを共有schemaへ統合し、1694行の`App.tsx`と1444行の`defaultWorkflow.ts`を責務別に分割する
+- [x] タイムラインへドラッグ移動/リサイズ、スナップ、Undo/Redo、キーボード操作、未保存表示、動画プレビューとの再生ヘッド同期を追加する
+- [x] APIエラーを画面内に表示し、処理中disable、再試行、破壊操作確認、空状態の次アクション、技術ステータスの日本語化を行う
+- [x] health checkへDB/queue/Worker/Aivis/Gemini readinessを追加し、job/stepの構造化ログ、所要時間、cache fingerprint、retry backoff、失敗分類を記録する
+- [x] `projects/` 配下で追跡済みの生成物約238MBを追跡対象から外し、repository hygieneテストで再混入を検出する（共有済みGit履歴の書き換えは行わない）
+- [x] `start_yukkuri_movie_maker.ps1` をUTF-8化し、ユーザー名固定パス、サーバー起動前のブラウザ表示、DB手動起動前提を解消する
+- [x] README・reproduction kit・完了チェックを実装実態に合わせ、CLI、AI拡張、YouTube投稿の実装状態を明示する

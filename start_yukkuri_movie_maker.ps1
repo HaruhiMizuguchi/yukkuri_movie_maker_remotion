@@ -46,40 +46,59 @@ function Wait-HttpReady {
 
 if (-not $SkipAivis) {
   $aivisCandidates = @(
-    "C:\Users\1120h\AppData\Local\Programs\AivisSpeech\AivisSpeech.exe",
-    "C:\Program Files\AivisSpeech\AivisSpeech.exe"
+    (Join-Path $env:LOCALAPPDATA "Programs\AivisSpeech\AivisSpeech.exe"),
+    (Join-Path $env:ProgramFiles "AivisSpeech\AivisSpeech.exe")
   )
   $aivisPath = $aivisCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
   if ($aivisPath) {
     if (-not (Test-PortOpen -HostName "127.0.0.1" -Port 10101)) {
-      Write-Host "AivisSpeech ‚ğ‹N“®‚µ‚Ü‚·: $aivisPath"
+      Write-Host "AivisSpeech ã‚’èµ·å‹•ã—ã¾ã™: $aivisPath"
       Start-Process -FilePath $aivisPath | Out-Null
     }
     Wait-HttpReady -Url "http://127.0.0.1:10101/speakers" -TimeoutSec 180
-    Write-Host "AivisSpeech ‚Ì€”õ‚ª‚Å‚«‚Ü‚µ‚½B"
+    Write-Host "AivisSpeech ã®æº–å‚™ãŒã§ãã¾ã—ãŸã€‚"
   } else {
-    Write-Warning "AivisSpeech.exe ‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ‚Å‚µ‚½B‰¹º‡¬‚ª•K—v‚È‚çè“®‚Å‹N“®‚µ‚Ä‚­‚¾‚³‚¢B"
+    Write-Warning "AivisSpeech.exe ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã§ã—ãŸã€‚éŸ³å£°åˆæˆãŒå¿…è¦ãªã‚‰æ‰‹å‹•ã§èµ·å‹•ã—ã¦ãã ã•ã„ã€‚"
   }
 }
 
 if (-not (Test-PortOpen -HostName "localhost" -Port 5432)) {
-  throw "PostgreSQL (localhost:5432) ‚ÉÚ‘±‚Å‚«‚Ü‚¹‚ñBæ‚ÉDB‚ğ‹N“®‚µ‚Ä‚­‚¾‚³‚¢B"
-}
-
-if (-not $SkipDbPush) {
-  Write-Host "Prisma schema ‚ğ”½‰f‚µ‚Ü‚·B"
-  corepack pnpm db:push
+  Write-Host "PostgreSQLã‚’Docker Composeã§èµ·å‹•ã—ã¾ã™ã€‚"
+  corepack pnpm db:up
   if ($LASTEXITCODE -ne 0) {
-    throw "corepack pnpm db:push ‚É¸”s‚µ‚Ü‚µ‚½B"
+    throw "PostgreSQLã‚’è‡ªå‹•èµ·å‹•ã§ãã¾ã›ã‚“ã§ã—ãŸã€‚Docker Desktopã¾ãŸã¯ãƒ­ãƒ¼ã‚«ãƒ«DBã‚’èµ·å‹•ã—ã¦ãã ã•ã„ã€‚"
+  }
+  $dbStartedAt = Get-Date
+  while (-not (Test-PortOpen -HostName "localhost" -Port 5432)) {
+    if (((Get-Date) - $dbStartedAt).TotalSeconds -ge 60) {
+      throw "PostgreSQLã®èµ·å‹•å¾…æ©ŸãŒã‚¿ã‚¤ãƒ ã‚¢ã‚¦ãƒˆã—ã¾ã—ãŸã€‚"
+    }
+    Start-Sleep -Seconds 2
   }
 }
 
-if (-not $NoBrowser) {
-  Start-Process "http://127.0.0.1:3000" | Out-Null
+if (-not $SkipDbPush) {
+  Write-Host "Prisma migration ã‚’åæ˜ ã—ã¾ã™ã€‚"
+  corepack pnpm db:migrate:deploy
+  if ($LASTEXITCODE -ne 0) {
+    throw "corepack pnpm db:migrate:deploy ã«å¤±æ•—ã—ã¾ã—ãŸã€‚æ—¢å­˜DBã‚’åˆã‚ã¦migrationç®¡ç†ã¸ç§»ã™å ´åˆã¯READMEã®æ‰‹é †ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚"
+  }
 }
 
-Write-Host "ŠJ”­ƒT[ƒo[‚ğ‹N“®‚µ‚Ü‚·B’â~‚·‚é‚Ü‚Å‚±‚ÌƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚È‚¢‚Å‚­‚¾‚³‚¢B"
-corepack pnpm dev
-if ($LASTEXITCODE -ne 0) {
-  throw "corepack pnpm dev ‚É¸”s‚µ‚Ü‚µ‚½B"
+Write-Host "é–‹ç™ºã‚µãƒ¼ãƒãƒ¼ã‚’èµ·å‹•ã—ã¾ã™ã€‚åœæ­¢ã™ã‚‹ã¾ã§ã“ã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’é–‰ã˜ãªã„ã§ãã ã•ã„ã€‚"
+$devProcess = Start-Process -FilePath "corepack.cmd" -ArgumentList @("pnpm", "dev") -WorkingDirectory $workspaceRoot -PassThru -NoNewWindow
+try {
+  Wait-HttpReady -Url "http://127.0.0.1:3000" -TimeoutSec 120
+  Wait-HttpReady -Url "http://127.0.0.1:3001/health" -TimeoutSec 120
+  if (-not $NoBrowser) {
+    Start-Process "http://127.0.0.1:3000" | Out-Null
+  }
+  Wait-Process -Id $devProcess.Id
+  if ($devProcess.ExitCode -ne 0) {
+    throw "corepack pnpm dev ã«å¤±æ•—ã—ã¾ã—ãŸã€‚"
+  }
+} finally {
+  if (-not $devProcess.HasExited) {
+    Stop-Process -Id $devProcess.Id
+  }
 }

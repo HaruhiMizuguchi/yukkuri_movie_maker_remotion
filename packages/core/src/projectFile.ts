@@ -32,6 +32,9 @@ export async function registerProjectFiles({
         : undefined,
   }));
 
-  const result = await prisma.projectFile.createMany({ data });
+  const result = await prisma.projectFile.createMany({
+    data,
+    skipDuplicates: true,
+  });
   return result.count;
 }

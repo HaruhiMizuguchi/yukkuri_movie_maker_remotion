@@ -9,9 +9,11 @@ const createWorkspace = async () => {
     "outputs",
     "test_evidence",
     "worker_settings",
-    `workspace-${Date.now()}`
+    `workspace-${Date.now()}`,
   );
-  await fs.mkdir(path.join(workspaceRoot, "outputs", "system"), { recursive: true });
+  await fs.mkdir(path.join(workspaceRoot, "outputs", "system"), {
+    recursive: true,
+  });
   return workspaceRoot;
 };
 
@@ -24,11 +26,22 @@ describe("worker settings", () => {
         apiKeys: { google: "secret" },
         outputPreset: { width: 1280, height: 720, fps: 24 },
       }),
-      "utf-8"
+      "utf-8",
     );
 
     await expect(readWorkerSettings(workspaceRoot)).resolves.toEqual({
       outputPreset: { width: 1280, height: 720, fps: 24 },
+    });
+  });
+
+  it("ジョブ作成時の設定snapshotをグローバル設定より優先する", async () => {
+    const workspaceRoot = await createWorkspace();
+    await expect(
+      readWorkerSettings(workspaceRoot, {
+        outputPreset: { width: 854, height: 480, fps: 30 },
+      }),
+    ).resolves.toEqual({
+      outputPreset: { width: 854, height: 480, fps: 30 },
     });
   });
 });

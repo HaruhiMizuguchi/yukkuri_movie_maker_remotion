@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ArtifactMetadata, Script } from "@ymm/shared";
@@ -14,6 +15,13 @@ import type {
   WorkflowStepName,
 } from "./index";
 import { registerProjectFiles } from "./projectFile";
+import { syncLatestAtomically } from "./atomicLatest";
+import { createCharacterPerformancePlan } from "./characterPerformance";
+import {
+  computeWorkflowStepFingerprint,
+  hasValidWorkflowCache,
+  writeWorkflowCacheManifest,
+} from "./workflowCache";
 
 type JobDetails = {
   projectId: string;
@@ -30,14 +38,14 @@ const cacheTargets: Partial<Record<WorkflowStepName, string>> = {
   script_generation: "script_generation/latest/script.json",
   title_generation: "title_generation/latest/title.json",
   tts_generation: "tts_generation/latest/audio.wav",
-  character_synthesis: "character_synthesis/latest/character_motion.json",
+  character_synthesis: "character_synthesis/latest/character-performance.json",
   background_generation: "background_generation/latest/background.png",
+  background_animation: "background_animation/latest/background-animation.json",
   subtitle_generation: "subtitle_generation/latest/subtitles.ass",
   video_composition: "video_composition/latest/preview.mp4",
   audio_enhancement: "audio_enhancement/latest/enhanced.wav",
   illustration_insertion: "illustration_insertion/latest/illustration.png",
   final_encoding: "final_encoding/latest/final.mp4",
-  youtube_upload: "youtube_upload/latest/youtube_upload.json",
 };
 
 const cacheArtifactDescriptors: Partial<
@@ -54,24 +62,25 @@ const cacheArtifactDescriptors: Partial<
   script_generation: { type: "script" },
   title_generation: { type: "metadata", kind: "title_generation" },
   tts_generation: { type: "audio" },
-  character_synthesis: { type: "metadata", kind: "character_motion" },
+  character_synthesis: { type: "metadata", kind: "character_performance" },
   background_generation: { type: "image" },
+  background_animation: { type: "metadata", kind: "background_animation" },
   subtitle_generation: { type: "subtitle" },
   video_composition: { type: "video" },
   audio_enhancement: { type: "audio" },
   illustration_insertion: { type: "image" },
   final_encoding: { type: "video", fileCategory: "final" },
-  youtube_upload: { type: "metadata", kind: "youtube_upload" },
 };
 
 export function createProductionWorkflowImplementations(
-  options: ProductionWorkflowOptions = {}
+  options: ProductionWorkflowOptions = {},
 ): WorkflowStepImplementations {
   const base = createDefaultWorkflowImplementations(options);
   const extended: WorkflowStepImplementations = {
     theme_selection: createThemeSelectionImplementation(options),
     title_generation: createTitleGenerationImplementation(options),
     background_generation: createBackgroundGenerationImplementation(options),
+    background_animation: createBackgroundAnimationImplementation(options),
     character_synthesis: createCharacterSynthesisImplementation(options),
     illustration_insertion: createIllustrationInsertionImplementation(options),
     audio_enhancement: createAudioEnhancementImplementation(options),
@@ -91,7 +100,7 @@ export function createProductionWorkflowImplementations(
     wrapped[stepName as WorkflowStepName] = withReliability(
       stepName as WorkflowStepName,
       implementation,
-      options
+      options,
     );
   }
 
@@ -101,7 +110,7 @@ export function createProductionWorkflowImplementations(
 const withReliability = (
   stepName: WorkflowStepName,
   implementation: WorkflowStepImplementation,
-  options: ProductionWorkflowOptions
+  options: ProductionWorkflowOptions,
 ): WorkflowStepImplementation => {
   const retryCount = Math.max(0, options.retryCount ?? 1);
   const cacheEnabled = options.cacheEnabled ?? true;
@@ -112,12 +121,39 @@ const withReliability = (
     const projectRoot = path.join(outputRoot, "projects", details.projectId);
     const workflowLogPath = path.join(projectRoot, "logs", "workflow.log");
     await fs.mkdir(path.dirname(workflowLogPath), { recursive: true });
+    const fingerprint = await computeWorkflowStepFingerprint({
+      projectRoot,
+      stepName,
+      signature: {
+        theme: details.theme,
+        outputPreset: options.outputPreset,
+        ttsProvider: options.ttsProvider,
+        allowMockTtsFallback: options.allowMockTtsFallback,
+        disableRemotion: options.disableRemotion,
+        requireCharacterAsset: options.requireCharacterAsset,
+        youtubeTokenConfigured: Boolean(
+          process.env.YOUTUBE_ACCESS_TOKEN?.trim(),
+        ),
+      },
+    });
+    const cacheTarget = cacheTargets[stepName];
 
-    if (cacheEnabled && (await hasCachedOutput(projectRoot, stepName))) {
+    if (
+      cacheEnabled &&
+      !ctx.forceStep &&
+      cacheTarget &&
+      (await hasValidWorkflowCache(
+        projectRoot,
+        stepName,
+        path.join(projectRoot, "output", cacheTarget),
+        fingerprint,
+      ))
+    ) {
       await appendWorkflowLog(workflowLogPath, {
         event: "cache_hit",
         jobId: ctx.jobId,
         stepName,
+        fingerprint,
       });
       await registerCachedProjectFile({
         ctx,
@@ -132,6 +168,7 @@ const withReliability = (
     }
 
     for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+      const attemptStartedAt = Date.now();
       await appendWorkflowLog(workflowLogPath, {
         event: "step_start",
         jobId: ctx.jobId,
@@ -140,11 +177,14 @@ const withReliability = (
       });
       try {
         const result = await implementation(ctx);
+        await writeWorkflowCacheManifest(projectRoot, stepName, fingerprint);
         await appendWorkflowLog(workflowLogPath, {
           event: "step_complete",
           jobId: ctx.jobId,
           stepName,
           attempt,
+          durationMs: Date.now() - attemptStartedAt,
+          fingerprint,
         });
         return result;
       } catch (error) {
@@ -154,10 +194,13 @@ const withReliability = (
           stepName,
           attempt,
           message: error instanceof Error ? error.message : String(error),
+          durationMs: Date.now() - attemptStartedAt,
+          fingerprint,
         });
         if (attempt >= retryCount) {
           throw error;
         }
+        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
       }
     }
     throw new Error(`Unexpected retry state: ${stepName}`);
@@ -165,7 +208,7 @@ const withReliability = (
 };
 
 const createThemeSelectionImplementation = (
-  options: ProductionWorkflowOptions
+  options: ProductionWorkflowOptions,
 ): WorkflowStepImplementation => {
   const fetchFn = options.fetchFn ?? fetch;
   return async (ctx) => {
@@ -205,263 +248,313 @@ const createThemeSelectionImplementation = (
   };
 };
 
-const createTitleGenerationImplementation = (
-  options: ProductionWorkflowOptions
-): WorkflowStepImplementation => async (ctx) => {
-  const outputRoot = resolveOutputRoot(ctx, options);
-  const details = await loadJobDetails(ctx);
-  const projectRoot = path.join(outputRoot, "projects", details.projectId);
-  const stepDir = await createStepRunDir(projectRoot, "title_generation");
+const createTitleGenerationImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(projectRoot, "title_generation");
 
-  const script = await readScriptOrFallback(projectRoot, details.theme);
-  const baseTheme = script.theme ?? details.theme;
-  const titleCandidates = [
-    `【3分解説】${baseTheme}の要点を一気に理解`,
-    `${baseTheme}が伸びる理由をゆっくり整理`,
-    `失敗しない${baseTheme}入門: 初心者向け`,
-  ];
-  const pickedTitle = pickCtrOptimizedTitle(titleCandidates);
+    const script = await readScriptOrFallback(projectRoot, details.theme);
+    const baseTheme = script.theme ?? details.theme;
+    const titleCandidates = [
+      `【3分解説】${baseTheme}の要点を一気に理解`,
+      `${baseTheme}が伸びる理由をゆっくり整理`,
+      `失敗しない${baseTheme}入門: 初心者向け`,
+    ];
+    const pickedTitle = pickCtrOptimizedTitle(titleCandidates);
 
-  const titlePayload = {
-    title: pickedTitle,
-    candidates: titleCandidates,
-    sourceTheme: baseTheme,
+    const titlePayload = {
+      title: pickedTitle,
+      candidates: titleCandidates,
+      sourceTheme: baseTheme,
+    };
+    const titlePath = path.join(stepDir.runDir, "title.json");
+    await writeJson(titlePath, titlePayload);
+    await syncLatest(stepDir);
+
+    const stat = await fs.stat(titlePath);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "title_generation",
+      artifacts: [
+        {
+          type: "metadata",
+          relativePath: toRelativePath(outputRoot, titlePath),
+          fileCategory: "output",
+          fileSizeBytes: stat.size,
+          kind: "title_generation",
+        },
+      ],
+    });
+
+    return titlePayload;
   };
-  const titlePath = path.join(stepDir.runDir, "title.json");
-  await writeJson(titlePath, titlePayload);
-  await syncLatest(stepDir);
 
-  const stat = await fs.stat(titlePath);
-  await registerProjectFiles({
-    prisma: ctx.prisma,
-    jobId: ctx.jobId,
-    stepName: "title_generation",
-    artifacts: [
-      {
-        type: "metadata",
-        relativePath: toRelativePath(outputRoot, titlePath),
-        fileCategory: "output",
-        fileSizeBytes: stat.size,
-        kind: "title_generation",
-      },
-    ],
-  });
+const createBackgroundGenerationImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(
+      projectRoot,
+      "background_generation",
+    );
 
-  return titlePayload;
-};
+    const backgroundPath = path.join(stepDir.runDir, "background.png");
+    await runCommand(
+      "ffmpeg",
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=0x0f172a:s=1920x1080:d=1",
+        "-vf",
+        "drawbox=x=0:y=0:w=1920:h=380:color=0x1d4ed8@0.48:t=fill,drawbox=x=0:y=380:w=1920:h=700:color=0x0891b2@0.3:t=fill",
+        "-frames:v",
+        "1",
+        backgroundPath,
+      ],
+      path.dirname(backgroundPath),
+    );
 
-const createBackgroundGenerationImplementation = (
-  options: ProductionWorkflowOptions
-): WorkflowStepImplementation => async (ctx) => {
-  const outputRoot = resolveOutputRoot(ctx, options);
-  const details = await loadJobDetails(ctx);
-  const projectRoot = path.join(outputRoot, "projects", details.projectId);
-  const stepDir = await createStepRunDir(projectRoot, "background_generation");
+    const promptPath = path.join(stepDir.runDir, "background_prompt.txt");
+    await fs.writeFile(
+      promptPath,
+      `${details.theme}向けの背景を生成\n`,
+      "utf-8",
+    );
+    await syncLatest(stepDir);
 
-  const backgroundPath = path.join(stepDir.runDir, "background.png");
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "color=c=0x0f172a:s=1920x1080:d=1",
-      "-vf",
-      "drawbox=x=0:y=0:w=1920:h=380:color=0x1d4ed8@0.48:t=fill,drawbox=x=0:y=380:w=1920:h=700:color=0x0891b2@0.3:t=fill",
-      "-frames:v",
-      "1",
-      backgroundPath,
-    ],
-    path.dirname(backgroundPath)
-  );
+    const [imageStat, promptStat] = await Promise.all([
+      fs.stat(backgroundPath),
+      fs.stat(promptPath),
+    ]);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "background_generation",
+      artifacts: [
+        {
+          type: "image",
+          relativePath: toRelativePath(outputRoot, backgroundPath),
+          fileCategory: "output",
+          fileSizeBytes: imageStat.size,
+          width: 1920,
+          height: 1080,
+        },
+        {
+          type: "metadata",
+          relativePath: toRelativePath(outputRoot, promptPath),
+          fileCategory: "output",
+          fileSizeBytes: promptStat.size,
+          kind: "background_prompt",
+        },
+      ],
+    });
 
-  const promptPath = path.join(stepDir.runDir, "background_prompt.txt");
-  await fs.writeFile(promptPath, `${details.theme}向けの背景を生成\n`, "utf-8");
-  await syncLatest(stepDir);
-
-  const [imageStat, promptStat] = await Promise.all([
-    fs.stat(backgroundPath),
-    fs.stat(promptPath),
-  ]);
-  await registerProjectFiles({
-    prisma: ctx.prisma,
-    jobId: ctx.jobId,
-    stepName: "background_generation",
-    artifacts: [
-      {
-        type: "image",
-        relativePath: toRelativePath(outputRoot, backgroundPath),
-        fileCategory: "output",
-        fileSizeBytes: imageStat.size,
-        width: 1920,
-        height: 1080,
-      },
-      {
-        type: "metadata",
-        relativePath: toRelativePath(outputRoot, promptPath),
-        fileCategory: "output",
-        fileSizeBytes: promptStat.size,
-        kind: "background_prompt",
-      },
-    ],
-  });
-
-  return {
-    backgroundPath: toRelativePath(outputRoot, backgroundPath),
-    promptPath: toRelativePath(outputRoot, promptPath),
+    return {
+      backgroundPath: toRelativePath(outputRoot, backgroundPath),
+      promptPath: toRelativePath(outputRoot, promptPath),
+    };
   };
-};
 
-const createCharacterSynthesisImplementation = (
-  options: ProductionWorkflowOptions
-): WorkflowStepImplementation => async (ctx) => {
-  const outputRoot = resolveOutputRoot(ctx, options);
-  const details = await loadJobDetails(ctx);
-  const projectRoot = path.join(outputRoot, "projects", details.projectId);
-  const stepDir = await createStepRunDir(projectRoot, "character_synthesis");
+const createCharacterSynthesisImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(projectRoot, "character_synthesis");
 
-  const timestampsPath = path.join(
-    projectRoot,
-    "output",
-    "tts_generation",
-    "latest",
-    "timestamps.json"
-  );
-  const rawTimestamps = await readJsonSafe<Array<{ startMs: number; endMs: number; speaker: string }>>(
-    timestampsPath
-  );
-  const motion = (rawTimestamps ?? []).map((item, index) => ({
-    id: `motion-${index + 1}`,
-    startMs: item.startMs,
-    endMs: item.endMs,
-    mouth: index % 2 === 0 ? "open" : "close",
-    expression: item.speaker === "marisa" ? "smile" : "normal",
-  }));
+    const timestampsPath = path.join(
+      projectRoot,
+      "output",
+      "tts_generation",
+      "latest",
+      "timestamps.json",
+    );
+    const rawTimestamps =
+      await readJsonSafe<
+        Array<{ startMs: number; endMs: number; speaker: string }>
+      >(timestampsPath);
+    const script = await readScriptOrFallback(projectRoot, details.theme);
+    const performance = createCharacterPerformancePlan({
+      script,
+      timestamps: (rawTimestamps ?? []).map((item, index) => ({
+        index,
+        text: script.lines[index]?.text ?? "",
+        ...item,
+      })),
+    });
 
-  const motionPath = path.join(stepDir.runDir, "character_motion.json");
-  await writeJson(motionPath, {
-    generatedAt: new Date().toISOString(),
-    motion,
-  });
-  await syncLatest(stepDir);
+    const motionPath = path.join(stepDir.runDir, "character-performance.json");
+    await writeJson(motionPath, performance);
+    await syncLatest(stepDir);
 
-  const stat = await fs.stat(motionPath);
-  await registerProjectFiles({
-    prisma: ctx.prisma,
-    jobId: ctx.jobId,
-    stepName: "character_synthesis",
-    artifacts: [
-      {
-        type: "metadata",
-        relativePath: toRelativePath(outputRoot, motionPath),
-        fileCategory: "output",
-        fileSizeBytes: stat.size,
-        kind: "character_motion",
-      },
-    ],
-  });
+    const stat = await fs.stat(motionPath);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "character_synthesis",
+      artifacts: [
+        {
+          type: "metadata",
+          relativePath: toRelativePath(outputRoot, motionPath),
+          fileCategory: "output",
+          fileSizeBytes: stat.size,
+          kind: "character_performance",
+        },
+      ],
+    });
 
-  return { motionCount: motion.length };
-};
+    return {
+      mouthCueCount: performance.mouthCues.length,
+      blinkCueCount: performance.blinkCues.length,
+      expressionCueCount: performance.expressionCues.length,
+    };
+  };
 
-const createIllustrationInsertionImplementation = (
-  options: ProductionWorkflowOptions
-): WorkflowStepImplementation => async (ctx) => {
-  const outputRoot = resolveOutputRoot(ctx, options);
-  const details = await loadJobDetails(ctx);
-  const projectRoot = path.join(outputRoot, "projects", details.projectId);
-  const stepDir = await createStepRunDir(projectRoot, "illustration_insertion");
+const createBackgroundAnimationImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(projectRoot, "background_animation");
+    const animationPath = path.join(
+      stepDir.runDir,
+      "background-animation.json",
+    );
+    const animation = {
+      zoomMultiplier: 1.025,
+      panStrength: 1.1,
+      easing: "ease-in-out",
+    };
+    await writeJson(animationPath, animation);
+    await syncLatest(stepDir);
+    const stat = await fs.stat(animationPath);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "background_animation",
+      artifacts: [
+        {
+          type: "metadata",
+          relativePath: toRelativePath(outputRoot, animationPath),
+          fileCategory: "output",
+          fileSizeBytes: stat.size,
+          kind: "background_animation",
+        },
+      ],
+    });
+    return animation;
+  };
 
-  const illustrationPath = path.join(stepDir.runDir, "illustration.png");
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "color=c=0x111827:s=1280x720:d=1",
-      "-vf",
-      "drawbox=x=160:y=130:w=960:h=460:color=0xf59e0b@0.92:t=fill,drawbox=x=220:y=190:w=840:h=340:color=0x0f172a@0.88:t=fill",
-      "-frames:v",
-      "1",
-      illustrationPath,
-    ],
-    path.dirname(illustrationPath)
-  );
-  await syncLatest(stepDir);
+const createIllustrationInsertionImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(
+      projectRoot,
+      "illustration_insertion",
+    );
 
-  const stat = await fs.stat(illustrationPath);
-  await registerProjectFiles({
-    prisma: ctx.prisma,
-    jobId: ctx.jobId,
-    stepName: "illustration_insertion",
-    artifacts: [
-      {
-        type: "image",
-        relativePath: toRelativePath(outputRoot, illustrationPath),
-        fileCategory: "output",
-        fileSizeBytes: stat.size,
-        width: 1280,
-        height: 720,
-      },
-    ],
-  });
+    const illustrationPath = path.join(stepDir.runDir, "illustration.png");
+    await runCommand(
+      "ffmpeg",
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=0x111827:s=1280x720:d=1",
+        "-vf",
+        "drawbox=x=160:y=130:w=960:h=460:color=0xf59e0b@0.92:t=fill,drawbox=x=220:y=190:w=840:h=340:color=0x0f172a@0.88:t=fill",
+        "-frames:v",
+        "1",
+        illustrationPath,
+      ],
+      path.dirname(illustrationPath),
+    );
+    await syncLatest(stepDir);
 
-  return { illustrationPath: toRelativePath(outputRoot, illustrationPath) };
-};
+    const stat = await fs.stat(illustrationPath);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "illustration_insertion",
+      artifacts: [
+        {
+          type: "image",
+          relativePath: toRelativePath(outputRoot, illustrationPath),
+          fileCategory: "output",
+          fileSizeBytes: stat.size,
+          width: 1280,
+          height: 720,
+        },
+      ],
+    });
 
-const createAudioEnhancementImplementation = (
-  options: ProductionWorkflowOptions
-): WorkflowStepImplementation => async (ctx) => {
-  const outputRoot = resolveOutputRoot(ctx, options);
-  const details = await loadJobDetails(ctx);
-  const projectRoot = path.join(outputRoot, "projects", details.projectId);
-  const stepDir = await createStepRunDir(projectRoot, "audio_enhancement");
+    return { illustrationPath: toRelativePath(outputRoot, illustrationPath) };
+  };
 
-  const sourceAudioPath = path.join(
-    projectRoot,
-    "output",
-    "tts_generation",
-    "latest",
-    "audio.wav"
-  );
-  const enhancedPath = path.join(stepDir.runDir, "enhanced.wav");
-  await runCommand(
-    "ffmpeg",
-    [
-      "-y",
-      "-i",
-      sourceAudioPath,
-      "-af",
-      "loudnorm=I=-16:TP=-1.5:LRA=11",
-      enhancedPath,
-    ],
-    path.dirname(enhancedPath)
-  );
-  await syncLatest(stepDir);
+const createAudioEnhancementImplementation =
+  (options: ProductionWorkflowOptions): WorkflowStepImplementation =>
+  async (ctx) => {
+    const outputRoot = resolveOutputRoot(ctx, options);
+    const details = await loadJobDetails(ctx);
+    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const stepDir = await createStepRunDir(projectRoot, "audio_enhancement");
 
-  const stat = await fs.stat(enhancedPath);
-  await registerProjectFiles({
-    prisma: ctx.prisma,
-    jobId: ctx.jobId,
-    stepName: "audio_enhancement",
-    artifacts: [
-      {
-        type: "audio",
-        relativePath: toRelativePath(outputRoot, enhancedPath),
-        fileCategory: "output",
-        fileSizeBytes: stat.size,
-      },
-    ],
-  });
+    const sourceAudioPath = path.join(
+      projectRoot,
+      "output",
+      "tts_generation",
+      "latest",
+      "audio.wav",
+    );
+    const enhancedPath = path.join(stepDir.runDir, "enhanced.wav");
+    await runCommand(
+      "ffmpeg",
+      [
+        "-y",
+        "-i",
+        sourceAudioPath,
+        "-af",
+        "loudnorm=I=-16:TP=-1.5:LRA=11",
+        enhancedPath,
+      ],
+      path.dirname(enhancedPath),
+    );
+    await syncLatest(stepDir);
 
-  return { enhancedPath: toRelativePath(outputRoot, enhancedPath) };
-};
+    const stat = await fs.stat(enhancedPath);
+    await registerProjectFiles({
+      prisma: ctx.prisma,
+      jobId: ctx.jobId,
+      stepName: "audio_enhancement",
+      artifacts: [
+        {
+          type: "audio",
+          relativePath: toRelativePath(outputRoot, enhancedPath),
+          fileCategory: "output",
+          fileSizeBytes: stat.size,
+        },
+      ],
+    });
+
+    return { enhancedPath: toRelativePath(outputRoot, enhancedPath) };
+  };
 
 const createYoutubeUploadImplementation = (
-  options: ProductionWorkflowOptions
+  options: ProductionWorkflowOptions,
 ): WorkflowStepImplementation => {
   const fetchFn = options.fetchFn ?? fetch;
   return async (ctx) => {
@@ -477,23 +570,62 @@ const createYoutubeUploadImplementation = (
 
     if (!token) {
       payload = {
+        skipped: true,
         status: "skipped",
         reason: "YOUTUBE_ACCESS_TOKEN is missing",
       };
     } else if (!(await fileExists(finalPath))) {
       payload = {
+        skipped: true,
         status: "skipped",
         reason: "final.mp4 is missing",
       };
     } else {
-      const response = await fetchFn(
-        "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
-        { headers: { Authorization: `Bearer ${token}` } }
+      const title = await readGeneratedTitle(projectRoot, details.theme);
+      const boundary = `ymm-${Date.now().toString(16)}`;
+      const metadata = Buffer.from(
+        JSON.stringify({
+          snippet: { title, description: `${details.theme}の自動生成動画` },
+          status: {
+            privacyStatus: process.env.YOUTUBE_PRIVACY_STATUS ?? "private",
+          },
+        }),
+        "utf-8",
       );
-      const body = await response.json();
+      const video = await fs.readFile(finalPath);
+      const multipartBody = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+          "utf-8",
+        ),
+        metadata,
+        Buffer.from(
+          `\r\n--${boundary}\r\nContent-Type: video/mp4\r\n\r\n`,
+          "utf-8",
+        ),
+        video,
+        Buffer.from(`\r\n--${boundary}--\r\n`, "utf-8"),
+      ]);
+      const response = await fetchFn(
+        "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`,
+            "Content-Length": String(multipartBody.length),
+          },
+          body: multipartBody,
+          signal: AbortSignal.timeout(120_000),
+        },
+      );
+      const body = (await response.json()) as { id?: string; error?: unknown };
+      if (!response.ok || !body.id) {
+        throw new Error(`YouTube upload failed: HTTP ${response.status}`);
+      }
       payload = {
-        status: response.ok ? "validated" : "failed",
-        youtubeResponse: body,
+        status: "uploaded",
+        videoId: body.id,
         videoPath: toRelativePath(outputRoot, finalPath),
       };
     }
@@ -520,9 +652,27 @@ const createYoutubeUploadImplementation = (
   };
 };
 
+const readGeneratedTitle = async (
+  projectRoot: string,
+  fallback: string,
+): Promise<string> => {
+  const loaded = await readJsonSafe<{ title?: unknown }>(
+    path.join(
+      projectRoot,
+      "output",
+      "title_generation",
+      "latest",
+      "title.json",
+    ),
+  );
+  return typeof loaded?.title === "string" && loaded.title.trim()
+    ? loaded.title.trim()
+    : fallback;
+};
+
 const resolveOutputRoot = (
   ctx: WorkflowContext,
-  options: ProductionWorkflowOptions
+  options: ProductionWorkflowOptions,
 ): string => options.outputRoot ?? ctx.outputRoot ?? process.cwd();
 
 const loadJobDetails = async (ctx: WorkflowContext): Promise<JobDetails> => {
@@ -541,9 +691,15 @@ const loadJobDetails = async (ctx: WorkflowContext): Promise<JobDetails> => {
 
 const readScriptOrFallback = async (
   projectRoot: string,
-  theme: string
+  theme: string,
 ): Promise<Script> => {
-  const scriptPath = path.join(projectRoot, "output", "script_generation", "latest", "script.json");
+  const scriptPath = path.join(
+    projectRoot,
+    "output",
+    "script_generation",
+    "latest",
+    "script.json",
+  );
   const loaded = await readJsonSafe<unknown>(scriptPath);
   if (!loaded) {
     return {
@@ -560,9 +716,14 @@ const readScriptOrFallback = async (
 
 const createStepRunDir = async (
   projectRoot: string,
-  stepName: string
+  stepName: string,
 ): Promise<{ runDir: string; latestDir: string }> => {
-  const runDir = path.join(projectRoot, "output", stepName, `run-${Date.now()}`);
+  const runDir = path.join(
+    projectRoot,
+    "output",
+    stepName,
+    `run-${Date.now()}-${randomUUID().slice(0, 8)}`,
+  );
   const latestDir = path.join(projectRoot, "output", stepName, "latest");
   await fs.mkdir(runDir, { recursive: true });
   return { runDir, latestDir };
@@ -575,12 +736,18 @@ const syncLatest = async ({
   runDir: string;
   latestDir: string;
 }): Promise<void> => {
-  await fs.rm(latestDir, { recursive: true, force: true });
-  await fs.cp(runDir, latestDir, { recursive: true });
+  await syncLatestAtomically({ runDir, latestDir });
 };
 
-const writeJson = async (targetPath: string, payload: unknown): Promise<void> => {
-  await fs.writeFile(targetPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+const writeJson = async (
+  targetPath: string,
+  payload: unknown,
+): Promise<void> => {
+  await fs.writeFile(
+    targetPath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 };
 
 const toRelativePath = (outputRoot: string, absolutePath: string): string =>
@@ -602,17 +769,6 @@ const fileExists = async (targetPath: string): Promise<boolean> => {
   } catch {
     return false;
   }
-};
-
-const hasCachedOutput = async (
-  projectRoot: string,
-  stepName: WorkflowStepName
-): Promise<boolean> => {
-  const relativePath = cacheTargets[stepName];
-  if (!relativePath) {
-    return false;
-  }
-  return fileExists(path.join(projectRoot, "output", relativePath));
 };
 
 const registerCachedProjectFile = async ({
@@ -658,7 +814,9 @@ const appendWorkflowLog = async (
     stepName: string;
     attempt?: number;
     message?: string;
-  }
+    durationMs?: number;
+    fingerprint?: string;
+  },
 ): Promise<void> => {
   const line = JSON.stringify({
     at: new Date().toISOString(),
@@ -667,31 +825,42 @@ const appendWorkflowLog = async (
   await fs.appendFile(workflowLogPath, `${line}\n`, "utf-8");
 };
 
-const fetchTrendCandidates = async (fetchFn: typeof fetch): Promise<string[]> => {
+const fetchTrendCandidates = async (
+  fetchFn: typeof fetch,
+): Promise<string[]> => {
   try {
-    const response = await fetchFn("https://trends.google.com/trending/rss?geo=US");
+    const response = await fetchFn(
+      "https://trends.google.com/trending/rss?geo=JP",
+      {
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
     if (!response.ok) {
       return [];
     }
     const text = await response.text();
-    const titles = Array.from(text.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)).map(
-      (match) => match[1]
-    );
-    return titles.filter((title) => !title.includes("Daily Search Trends")).slice(0, 10);
+    const titles = Array.from(
+      text.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g),
+    ).map((match) => match[1]);
+    return titles
+      .filter((title) => !title.includes("Daily Search Trends"))
+      .slice(0, 10);
   } catch {
     return [];
   }
 };
 
 const pickCtrOptimizedTitle = (candidates: string[]): string =>
-  [...candidates].sort((left, right) => scoreTitle(right) - scoreTitle(left))[0] ??
-  "ゆっくり解説";
+  [...candidates].sort(
+    (left, right) => scoreTitle(right) - scoreTitle(left),
+  )[0] ?? "ゆっくり解説";
 
 const scoreTitle = (title: string): number => {
-  const lengthScore = title.length <= 34 ? 10 : Math.max(0, 10 - (title.length - 34));
+  const lengthScore =
+    title.length <= 34 ? 10 : Math.max(0, 10 - (title.length - 34));
   const keywordBonus = ["解説", "入門", "要点"].reduce(
     (sum, keyword) => sum + (title.includes(keyword) ? 2 : 0),
-    0
+    0,
   );
   return lengthScore + keywordBonus;
 };
@@ -699,7 +868,7 @@ const scoreTitle = (title: string): number => {
 const runCommand = async (
   command: string,
   args: string[],
-  cwd: string
+  cwd: string,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, {

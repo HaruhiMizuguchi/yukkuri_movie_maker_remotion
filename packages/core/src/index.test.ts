@@ -41,7 +41,8 @@ describe("runWorkflow", () => {
 
     expect(implementation).toHaveBeenCalledWith(ctx);
     const update = updates.find(
-      (payload) => payload.where.jobId_stepName.stepName === "script_generation"
+      (payload) =>
+        payload.where.jobId_stepName.stepName === "script_generation",
     );
     expect(update?.data.status).toBe("COMPLETED");
     expect(update?.data.outputJson).toEqual({ ok: "yes" });
@@ -54,7 +55,7 @@ describe("runWorkflow", () => {
     await runWorkflow(ctx, {});
 
     const update = updates.find(
-      (payload) => payload.where.jobId_stepName.stepName === "theme_selection"
+      (payload) => payload.where.jobId_stepName.stepName === "theme_selection",
     );
     expect(update?.data.status).toBe("SKIPPED");
     expect(update?.data.outputJson).toEqual(SKIPPED_OUTPUT);
@@ -75,7 +76,8 @@ describe("runWorkflow", () => {
 
     expect(implementation).not.toHaveBeenCalled();
     const update = updates.find(
-      (payload) => payload.where.jobId_stepName.stepName === "script_generation"
+      (payload) =>
+        payload.where.jobId_stepName.stepName === "script_generation",
     );
     expect(update).toBeUndefined();
   });
@@ -95,7 +97,8 @@ describe("runWorkflow", () => {
 
     expect(implementation).toHaveBeenCalledWith(ctx);
     const update = updates.find(
-      (payload) => payload.where.jobId_stepName.stepName === "script_generation"
+      (payload) =>
+        payload.where.jobId_stepName.stepName === "script_generation",
     );
     expect(update?.data.status).toBe("COMPLETED");
   });
@@ -105,13 +108,30 @@ describe("runWorkflow", () => {
     const implementation = vi.fn().mockResolvedValue({ ok: "skip" });
     const ctx = { jobId: "job-5", prisma } as unknown as WorkflowContext;
 
-    await runWorkflow(ctx, { script_generation: implementation }, { skipSteps: ["script_generation"] });
+    await runWorkflow(
+      ctx,
+      { script_generation: implementation },
+      { skipSteps: ["script_generation"] },
+    );
 
     expect(implementation).not.toHaveBeenCalled();
     const upsert = upserts.find(
-      (payload) => payload.where.jobId_stepName.stepName === "script_generation"
+      (payload) =>
+        payload.where.jobId_stepName.stepName === "script_generation",
     );
     expect(upsert?.update.status).toBe("SKIPPED");
     expect(upsert?.update.outputJson).toEqual(MANUAL_SKIP_OUTPUT);
+  });
+
+  it("forceStepsでは実装へcache bypass情報を渡す", async () => {
+    const { prisma } = createPrismaMock();
+    const implementation = vi.fn().mockResolvedValue({ ok: true });
+    const ctx = { jobId: "job-6", prisma } as unknown as WorkflowContext;
+    await runWorkflow(
+      ctx,
+      { video_composition: implementation },
+      { forceSteps: ["video_composition"] },
+    );
+    expect(implementation).toHaveBeenCalledWith({ ...ctx, forceStep: true });
   });
 });

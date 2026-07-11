@@ -25,7 +25,12 @@ type TimelineClip = {
 
 type TimelineData = {
   playbackRange: { inMs: number; outMs: number };
-  tracks: Array<{ id: string; name: string; type: string; clips: TimelineClip[] }>;
+  tracks: Array<{
+    id: string;
+    name: string;
+    type: string;
+    clips: TimelineClip[];
+  }>;
   markers: Array<{ id: string; timeMs: number; label: string }>;
 };
 
@@ -53,7 +58,9 @@ test.beforeEach(async ({ page }) => {
   await installCustomerJourneyApiMock(page);
 });
 
-test("制作開始からレンダリング準備までの顧客導線を可視化できる", async ({ page }, testInfo) => {
+test("制作開始からレンダリング準備までの顧客導線を可視化できる", async ({
+  page,
+}, testInfo) => {
   const visual = createVisualEvidenceRecorder(testInfo);
 
   await page.goto("/");
@@ -73,7 +80,9 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.getByTestId("wizard-create-button").click();
   await expect(page.getByTestId("screen-project")).toBeVisible();
-  await expect(page.getByTestId("selected-project-id")).toContainText(projectId);
+  await expect(page.getByTestId("selected-project-id")).toContainText(
+    projectId,
+  );
   await visual.capture(page, "03-project-created", "プロジェクト詳細", [
     "作成直後のプロジェクトが選択状態になる",
     "ジョブ数とステータスが確認できる",
@@ -82,8 +91,12 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page.getByTestId("nav-script").click();
   await page.getByTestId("script-title-input").fill("AIニュース解説テスト");
   await page.getByTestId("script-theme-input").fill("AIニュース解説");
-  await page.getByTestId("script-line-text-0").fill("今日は生成AIのニュースを短く紹介します。");
-  await page.getByTestId("script-line-text-1").fill("編集と確認まで一気に進めるぜ。");
+  await page
+    .getByTestId("script-line-text-0")
+    .fill("今日は生成AIのニュースを短く紹介します。");
+  await page
+    .getByTestId("script-line-text-1")
+    .fill("編集と確認まで一気に進めるぜ。");
   await page.getByTestId("script-save-button").click();
   await expect(page.getByRole("status")).toContainText("台本を保存しました");
   await visual.capture(page, "04-script-saved", "台本編集", [
@@ -99,7 +112,7 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     mimeType: "image/png",
     buffer: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      "base64"
+      "base64",
     ),
   });
   await page.getByTestId("asset-add-button").click();
@@ -112,17 +125,23 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page.getByTestId("nav-timeline").click();
   await expect(page.getByTestId("screen-timeline")).toContainText("字幕");
   await page.getByTestId("timeline-out-input").fill("4500");
-  await page.getByTestId("timeline-manual-subtitle-input").fill("仕上げ用の手動テロップです。");
+  await page
+    .getByTestId("timeline-manual-subtitle-input")
+    .fill("仕上げ用の手動テロップです。");
   await page.getByTestId("timeline-add-subtitle-button").click();
   await page.getByTestId("timeline-clip-block-track-subtitle-sub-2").click();
   await page.getByTestId("timeline-playhead-input").fill("2600");
   await page.getByTestId("timeline-split-button").click();
-  await expect(page.getByTestId("timeline-selected-clip")).toContainText("sub-2-split-2");
+  await expect(page.getByTestId("timeline-selected-clip")).toContainText(
+    "sub-2-split-2",
+  );
   await page.getByTestId("timeline-marker-label-input").fill("見せ場");
   await page.getByTestId("timeline-marker-time-input").fill("4200");
   await page.getByTestId("timeline-add-marker-button").click();
   await page.getByTestId("timeline-save-button").click();
-  await expect(page.getByRole("status")).toContainText("タイムラインを保存しました");
+  await expect(page.getByRole("status")).toContainText(
+    "タイムラインを保存しました",
+  );
   await visual.capture(page, "06-timeline", "タイムライン編集", [
     "視覚タイムラインからクリップ選択と分割ができる",
     "手動テロップとマーカーを追加して保存できる",
@@ -130,12 +149,22 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.getByTestId("nav-preview").click();
   await page.getByTestId("preview-load-button").click();
-  await expect(page.getByTestId("preview-summary")).toContainText("durationInFrames");
-  await expect(page.getByTestId("preview-manual-summary")).toContainText("トリム あり");
-  await expect(page.getByTestId("preview-manual-summary")).toContainText("字幕 4");
+  await expect(page.getByTestId("preview-summary")).toContainText(
+    "durationInFrames",
+  );
+  await expect(page.getByTestId("preview-manual-summary")).toContainText(
+    "トリム あり",
+  );
+  await expect(page.getByTestId("preview-manual-summary")).toContainText(
+    "字幕 4",
+  );
   await page.getByTestId("preview-render-button").click();
-  await expect(page.getByRole("status")).toContainText("レンダリングジョブを作成しました");
-  await expect(page.getByTestId("preview-summary")).toContainText("durationInFrames");
+  await expect(page.getByRole("status")).toContainText(
+    "レンダリングジョブを作成しました",
+  );
+  await expect(page.getByTestId("preview-summary")).toContainText(
+    "durationInFrames",
+  );
   await visual.capture(page, "07-preview-render", "プレビューとレンダリング", [
     "Remotion向けプレビュー情報を確認できる",
     "手動編集サマリーがプレビュー画面で確認できる",
@@ -144,7 +173,9 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.getByTestId("nav-settings").click();
   await page.getByTestId("settings-diagnostics-button").click();
-  await expect(page.getByTestId("settings-google-status")).toContainText("設定済み");
+  await expect(page.getByTestId("settings-google-status")).toContainText(
+    "設定済み",
+  );
   await page.getByTestId("settings-width-input").fill("1280");
   await page.getByTestId("settings-height-input").fill("720");
   await page.getByTestId("settings-save-button").click();
@@ -163,7 +194,12 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     script: null as ScriptData | null,
     timeline: null as TimelineData | null,
     assets: [] as ProjectAsset[],
-    jobs: [] as Array<{ id: string; status: string; mode: string; createdAt: string }>,
+    jobs: [] as Array<{
+      id: string;
+      status: string;
+      mode: string;
+      createdAt: string;
+    }>,
     settings: {
       apiKeys: {},
       outputPreset: { width: 1920, height: 1080, fps: 30 },
@@ -174,7 +210,15 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    const body = request.postData() ? JSON.parse(request.postData() ?? "{}") : {};
+    const rawBody = request.postData() ?? "";
+    const contentType = request.headers()["content-type"] ?? "";
+    const body = contentType.includes("application/json")
+      ? JSON.parse(rawBody || "{}")
+      : Object.fromEntries(
+          Array.from(rawBody.matchAll(/name="([^"]+)"\r\n\r\n([^\r]*)/g)).map(
+            (match) => [match[1], match[2]],
+          ),
+        );
     const fulfillJson = (payload: unknown, status = 200) =>
       route.fulfill({
         status,
@@ -203,67 +247,98 @@ const installCustomerJourneyApiMock = async (page: Page) => {
                 latestJob: state.jobs[0] ?? null,
               },
             ]
-          : []
+          : [],
       );
     }
 
     if (url.pathname === "/api/projects" && method === "POST") {
       state.theme = String(body.theme ?? "AIニュース解説");
-      return fulfillJson({ projectId, theme: state.theme, mode: body.mode ?? "full" }, 201);
+      return fulfillJson(
+        { projectId, theme: state.theme, mode: body.mode ?? "full" },
+        201,
+      );
     }
 
     if (url.pathname === `/api/projects/${projectId}` && method === "GET") {
       return fulfillJson(createProjectDetail(state));
     }
 
-    if (url.pathname === `/api/projects/${projectId}/script` && method === "PUT") {
+    if (
+      url.pathname === `/api/projects/${projectId}/script` &&
+      method === "PUT"
+    ) {
       state.script = body as ScriptData;
       state.timeline = createTimelineFromScript(state.script);
       return fulfillJson({ ok: true });
     }
 
-    if (url.pathname === `/api/projects/${projectId}/assets` && method === "GET") {
+    if (
+      url.pathname === `/api/projects/${projectId}/assets` &&
+      method === "GET"
+    ) {
       return fulfillJson(state.assets);
     }
 
-    if (url.pathname === `/api/projects/${projectId}/assets` && method === "POST") {
+    if (
+      url.pathname === `/api/projects/${projectId}/assets` &&
+      method === "POST"
+    ) {
       const asset = {
         id: "asset-customer-journey-1",
         type: String(body.type ?? "image"),
         name: String(body.name ?? "asset"),
         usage: String(body.usage ?? "background"),
         relativePath: String(
-          body.relativePath ?? `projects/${projectId}/input/assets/backgrounds/background.png`
+          body.relativePath ??
+            `projects/${projectId}/input/assets/backgrounds/background.png`,
         ),
         createdAt,
       };
       state.assets = [asset];
-      return fulfillJson({ ok: true, assetId: asset.id, relativePath: asset.relativePath }, 201);
+      return fulfillJson(
+        { ok: true, assetId: asset.id, relativePath: asset.relativePath },
+        201,
+      );
     }
 
-    if (url.pathname === `/api/projects/${projectId}/assets/asset-customer-journey-1/file` && method === "GET") {
+    if (
+      url.pathname ===
+        `/api/projects/${projectId}/assets/asset-customer-journey-1/file` &&
+      method === "GET"
+    ) {
       return route.fulfill({
         status: 200,
         contentType: "image/png",
         body: Buffer.from(
           "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-          "base64"
+          "base64",
         ),
       });
     }
 
-    if (url.pathname === `/api/projects/${projectId}/timeline/operations` && method === "POST") {
+    if (
+      url.pathname === `/api/projects/${projectId}/timeline/operations` &&
+      method === "POST"
+    ) {
       state.timeline = applyTimelineOperation(state.timeline, body);
       return fulfillJson(state.timeline);
     }
 
-    if (url.pathname === `/api/projects/${projectId}/timeline` && method === "PUT") {
+    if (
+      url.pathname === `/api/projects/${projectId}/timeline` &&
+      method === "PUT"
+    ) {
       state.timeline = body as TimelineData;
       return fulfillJson({ ok: true });
     }
 
-    if (url.pathname === `/api/projects/${projectId}/preview` && method === "GET") {
-      const timeline = state.timeline ?? createTimelineFromScript(state.script ?? defaultScript());
+    if (
+      url.pathname === `/api/projects/${projectId}/preview` &&
+      method === "GET"
+    ) {
+      const timeline =
+        state.timeline ??
+        createTimelineFromScript(state.script ?? defaultScript());
       return fulfillJson({
         timeline,
         outputPreset: state.settings.outputPreset,
@@ -271,12 +346,25 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       });
     }
 
-    if (url.pathname === `/api/projects/${projectId}/jobs` && method === "POST") {
-      state.jobs = [{ id: jobId, status: "PENDING", mode: String(body.mode ?? "full"), createdAt }];
+    if (
+      url.pathname === `/api/projects/${projectId}/jobs` &&
+      method === "POST"
+    ) {
+      state.jobs = [
+        {
+          id: jobId,
+          status: "PENDING",
+          mode: String(body.mode ?? "full"),
+          createdAt,
+        },
+      ];
       return fulfillJson({ projectId, jobId }, 201);
     }
 
-    if (url.pathname.startsWith(`/api/jobs/${jobId}/files/`) && method === "GET") {
+    if (
+      url.pathname.startsWith(`/api/jobs/${jobId}/files/`) &&
+      method === "GET"
+    ) {
       return route.fulfill({
         status: 200,
         contentType: "video/mp4",
@@ -289,6 +377,21 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     }
 
     if (url.pathname === "/api/settings" && method === "PUT") {
+      state.settings = body;
+      return fulfillJson({ ok: true });
+    }
+
+    if (
+      url.pathname === `/api/projects/${projectId}/settings` &&
+      method === "GET"
+    ) {
+      return fulfillJson(state.settings);
+    }
+
+    if (
+      url.pathname === `/api/projects/${projectId}/settings` &&
+      method === "PUT"
+    ) {
       state.settings = body;
       return fulfillJson({ ok: true });
     }
@@ -318,15 +421,37 @@ const createProjectDetail = (state: {
   timeline: TimelineData | null;
   assets: ProjectAsset[];
   jobs: Array<{ id: string; status: string; mode: string; createdAt: string }>;
+  settings: {
+    apiKeys: Record<string, string>;
+    outputPreset: { width: number; height: number; fps: number };
+  };
 }) => ({
-  project: { id: projectId, theme: state.theme, status: "PENDING" },
+  project: {
+    id: projectId,
+    theme: state.theme,
+    status: "PENDING",
+    automationMode: "full",
+    settingsJson: state.settings,
+  },
   ownerId: "e2e-user",
   jobs: state.jobs.map((job) => ({
     ...job,
     steps: [
-      { stepName: "script_generation", status: "COMPLETED", completedAt: createdAt },
-      { stepName: "video_composition", status: "COMPLETED", completedAt: createdAt },
-      { stepName: "final_encoding", status: "COMPLETED", completedAt: createdAt },
+      {
+        stepName: "script_generation",
+        status: "COMPLETED",
+        completedAt: createdAt,
+      },
+      {
+        stepName: "video_composition",
+        status: "COMPLETED",
+        completedAt: createdAt,
+      },
+      {
+        stepName: "final_encoding",
+        status: "COMPLETED",
+        completedAt: createdAt,
+      },
     ],
     files: [
       {
@@ -405,7 +530,7 @@ const createTimelineFromScript = (script: ScriptData): TimelineData => {
 
 const applyTimelineOperation = (
   current: TimelineData | null,
-  operation: Record<string, unknown>
+  operation: Record<string, unknown>,
 ): TimelineData => {
   const timeline = current ?? createTimelineFromScript(defaultScript());
   if (operation.operation === "playbackRange") {
@@ -442,12 +567,14 @@ const buildPreviewRemotionProps = (timeline: TimelineData) => {
     .flatMap((track) =>
       track.clips
         .map(normalizeClip)
-        .filter((clip): clip is TimelineClip & { endMs: number } => clip !== null)
+        .filter(
+          (clip): clip is TimelineClip & { endMs: number } => clip !== null,
+        )
         .map((clip) => ({
           text: clip.text ?? "",
           startMs: clip.startMs,
           endMs: clip.endMs,
-        }))
+        })),
     );
 
   const audioTracks = timeline.tracks
@@ -455,12 +582,14 @@ const buildPreviewRemotionProps = (timeline: TimelineData) => {
     .flatMap((track) =>
       track.clips
         .map(normalizeClip)
-        .filter((clip): clip is TimelineClip & { endMs: number } => clip !== null)
+        .filter(
+          (clip): clip is TimelineClip & { endMs: number } => clip !== null,
+        )
         .map((clip) => ({
           clipId: clip.id,
           startMs: clip.startMs,
           endMs: clip.endMs,
-        }))
+        })),
     );
 
   const markers = timeline.markers
@@ -472,7 +601,9 @@ const buildPreviewRemotionProps = (timeline: TimelineData) => {
 
   const maxTrackEnd = Math.max(
     0,
-    ...timeline.tracks.flatMap((track) => track.clips.map((clip) => clip.startMs + clip.durationMs))
+    ...timeline.tracks.flatMap((track) =>
+      track.clips.map((clip) => clip.startMs + clip.durationMs),
+    ),
   );
 
   return {
@@ -493,7 +624,11 @@ const buildPreviewRemotionProps = (timeline: TimelineData) => {
 const createVisualEvidenceRecorder = (testInfo: TestInfo) => {
   const runId =
     process.env.E2E_RUN_ID ??
-    new Date().toISOString().replace(/[-:.]/g, "").replace("T", "-").slice(0, 15);
+    new Date()
+      .toISOString()
+      .replace(/[-:.]/g, "")
+      .replace("T", "-")
+      .slice(0, 15);
   const projectName = testInfo.project.name.replace(/[^a-z0-9-]/gi, "_");
   const evidenceRoot = path.join(
     process.cwd(),
@@ -501,7 +636,7 @@ const createVisualEvidenceRecorder = (testInfo: TestInfo) => {
     "test_evidence",
     "customer_journey",
     runId,
-    projectName
+    projectName,
   );
   const checkpoints: VisualCheckpoint[] = [];
 
@@ -510,7 +645,7 @@ const createVisualEvidenceRecorder = (testInfo: TestInfo) => {
       page: Page,
       id: string,
       label: string,
-      expectedObservations: string[]
+      expectedObservations: string[],
     ): Promise<void> {
       await fs.mkdir(evidenceRoot, { recursive: true });
       const screenshotPath = path.join(evidenceRoot, `${id}.png`);
@@ -525,7 +660,9 @@ const createVisualEvidenceRecorder = (testInfo: TestInfo) => {
       checkpoints.push({
         id,
         label,
-        screenshotPath: toPortablePath(path.relative(process.cwd(), screenshotPath)),
+        screenshotPath: toPortablePath(
+          path.relative(process.cwd(), screenshotPath),
+        ),
         expectedObservations,
       });
       await testInfo.attach(`${id}-${label}`, {
@@ -550,12 +687,19 @@ const createVisualEvidenceRecorder = (testInfo: TestInfo) => {
           ],
         },
       };
-      const manifestPath = path.join(evidenceRoot, "visual-regression-manifest.json");
-      await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
+      const manifestPath = path.join(
+        evidenceRoot,
+        "visual-regression-manifest.json",
+      );
+      await fs.writeFile(
+        manifestPath,
+        `${JSON.stringify(manifest, null, 2)}\n`,
+        "utf-8",
+      );
       await fs.writeFile(
         path.join(evidenceRoot, "ai-visual-review-prompt.md"),
         buildAiVisualReviewPrompt(manifest),
-        "utf-8"
+        "utf-8",
       );
       await testInfo.attach("visual-regression-manifest", {
         path: manifestPath,
@@ -572,7 +716,7 @@ const buildAiVisualReviewPrompt = (manifest: {
   const checkpoints = manifest.checkpoints
     .map(
       (checkpoint) =>
-        `- ${checkpoint.id} ${checkpoint.label}: ${checkpoint.screenshotPath}\n  期待: ${checkpoint.expectedObservations.join(" / ")}`
+        `- ${checkpoint.id} ${checkpoint.label}: ${checkpoint.screenshotPath}\n  期待: ${checkpoint.expectedObservations.join(" / ")}`,
     )
     .join("\n");
   const failCandidates = manifest.reviewPolicy.failCandidates
@@ -597,4 +741,5 @@ ${failCandidates}
 `;
 };
 
-const toPortablePath = (targetPath: string): string => targetPath.replaceAll("\\", "/");
+const toPortablePath = (targetPath: string): string =>
+  targetPath.replaceAll("\\", "/");

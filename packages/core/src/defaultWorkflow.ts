@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
@@ -12,6 +13,7 @@ import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
 import { createSubtitlePresentationPlan } from "./subtitlePresentation";
 import { timelineToRemotionProps } from "./timeline";
+import { syncLatestAtomically } from "./atomicLatest";
 import {
   type ScriptTimestamp,
   synthesizeTask3Speech,
@@ -69,10 +71,14 @@ const defaultLogger: Logger = {
   error: () => undefined,
 };
 
-const defaultOutputPreset: OutputPreset = { width: 1920, height: 1080, fps: 30 };
+const defaultOutputPreset: OutputPreset = {
+  width: 1920,
+  height: 1080,
+  fps: 30,
+};
 
 export function createDefaultWorkflowImplementations(
-  options: DefaultWorkflowOptions = {}
+  options: DefaultWorkflowOptions = {},
 ): WorkflowStepImplementations {
   return {
     script_generation: async (ctx) => {
@@ -82,10 +88,25 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
-      await appendStepLog(projectRoot, "script_generation", { event: "start", jobId: ctx.jobId });
+      await appendStepLog(projectRoot, "script_generation", {
+        event: "start",
+        jobId: ctx.jobId,
+      });
 
-      const stepDir = await createStepRunDir(projectRoot, "script_generation", runId);
-      const script = await generateScript(details.theme, options.fetchFn);
+      const stepDir = await createStepRunDir(
+        projectRoot,
+        "script_generation",
+        runId,
+      );
+      const manualScriptPath = path.join(
+        projectRoot,
+        "input",
+        "manual-script.json",
+      );
+      const selectedTheme = await readSelectedTheme(projectRoot, details.theme);
+      const script = (await fileExists(manualScriptPath))
+        ? ScriptSchema.parse(await readJson(manualScriptPath))
+        : await generateScript(selectedTheme, options.fetchFn);
       const scriptPath = path.join(stepDir.runDir, "script.json");
       await writeJson(scriptPath, script);
       await syncLatest(stepDir);
@@ -122,18 +143,25 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
-      await appendStepLog(projectRoot, "tts_generation", { event: "start", jobId: ctx.jobId });
+      await appendStepLog(projectRoot, "tts_generation", {
+        event: "start",
+        jobId: ctx.jobId,
+      });
 
       const scriptPath = path.join(
         projectRoot,
         "output",
         "script_generation",
         "latest",
-        "script.json"
+        "script.json",
       );
       const script = ScriptSchema.parse(await readJson(scriptPath));
 
-      const stepDir = await createStepRunDir(projectRoot, "tts_generation", runId);
+      const stepDir = await createStepRunDir(
+        projectRoot,
+        "tts_generation",
+        runId,
+      );
       const audioPath = path.join(stepDir.runDir, "audio.wav");
       const timestampsPath = path.join(stepDir.runDir, "timestamps.json");
       const synthesisResult = await synthesizeTask3Speech({
@@ -153,7 +181,8 @@ export function createDefaultWorkflowImplementations(
         fs.stat(timestampsPath),
       ]);
       const durationMs =
-        synthesisResult.timestamps[synthesisResult.timestamps.length - 1]?.endMs ?? 0;
+        synthesisResult.timestamps[synthesisResult.timestamps.length - 1]
+          ?.endMs ?? 0;
       await registerProjectFiles({
         prisma: ctx.prisma,
         jobId: ctx.jobId,
@@ -203,21 +232,24 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
-      await appendStepLog(projectRoot, "subtitle_generation", { event: "start", jobId: ctx.jobId });
+      await appendStepLog(projectRoot, "subtitle_generation", {
+        event: "start",
+        jobId: ctx.jobId,
+      });
 
       const scriptPath = path.join(
         projectRoot,
         "output",
         "script_generation",
         "latest",
-        "script.json"
+        "script.json",
       );
       const timestampsPath = path.join(
         projectRoot,
         "output",
         "tts_generation",
         "latest",
-        "timestamps.json"
+        "timestamps.json",
       );
       const script = ScriptSchema.parse(await readJson(scriptPath));
       const timestamps = (await readJson(timestampsPath)) as ScriptTimestamp[];
@@ -226,11 +258,16 @@ export function createDefaultWorkflowImplementations(
         speaker: line.speaker,
         text: line.text,
         startMs: timestamps[index]?.startMs ?? 0,
-        endMs: timestamps[index]?.endMs ?? (timestamps[index]?.startMs ?? 0) + 1000,
+        endMs:
+          timestamps[index]?.endMs ?? (timestamps[index]?.startMs ?? 0) + 1000,
       }));
       const assText = createAssText(subtitleItems);
 
-      const stepDir = await createStepRunDir(projectRoot, "subtitle_generation", runId);
+      const stepDir = await createStepRunDir(
+        projectRoot,
+        "subtitle_generation",
+        runId,
+      );
       const subtitlesJsonPath = path.join(stepDir.runDir, "subtitles.json");
       const subtitlesAssPath = path.join(stepDir.runDir, "subtitles.ass");
       await writeJson(subtitlesJsonPath, subtitleItems);
@@ -270,7 +307,10 @@ export function createDefaultWorkflowImplementations(
         lineCount: subtitleItems.length,
       });
 
-      logger.info("subtitle_generation completed", { subtitlesJsonPath, subtitlesAssPath });
+      logger.info("subtitle_generation completed", {
+        subtitlesJsonPath,
+        subtitlesAssPath,
+      });
       return {
         subtitlesJsonPath: toRelativePath(outputRoot, subtitlesJsonPath),
         subtitlesAssPath: toRelativePath(outputRoot, subtitlesAssPath),
@@ -285,48 +325,100 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
-      await appendStepLog(projectRoot, "video_composition", { event: "start", jobId: ctx.jobId });
+      await appendStepLog(projectRoot, "video_composition", {
+        event: "start",
+        jobId: ctx.jobId,
+      });
 
-      const audioPath = path.join(
+      const generatedAudioPath = path.join(
         projectRoot,
         "output",
         "tts_generation",
         "latest",
-        "audio.wav"
+        "audio.wav",
       );
+      const enhancedAudioPath = path.join(
+        projectRoot,
+        "output",
+        "audio_enhancement",
+        "latest",
+        "enhanced.wav",
+      );
+      const audioPath = (await fileExists(enhancedAudioPath))
+        ? enhancedAudioPath
+        : generatedAudioPath;
       const subtitlesAssPath = path.join(
         projectRoot,
         "output",
         "subtitle_generation",
         "latest",
-        "subtitles.ass"
+        "subtitles.ass",
       );
       const subtitlesJsonPath = path.join(
         projectRoot,
         "output",
         "subtitle_generation",
         "latest",
-        "subtitles.json"
+        "subtitles.json",
       );
       const scriptPath = path.join(
         projectRoot,
         "output",
         "script_generation",
         "latest",
-        "script.json"
+        "script.json",
       );
       const script = ScriptSchema.parse(await readJson(scriptPath));
-      const subtitleTracks = (await readJson(subtitlesJsonPath)) as ScriptTimestamp[];
+      const subtitleTracks = (await readJson(
+        subtitlesJsonPath,
+      )) as ScriptTimestamp[];
       const timelineProps = await readTimelineRemotionProps(projectRoot);
       const effectiveSubtitleTracks = toEffectiveSubtitleTracks(
         timelineProps?.subtitleTracks ?? [],
-        subtitleTracks
+        subtitleTracks,
       );
-      const shotPlan = createShotPlan({ script, timestamps: effectiveSubtitleTracks });
-      const characterPerformance = createCharacterPerformancePlan({
+      const baseShotPlan = createShotPlan({
         script,
         timestamps: effectiveSubtitleTracks,
       });
+      const backgroundAnimationPath = path.join(
+        projectRoot,
+        "output",
+        "background_animation",
+        "latest",
+        "background-animation.json",
+      );
+      const backgroundAnimation = (await fileExists(backgroundAnimationPath))
+        ? ((await readJson(backgroundAnimationPath)) as {
+            zoomMultiplier?: number;
+            panStrength?: number;
+          })
+        : {};
+      const shotPlan = baseShotPlan.map((shot) => ({
+        ...shot,
+        zoomStart: shot.zoomStart * (backgroundAnimation.zoomMultiplier ?? 1),
+        zoomEnd: shot.zoomEnd * (backgroundAnimation.zoomMultiplier ?? 1),
+        panX: shot.panX * (backgroundAnimation.panStrength ?? 1),
+        panY: shot.panY * (backgroundAnimation.panStrength ?? 1),
+      }));
+      const generatedCharacterPerformance = createCharacterPerformancePlan({
+        script,
+        timestamps: effectiveSubtitleTracks,
+      });
+      const characterPerformancePathFromStep = path.join(
+        projectRoot,
+        "output",
+        "character_synthesis",
+        "latest",
+        "character-performance.json",
+      );
+      const characterPerformance = (await fileExists(
+        characterPerformancePathFromStep,
+      ))
+        ? ((await readJson(
+            characterPerformancePathFromStep,
+          )) as typeof generatedCharacterPerformance)
+        : generatedCharacterPerformance;
       const subtitlePresentation = createSubtitlePresentationPlan({
         script,
         timestamps: effectiveSubtitleTracks,
@@ -336,13 +428,23 @@ export function createDefaultWorkflowImplementations(
         timestamps: effectiveSubtitleTracks,
       });
 
-      const stepDir = await createStepRunDir(projectRoot, "video_composition", runId);
+      const stepDir = await createStepRunDir(
+        projectRoot,
+        "video_composition",
+        runId,
+      );
       const audioCopyPath = path.join(stepDir.runDir, "audio.wav");
       const subtitlesCopyPath = path.join(stepDir.runDir, "subtitles.ass");
       const compositionJsonPath = path.join(stepDir.runDir, "composition.json");
       const shotPlanPath = path.join(stepDir.runDir, "shot-plan.json");
-      const characterPerformancePath = path.join(stepDir.runDir, "character-performance.json");
-      const subtitlePresentationPath = path.join(stepDir.runDir, "subtitle-presentation.json");
+      const characterPerformancePath = path.join(
+        stepDir.runDir,
+        "character-performance.json",
+      );
+      const subtitlePresentationPath = path.join(
+        stepDir.runDir,
+        "subtitle-presentation.json",
+      );
       const audioMixPlanPath = path.join(stepDir.runDir, "audio-mix-plan.json");
       const chapterPlanPath = path.join(stepDir.runDir, "chapter-plan.json");
       const previewPath = path.join(stepDir.runDir, "preview.mp4");
@@ -362,8 +464,24 @@ export function createDefaultWorkflowImplementations(
         runDir: stepDir.runDir,
         requireCharacterAsset: options.requireCharacterAsset ?? false,
       });
+      const illustrationPath = path.join(
+        projectRoot,
+        "output",
+        "illustration_insertion",
+        "latest",
+        "illustration.png",
+      );
+      const effectiveIllustrationPath = (await fileExists(illustrationPath))
+        ? illustrationPath
+        : undefined;
+      const renderTitle = await readGeneratedTitle(
+        projectRoot,
+        script.title ?? "ゆっくり解説",
+      );
 
-      const durationMs = timelineProps?.durationMs ?? (await probeMediaDurationMs(audioCopyPath));
+      const durationMs =
+        timelineProps?.durationMs ??
+        (await probeMediaDurationMs(audioCopyPath));
       const usingRemotion = options.disableRemotion !== true;
       const audioMixPlan = createAudioMixPlan({
         durationMs,
@@ -371,7 +489,10 @@ export function createDefaultWorkflowImplementations(
         shotPlan,
         subtitlePresentation,
       });
-      const audioMixAssets = await prepareRemotionAudioAssets({ runDir: stepDir.runDir, durationMs });
+      const audioMixAssets = await prepareRemotionAudioAssets({
+        runDir: stepDir.runDir,
+        durationMs,
+      });
       const remotionAudioTracks = await resolveTimelineAudioTracks({
         outputRoot,
         projectRoot,
@@ -383,7 +504,10 @@ export function createDefaultWorkflowImplementations(
           bgmPath: toRelativePath(outputRoot, audioMixAssets.bgmPath),
           ambientPath: toRelativePath(outputRoot, audioMixAssets.ambientPath),
           accentPath: toRelativePath(outputRoot, audioMixAssets.accentPath),
-          transitionPath: toRelativePath(outputRoot, audioMixAssets.transitionPath),
+          transitionPath: toRelativePath(
+            outputRoot,
+            audioMixAssets.transitionPath,
+          ),
         },
       });
 
@@ -394,6 +518,7 @@ export function createDefaultWorkflowImplementations(
           audioPath: audioCopyPath,
           backgroundImagePath: visualAssets.backgroundRenderPath,
           characterImagePath: visualAssets.characterRenderPath,
+          illustrationImagePath: effectiveIllustrationPath,
           subtitleTracks: effectiveSubtitleTracks,
           audioTracks: remotionAudioTracks,
           shotPlan,
@@ -406,7 +531,7 @@ export function createDefaultWorkflowImplementations(
           chapterPlan,
           durationMs,
           outputPreset,
-          title: "ゆっくり解説MVP",
+          title: renderTitle,
           theme: details.theme,
           logger,
         });
@@ -422,10 +547,14 @@ export function createDefaultWorkflowImplementations(
 
       await writeJson(compositionJsonPath, {
         renderer: usingRemotion ? "remotion" : "ffmpeg",
+        title: renderTitle,
         audioPath: toRelativePath(outputRoot, audioPath),
         subtitlesPath: toRelativePath(outputRoot, subtitlesAssPath),
         backgroundImagePath: visualAssets.backgroundSourceRelativePath,
         characterImagePath: visualAssets.characterSourceRelativePath,
+        illustrationImagePath: effectiveIllustrationPath
+          ? toRelativePath(outputRoot, effectiveIllustrationPath)
+          : null,
         durationMs,
         outputPreset,
         shotCount: shotPlan.length,
@@ -434,8 +563,10 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
-        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        audioCueCount:
+          audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
+        backgroundAnimation,
         manualEditSummary: timelineProps?.manualEditSummary,
       });
       await syncLatest(stepDir);
@@ -527,7 +658,8 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
-        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        audioCueCount:
+          audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
       });
@@ -541,7 +673,8 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
-        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        audioCueCount:
+          audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
       });
@@ -556,7 +689,8 @@ export function createDefaultWorkflowImplementations(
           characterPerformance.blinkCues.length +
           characterPerformance.expressionCues.length,
         emphasisCount: subtitlePresentation.emphasisCount,
-        audioCueCount: audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
+        audioCueCount:
+          audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
       };
@@ -569,16 +703,23 @@ export function createDefaultWorkflowImplementations(
       const details = await loadJobDetails(ctx);
       const projectRoot = path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
-      await appendStepLog(projectRoot, "final_encoding", { event: "start", jobId: ctx.jobId });
+      await appendStepLog(projectRoot, "final_encoding", {
+        event: "start",
+        jobId: ctx.jobId,
+      });
 
       const previewPath = path.join(
         projectRoot,
         "output",
         "video_composition",
         "latest",
-        "preview.mp4"
+        "preview.mp4",
       );
-      const stepDir = await createStepRunDir(projectRoot, "final_encoding", runId);
+      const stepDir = await createStepRunDir(
+        projectRoot,
+        "final_encoding",
+        runId,
+      );
       const finalPath = path.join(stepDir.runDir, "final.mp4");
       const finalCopyPath = path.join(projectRoot, "final", "final.mp4");
 
@@ -636,16 +777,23 @@ const resolveWorkspaceRoot = (options: DefaultWorkflowOptions): string =>
 
 const resolveOutputRoot = (
   ctx: WorkflowContext,
-  options: DefaultWorkflowOptions
+  options: DefaultWorkflowOptions,
 ): string => {
-  const contextRoot = (ctx as WorkflowContext & { outputRoot?: string }).outputRoot;
+  const contextRoot = (ctx as WorkflowContext & { outputRoot?: string })
+    .outputRoot;
   return options.outputRoot ?? contextRoot ?? process.cwd();
 };
 
 const resolveOutputPreset = (preset?: OutputPreset): OutputPreset => ({
-  width: Number.isFinite(preset?.width) ? Math.max(320, Math.floor(preset!.width)) : defaultOutputPreset.width,
-  height: Number.isFinite(preset?.height) ? Math.max(180, Math.floor(preset!.height)) : defaultOutputPreset.height,
-  fps: Number.isFinite(preset?.fps) ? Math.max(1, Math.floor(preset!.fps)) : defaultOutputPreset.fps,
+  width: Number.isFinite(preset?.width)
+    ? Math.max(320, Math.floor(preset!.width))
+    : defaultOutputPreset.width,
+  height: Number.isFinite(preset?.height)
+    ? Math.max(180, Math.floor(preset!.height))
+    : defaultOutputPreset.height,
+  fps: Number.isFinite(preset?.fps)
+    ? Math.max(1, Math.floor(preset!.fps))
+    : defaultOutputPreset.fps,
 });
 
 const defaultRunIdFactory = (): string => {
@@ -656,21 +804,22 @@ const defaultRunIdFactory = (): string => {
   const hours = String(now.getHours()).padStart(2, "0");
   const minutes = String(now.getMinutes()).padStart(2, "0");
   const seconds = String(now.getSeconds()).padStart(2, "0");
-  return `run-${year}${month}${day}-${hours}${minutes}${seconds}-${now.getMilliseconds()}`;
+  return `run-${year}${month}${day}-${hours}${minutes}${seconds}-${now.getMilliseconds()}-${randomUUID().slice(0, 8)}`;
 };
 
 const ensureProjectRoot = async (projectRoot: string): Promise<void> => {
   await Promise.all(
-    ["input", "output", "intermediate", "final", "logs", "tmp"].map((directoryName) =>
-      fs.mkdir(path.join(projectRoot, directoryName), { recursive: true })
-    )
+    ["input", "output", "intermediate", "final", "logs", "tmp"].map(
+      (directoryName) =>
+        fs.mkdir(path.join(projectRoot, directoryName), { recursive: true }),
+    ),
   );
 };
 
 const createStepRunDir = async (
   projectRoot: string,
   stepName: string,
-  runId: string
+  runId: string,
 ): Promise<{ runDir: string; latestDir: string }> => {
   const stepRoot = path.join(projectRoot, "output", stepName);
   const runDir = path.join(stepRoot, runId);
@@ -686,15 +835,18 @@ const syncLatest = async ({
   runDir: string;
   latestDir: string;
 }): Promise<void> => {
-  await fs.rm(latestDir, { recursive: true, force: true });
-  await fs.cp(runDir, latestDir, { recursive: true });
+  await syncLatestAtomically({ runDir, latestDir });
 };
 
 const toRelativePath = (outputRoot: string, absolutePath: string): string =>
   path.relative(outputRoot, absolutePath).replaceAll("\\", "/");
 
 const writeJson = async (filePath: string, payload: unknown): Promise<void> => {
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    filePath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 };
 
 const readJson = async (filePath: string): Promise<unknown> => {
@@ -714,7 +866,7 @@ const fileExists = async (targetPath: string): Promise<boolean> => {
 const appendStepLog = async (
   projectRoot: string,
   stepName: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ): Promise<void> => {
   const logsDir = path.join(projectRoot, "logs");
   await fs.mkdir(logsDir, { recursive: true });
@@ -739,7 +891,50 @@ const loadJobDetails = async (ctx: WorkflowContext): Promise<JobDetails> => {
   };
 };
 
-const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Script> => {
+const readSelectedTheme = async (
+  projectRoot: string,
+  fallback: string,
+): Promise<string> => {
+  const themePath = path.join(
+    projectRoot,
+    "output",
+    "theme_selection",
+    "latest",
+    "theme.json",
+  );
+  if (!(await fileExists(themePath))) {
+    return fallback;
+  }
+  const value = (await readJson(themePath)) as { selectedTheme?: unknown };
+  return typeof value.selectedTheme === "string" && value.selectedTheme.trim()
+    ? value.selectedTheme.trim()
+    : fallback;
+};
+
+const readGeneratedTitle = async (
+  projectRoot: string,
+  fallback: string,
+): Promise<string> => {
+  const titlePath = path.join(
+    projectRoot,
+    "output",
+    "title_generation",
+    "latest",
+    "title.json",
+  );
+  if (!(await fileExists(titlePath))) {
+    return fallback;
+  }
+  const value = (await readJson(titlePath)) as { title?: unknown };
+  return typeof value.title === "string" && value.title.trim()
+    ? value.title.trim()
+    : fallback;
+};
+
+const generateScript = async (
+  theme: string,
+  fetchFn?: typeof fetch,
+): Promise<Script> => {
   const effectiveFetch = fetchFn ?? fetch;
   const geminiApiKey = process.env.GOOGLE_API_KEY?.trim();
   if (!geminiApiKey) {
@@ -747,7 +942,7 @@ const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Sc
   }
 
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
     const prompt =
       "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。" +
@@ -758,8 +953,12 @@ const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Sc
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.5, responseMimeType: "application/json" },
+        generationConfig: {
+          temperature: 0.5,
+          responseMimeType: "application/json",
+        },
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       throw new Error(`Gemini API error: ${response.status}`);
@@ -768,7 +967,9 @@ const generateScript = async (theme: string, fetchFn?: typeof fetch): Promise<Sc
     const body = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("");
+    const text = body.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("");
     if (!text) {
       throw new Error("Gemini response was empty");
     }
@@ -826,7 +1027,12 @@ const buildFallbackScript = (theme: string): Script => ({
 });
 
 const createAssText = (
-  subtitleItems: Array<{ speaker: string; text: string; startMs: number; endMs: number }>
+  subtitleItems: Array<{
+    speaker: string;
+    text: string;
+    startMs: number;
+    endMs: number;
+  }>,
 ): string => {
   const lines = subtitleItems.map((item) => {
     const start = toAssTime(item.startMs);
@@ -848,10 +1054,9 @@ const toAssTime = (milliseconds: number): string => {
   const totalMinutes = Math.floor(totalSeconds / 60);
   const minutes = totalMinutes % 60;
   const hours = Math.floor(totalMinutes / 60);
-  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-    2,
-    "0"
-  )}.${String(cs).padStart(2, "0")}`;
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(
+    seconds,
+  ).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 };
 
 const composeVideoWithFfmpeg = async ({
@@ -884,7 +1089,7 @@ const composeVideoWithFfmpeg = async ({
       "-filter_complex",
       `[0:v]scale=${outputPreset.width}:${outputPreset.height},setsar=1[bg];[1:v]scale=-1:${Math.max(
         120,
-        Math.round(outputPreset.height * 0.78)
+        Math.round(outputPreset.height * 0.78),
       )}[ch];[bg][ch]overlay=x=W-w-80:y=H-h-20,ass=${subtitlesPath}`,
       "-shortest",
       "-c:v",
@@ -899,7 +1104,7 @@ const composeVideoWithFfmpeg = async ({
       "192k",
       "preview.mp4",
     ],
-    runDir
+    runDir,
   );
 };
 
@@ -923,6 +1128,7 @@ const renderWithRemotion = async ({
   audioTracks,
   backgroundImagePath,
   characterImagePath,
+  illustrationImagePath,
   subtitleTracks,
   shotPlan,
   characterPerformance,
@@ -941,6 +1147,7 @@ const renderWithRemotion = async ({
   audioTracks: ResolvedRemotionAudioTrack[];
   backgroundImagePath: string;
   characterImagePath: string;
+  illustrationImagePath?: string;
   subtitleTracks: ScriptTimestamp[];
   shotPlan: Array<{
     id: string;
@@ -955,7 +1162,12 @@ const renderWithRemotion = async ({
     panY: number;
   }>;
   characterPerformance: {
-    mouthCues: Array<{ startMs: number; endMs: number; openness: number; speaker: string }>;
+    mouthCues: Array<{
+      startMs: number;
+      endMs: number;
+      openness: number;
+      speaker: string;
+    }>;
     blinkCues: Array<{ startMs: number; endMs: number }>;
     expressionCues: Array<{
       startMs: number;
@@ -1024,12 +1236,18 @@ const renderWithRemotion = async ({
       "/audio.wav": { filePath: audioPath },
       "/background.png": { filePath: backgroundImagePath },
       "/character.png": { filePath: characterImagePath },
+      ...(illustrationImagePath
+        ? { "/illustration.png": { filePath: illustrationImagePath } }
+        : {}),
       "/bgm.wav": { filePath: audioMixPlan.assets.bgmPath },
       "/ambient.wav": { filePath: audioMixPlan.assets.ambientPath },
       "/accent.wav": { filePath: audioMixPlan.assets.accentPath },
       "/transition.wav": { filePath: audioMixPlan.assets.transitionPath },
       ...Object.fromEntries(
-        audioTrackRouteEntries.map((entry) => [entry.routePath, { filePath: entry.track.filePath }])
+        audioTrackRouteEntries.map((entry) => [
+          entry.routePath,
+          { filePath: entry.track.filePath },
+        ]),
       ),
     },
   });
@@ -1038,7 +1256,13 @@ const renderWithRemotion = async ({
       import("@remotion/bundler"),
       import("@remotion/renderer"),
     ]);
-    const entryPoint = path.join(workspaceRoot, "packages", "remotion", "src", "index.tsx");
+    const entryPoint = path.join(
+      workspaceRoot,
+      "packages",
+      "remotion",
+      "src",
+      "index.tsx",
+    );
     const serveUrl = await bundle({
       entryPoint,
       onProgress: () => undefined,
@@ -1075,6 +1299,9 @@ const renderWithRemotion = async ({
       audioPath: assetServer.urls["/audio.wav"],
       backgroundImagePath: assetServer.urls["/background.png"],
       characterImagePath: assetServer.urls["/character.png"],
+      illustrationImagePath: illustrationImagePath
+        ? assetServer.urls["/illustration.png"]
+        : undefined,
     };
     const composition = await selectComposition({
       serveUrl,
@@ -1101,7 +1328,7 @@ const renderWithRemotion = async ({
 };
 
 const readTimelineRemotionProps = async (
-  projectRoot: string
+  projectRoot: string,
 ): Promise<TimelineRemotionProps | null> => {
   const timelinePath = path.join(projectRoot, "intermediate", "timeline.json");
   if (!(await fileExists(timelinePath))) {
@@ -1113,7 +1340,7 @@ const readTimelineRemotionProps = async (
 
 const toEffectiveSubtitleTracks = (
   manualSubtitleTracks: TimelineRemotionProps["subtitleTracks"],
-  fallbackTracks: ScriptTimestamp[]
+  fallbackTracks: ScriptTimestamp[],
 ): ScriptTimestamp[] => {
   if (manualSubtitleTracks.length === 0) {
     return fallbackTracks;
@@ -1150,7 +1377,7 @@ const resolveTimelineAudioTracks = async ({
       volume: track.volume,
       fadeInMs: track.fadeInMs,
       fadeOutMs: track.fadeOutMs,
-    }))
+    })),
   );
 
 const resolveTimelineAssetPath = async ({
@@ -1188,7 +1415,10 @@ const startAssetServer = async ({
   close: () => Promise<void>;
 }> => {
   const assetMap = new Map<string, string>(
-    Object.entries(assets).map(([routePath, value]) => [routePath, value.filePath])
+    Object.entries(assets).map(([routePath, value]) => [
+      routePath,
+      value.filePath,
+    ]),
   );
 
   // Remotion のブラウザ実行から参照できるよう、ローカル成果物を一時HTTP配信する。
@@ -1227,7 +1457,10 @@ const startAssetServer = async ({
 
   return {
     urls: Object.fromEntries(
-      Array.from(assetMap.keys()).map((routePath) => [routePath, `${baseUrl}${routePath}`])
+      Array.from(assetMap.keys()).map((routePath) => [
+        routePath,
+        `${baseUrl}${routePath}`,
+      ]),
     ),
     close: async () =>
       new Promise<void>((resolve, reject) => {
@@ -1293,7 +1526,7 @@ const prepareRemotionAudioAssets = async ({
       "pcm_s16le",
       bgmPath,
     ],
-    runDir
+    runDir,
   );
   await runCommand(
     "ffmpeg",
@@ -1309,7 +1542,7 @@ const prepareRemotionAudioAssets = async ({
       "pcm_s16le",
       ambientPath,
     ],
-    runDir
+    runDir,
   );
   await runCommand(
     "ffmpeg",
@@ -1325,7 +1558,7 @@ const prepareRemotionAudioAssets = async ({
       "pcm_s16le",
       accentPath,
     ],
-    runDir
+    runDir,
   );
   await runCommand(
     "ffmpeg",
@@ -1341,7 +1574,7 @@ const prepareRemotionAudioAssets = async ({
       "pcm_s16le",
       transitionPath,
     ],
-    runDir
+    runDir,
   );
 
   return {
@@ -1364,7 +1597,7 @@ const probeMediaDurationMs = async (targetPath: string): Promise<number> => {
       "default=noprint_wrappers=1:nokey=1",
       targetPath,
     ],
-    path.dirname(targetPath)
+    path.dirname(targetPath),
   );
   const durationSec = Number(stdout.trim());
   if (!Number.isFinite(durationSec) || durationSec <= 0) {
@@ -1376,7 +1609,7 @@ const probeMediaDurationMs = async (targetPath: string): Promise<number> => {
 const reencodeYoutubeCompatible = async (
   inputPath: string,
   outputPath: string,
-  outputPreset: OutputPreset
+  outputPreset: OutputPreset,
 ): Promise<void> => {
   await runCommand(
     "ffmpeg",
@@ -1410,14 +1643,14 @@ const reencodeYoutubeCompatible = async (
       "192k",
       outputPath,
     ],
-    path.dirname(outputPath)
+    path.dirname(outputPath),
   );
 };
 
 const runCommand = async (
   command: string,
   args: string[],
-  cwd: string
+  cwd: string,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const processRef = spawn(command, args, {

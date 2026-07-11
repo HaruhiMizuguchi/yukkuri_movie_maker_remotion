@@ -16,11 +16,15 @@ export async function checkRealE2ePrereqs() {
 
   if (databaseUrl) {
     const endpoint = parsePostgresEndpoint(databaseUrl);
-    const tcpOk = endpoint ? await canConnectTcp(endpoint.host, endpoint.port, 3000) : false;
+    const tcpOk = endpoint
+      ? await canConnectTcp(endpoint.host, endpoint.port, 3000)
+      : false;
     checks.push({
       name: "postgres_tcp",
       ok: tcpOk,
-      detail: endpoint ? `${endpoint.host}:${endpoint.port}` : "invalid DATABASE_URL",
+      detail: endpoint
+        ? `${endpoint.host}:${endpoint.port}`
+        : "invalid DATABASE_URL",
     });
   }
 
@@ -36,16 +40,23 @@ export async function checkRealE2ePrereqs() {
 
   const report = {
     createdAt: new Date().toISOString(),
-    ok: checks.filter((check) => check.required !== false).every((check) => check.ok),
+    ok: checks
+      .filter((check) => check.required !== false)
+      .every((check) => check.ok),
     checks,
     hints: [
       "PostgreSQLが未起動の場合は docker compose -f docker-compose.e2e.yml up -d を実行する",
-      "DB起動後は corepack pnpm db:push でPrismaスキーマを反映する",
+      "DB起動後は corepack pnpm db:migrate:deploy でPrisma migrationを反映する",
       "実API E2Eは YMM_TTS_PROVIDER=mock と YMM_DISABLE_REMOTION=true でWorkerまで通す",
     ],
   };
 
-  const reportPath = path.join("outputs", "test_evidence", "real_api_e2e", "preflight.json");
+  const reportPath = path.join(
+    "outputs",
+    "test_evidence",
+    "real_api_e2e",
+    "preflight.json",
+  );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
   return report;
@@ -105,7 +116,12 @@ const checkCommand = (command, args) =>
       stderr += chunk.toString();
     });
     child.on("error", (error) => {
-      resolve({ name: command, ok: false, detail: error.message, required: true });
+      resolve({
+        name: command,
+        ok: false,
+        detail: error.message,
+        required: true,
+      });
     });
     child.on("close", (code) => {
       resolve({
@@ -117,7 +133,10 @@ const checkCommand = (command, args) =>
     });
   });
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   checkRealE2ePrereqs()
     .then((report) => {
       console.log(JSON.stringify(report, null, 2));

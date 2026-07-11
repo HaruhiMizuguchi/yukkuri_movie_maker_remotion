@@ -1,22 +1,12 @@
-export type AutomationMode = "full" | "scriptOnly" | "renderOnly" | "custom";
+import {
+  WORKFLOW_STEPS,
+  type AutomationMode,
+  type WorkflowStepName,
+} from "@ymm/shared";
 
-export const workflowSteps = [
-  "theme_selection",
-  "script_generation",
-  "title_generation",
-  "tts_generation",
-  "character_synthesis",
-  "background_generation",
-  "background_animation",
-  "subtitle_generation",
-  "video_composition",
-  "audio_enhancement",
-  "illustration_insertion",
-  "final_encoding",
-  "youtube_upload",
-] as const;
+export type { AutomationMode, WorkflowStepName } from "@ymm/shared";
 
-export type WorkflowStepName = (typeof workflowSteps)[number];
+export const workflowSteps = WORKFLOW_STEPS;
 
 export const workflowStepLabels: Record<WorkflowStepName, string> = {
   theme_selection: "テーマ選定",
@@ -43,15 +33,25 @@ export const automationModeLabels: Record<AutomationMode, string> = {
 
 export const buildJobRequest = (
   mode: AutomationMode,
-  skipSteps: string[]
-): { mode: AutomationMode; runMode: "resume"; skipSteps?: WorkflowStepName[] } => {
+  skipSteps: string[],
+): {
+  mode: AutomationMode;
+  runMode: "resume";
+  skipSteps?: WorkflowStepName[];
+} => {
   const knownSteps = new Set(workflowSteps);
   const uniqueSkipSteps = [
-    ...new Set(skipSteps.filter((step): step is WorkflowStepName => knownSteps.has(step as WorkflowStepName))),
+    ...new Set(
+      skipSteps.filter((step): step is WorkflowStepName =>
+        knownSteps.has(step as WorkflowStepName),
+      ),
+    ),
   ];
   return {
     mode,
     runMode: "resume",
-    ...(mode === "custom" && uniqueSkipSteps.length > 0 ? { skipSteps: uniqueSkipSteps } : {}),
+    ...(mode === "custom" && uniqueSkipSteps.length > 0
+      ? { skipSteps: uniqueSkipSteps }
+      : {}),
   };
 };

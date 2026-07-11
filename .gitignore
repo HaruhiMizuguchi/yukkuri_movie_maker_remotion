@@ -3,7 +3,8 @@ node_modules
 apps/web/dist/
 outputs/*
 !outputs/.gitkeep
-projects/
+projects/*
+!projects/.gitkeep
 apps/api/projects/
 apps/worker/projects/
 logs/

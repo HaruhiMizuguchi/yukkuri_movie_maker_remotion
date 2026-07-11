@@ -53,22 +53,25 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # Stable Diffusionを使用する場合
 STABILITY_API_KEY=your_stability_api_key_here
+
+# YouTube投稿を使う場合のみ
+YOUTUBE_ACCESS_TOKEN=your_youtube_oauth_access_token_here
+YOUTUBE_PRIVACY_STATUS=private
 ```
 
 **注意**: `.env` ファイルはパスワードのようなものです。**絶対に他人と共有したり、GitHub等の公開リポジトリにアップロードしたりしないでください。**
 
-## 2. アプリケーション設定ファイル (config/*.yaml)
+## 2. アプリケーション設定ファイル (config/\*.yaml)
 
-`config` フォルダ内には、アプリケーションの挙動を制御するYAMLファイルがあります。
-初期状態ではデフォルト設定が使われますが、必要に応じて変更できます。
+`config` フォルダ内には、将来の設定統合に向けたYAMLテンプレートがあります。現在のWeb/API/Worker実行経路が直接読む設定は、環境変数とプロジェクト単位の `settingsJson`（GUIから保存）です。YAMLだけを編集しても実行結果へ反映されない項目がある点に注意してください。
 
 > 補足: 設定は「環境変数（秘密情報）+ YAML（挙動）」の2層を推奨します。将来的にWeb GUI上で編集できるようにする場合でも、YAML/JSONにシリアライズ可能な形を維持します。
 
 ### 主な設定ファイル
 
-- **`config/llm_config.yaml`**: 
+- **`config/llm_config.yaml`**:
   - 使用するLLMモデル（Gemini, GPT-4など）やプロンプトの設定。
-  - デフォルトでは `gemini-2.0-flash-preview-image-generation` などが設定されています。
+  - デフォルトでは `gemini-3.5-flash` が設定されています。
 
 - **`config/image_generation_config.yaml`**:
   - 画像生成に使用するモデルやサイズの設定。
@@ -83,8 +86,11 @@ STABILITY_API_KEY=your_stability_api_key_here
 設定が正しく行われているか確認するために、以下のコマンドを実行してみましょう。
 
 ```bash
-# CLI（現時点は雛形）
-pnpm cli
+# API/DB/Worker readiness
+pnpm cli health
+
+# Gemini/AivisSpeech設定診断
+pnpm cli config:test
 ```
 
-エラーが表示されなければ、設定は完了です。
+JSONで各componentの状態が返り、コマンドが終了コード0なら接続確認は完了です。

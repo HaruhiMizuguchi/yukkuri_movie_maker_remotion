@@ -4,8 +4,8 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@remotion/bundler": "4.0.414",
-    "@remotion/renderer": "4.0.414",
+    "@remotion/bundler": "4.0.487",
+    "@remotion/renderer": "4.0.487",
     "@ymm/shared": "workspace:*"
   }
 }

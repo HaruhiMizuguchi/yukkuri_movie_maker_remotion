@@ -56,7 +56,8 @@ export const styles: Record<string, React.CSSProperties> = {
     width: 420,
     height: 420,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(34,211,238,0.35), rgba(14,165,233,0.03) 70%)",
+    background:
+      "radial-gradient(circle, rgba(34,211,238,0.35), rgba(14,165,233,0.03) 70%)",
     pointerEvents: "none",
   },
   backgroundShapeTwo: {
@@ -66,7 +67,8 @@ export const styles: Record<string, React.CSSProperties> = {
     width: 480,
     height: 480,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(56,189,248,0.25), rgba(14,165,233,0.01) 70%)",
+    background:
+      "radial-gradient(circle, rgba(56,189,248,0.25), rgba(14,165,233,0.01) 70%)",
     pointerEvents: "none",
   },
   header: {
@@ -111,6 +113,20 @@ export const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     border: "1px solid rgba(34,211,238,0.42)",
     background: "rgba(8, 47, 73, 0.58)",
+  },
+  errorMessage: {
+    marginTop: 14,
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid rgba(248,113,113,0.7)",
+    background: "rgba(127,29,29,0.72)",
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  busyMessage: {
+    marginTop: 10,
+    color: "#a5f3fc",
   },
   main: {
     marginTop: 18,

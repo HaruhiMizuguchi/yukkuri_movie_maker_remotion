@@ -8,9 +8,9 @@ const DEFAULT_OUTPUT_ROOT = path.join(
   WORKSPACE_ROOT,
   "outputs",
   "diagnostics",
-  "script_generation_llm"
+  "script_generation_llm",
 );
-const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 const DEFAULT_THEME = "疎通確認用の台本生成";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -22,7 +22,8 @@ if (cliOptions.dryRun) {
       {
         provider: "gemini",
         model: cliOptions.model,
-        endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        endpoint:
+          "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         outputs: [
           "report.json",
           "request.json",
@@ -33,8 +34,8 @@ if (cliOptions.dryRun) {
         ],
       },
       null,
-      2
-    )
+      2,
+    ),
   );
   process.exit(0);
 }
@@ -53,8 +54,8 @@ main()
     const rawResponsePath = path.join(outputDir, "raw_response.txt");
     await fs.writeFile(
       rawResponsePath,
-      error instanceof Error ? error.stack ?? error.message : String(error),
-      "utf-8"
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+      "utf-8",
     );
     const report = {
       runId,
@@ -64,7 +65,8 @@ main()
       requestAttempted: false,
       success: false,
       classification: "unexpected_error",
-      classificationDetail: error instanceof Error ? error.message : String(error),
+      classificationDetail:
+        error instanceof Error ? error.message : String(error),
       responseStatus: null,
       errorStatus: null,
       workflowWouldFallback: true,
@@ -100,7 +102,10 @@ async function main() {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cliOptions.model}:generateContent`;
   const requestPayload = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.5, responseMimeType: "application/json" },
+    generationConfig: {
+      temperature: 0.5,
+      responseMimeType: "application/json",
+    },
   };
 
   await writeJson(requestPath, {
@@ -117,7 +122,7 @@ async function main() {
     await fs.writeFile(
       rawResponsePath,
       "GOOGLE_API_KEY is not configured. The workflow would silently fall back to buildFallbackScript().\n",
-      "utf-8"
+      "utf-8",
     );
     return {
       runId,
@@ -127,7 +132,8 @@ async function main() {
       requestAttempted: false,
       success: false,
       classification: "missing_api_key",
-      classificationDetail: "GOOGLE_API_KEY が未設定のため Gemini API を呼び出せません。",
+      classificationDetail:
+        "GOOGLE_API_KEY が未設定のため Gemini API を呼び出せません。",
       responseStatus: null,
       errorStatus: null,
       workflowWouldFallback: true,
@@ -149,18 +155,22 @@ async function main() {
   let parsedResponse = null;
 
   try {
-    response = await fetchWithTimeout(`${endpoint}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestPayload),
-    }, cliOptions.timeoutMs);
+    response = await fetchWithTimeout(
+      `${endpoint}?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestPayload),
+      },
+      cliOptions.timeoutMs,
+    );
     rawResponse = await response.text();
   } catch (error) {
     const classification = classifyThrownError(error);
     await fs.writeFile(
       rawResponsePath,
-      error instanceof Error ? error.stack ?? error.message : String(error),
-      "utf-8"
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+      "utf-8",
     );
     return {
       runId,
@@ -198,7 +208,11 @@ async function main() {
   }
 
   if (!response.ok) {
-    const failure = classifyHttpFailure(response.status, parsedResponse, rawResponse);
+    const failure = classifyHttpFailure(
+      response.status,
+      parsedResponse,
+      rawResponse,
+    );
     return {
       runId,
       provider: "gemini",
@@ -235,7 +249,8 @@ async function main() {
       requestAttempted: true,
       success: false,
       classification: "empty_response",
-      classificationDetail: "Gemini の candidates から本文を抽出できませんでした。",
+      classificationDetail:
+        "Gemini の candidates から本文を抽出できませんでした。",
       responseStatus: response.status,
       errorStatus: null,
       workflowWouldFallback: true,
@@ -264,7 +279,8 @@ async function main() {
       requestAttempted: true,
       success: false,
       classification: "missing_json_block",
-      classificationDetail: error instanceof Error ? error.message : String(error),
+      classificationDetail:
+        error instanceof Error ? error.message : String(error),
       responseStatus: response.status,
       errorStatus: null,
       workflowWouldFallback: true,
@@ -331,7 +347,9 @@ async function main() {
       responseJsonPath: parsedResponse ? responseJsonPath : null,
       extractedTextPath,
       generatedScriptPath: null,
-      lineCount: Array.isArray(parsedScript?.lines) ? parsedScript.lines.length : 0,
+      lineCount: Array.isArray(parsedScript?.lines)
+        ? parsedScript.lines.length
+        : 0,
       startedAt,
       finishedAt: new Date().toISOString(),
     };
@@ -383,7 +401,9 @@ function parseCliOptions(argv) {
       if (!value) {
         throw new Error("--output-root requires a value.");
       }
-      options.outputRoot = path.isAbsolute(value) ? value : path.resolve(WORKSPACE_ROOT, value);
+      options.outputRoot = path.isAbsolute(value)
+        ? value
+        : path.resolve(WORKSPACE_ROOT, value);
       index += 1;
       continue;
     }
@@ -430,7 +450,10 @@ function buildPrompt(theme) {
 
 async function fetchWithTimeout(url, init, timeoutMs) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(new Error("Request timed out.")), timeoutMs);
+  const timeout = setTimeout(
+    () => controller.abort(new Error("Request timed out.")),
+    timeoutMs,
+  );
   try {
     return await fetch(url, {
       ...init,
@@ -562,17 +585,20 @@ function createRunId() {
   return [
     "run",
     `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
-      now.getDate()
+      now.getDate(),
     ).padStart(2, "0")}`,
-    `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(
-      2,
-      "0"
-    )}${String(now.getSeconds()).padStart(2, "0")}`,
+    `${String(now.getHours()).padStart(2, "0")}${String(
+      now.getMinutes(),
+    ).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`,
     String(now.getMilliseconds()).padStart(3, "0"),
   ].join("-");
 }
 
 async function writeJson(targetPath, payload) {
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    targetPath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 }

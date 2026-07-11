@@ -24,25 +24,37 @@ enum StepStatus {
 }
 
 model Project {
-  id        String   @id @default(uuid())
-  theme     String?
-  status    JobStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(uuid())
+  theme          String?
+  status         JobStatus @default(PENDING)
+  ownerId        String    @default("default")
+  automationMode String    @default("full")
+  settingsJson   Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   jobs Job[]
+
+  @@index([ownerId])
 }
 
 model Job {
-  id          String   @id @default(uuid())
-  projectId   String
-  status      JobStatus @default(PENDING)
-  mode        String   @default("full") // e.g. full / scriptOnly / renderOnly
-  error       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(uuid())
+  projectId     String
+  status        JobStatus @default(PENDING)
+  mode          String    @default("full") // e.g. full / scriptOnly / renderOnly
+  runMode       String    @default("resume")
+  skipSteps     Json?
+  forceSteps    Json?
+  settingsJson  Json?
+  inputRevision String?
+  error         String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   steps   WorkflowStep[]
   files   ProjectFile[]
 
@@ -51,7 +63,7 @@ model Job {
 }
 
 model WorkflowStep {
-  id          String    @id @default(uuid())
+  id          String     @id @default(uuid())
   jobId       String
   stepName    String
   status      StepStatus @default(PENDING)
@@ -60,24 +72,24 @@ model WorkflowStep {
   outputJson  Json?
   error       String?
 
-  job Job @relation(fields: [jobId], references: [id])
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  @@index([jobId])
   @@unique([jobId, stepName])
+  @@index([jobId])
 }
 
 model ProjectFile {
-  id           String   @id @default(uuid())
-  jobId        String
-  stepName     String?
-  fileType     String   // audio/video/image/script/subtitle/metadata
-  fileCategory String   // input/output/intermediate/final
-  relativePath String
+  id            String   @id @default(uuid())
+  jobId         String
+  stepName      String?
+  fileType      String // audio/video/image/script/subtitle/metadata
+  fileCategory  String // input/output/intermediate/final
+  relativePath  String
   fileSizeBytes BigInt?
-  createdAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
 
-  job Job @relation(fields: [jobId], references: [id])
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
+  @@unique([jobId, relativePath])
   @@index([jobId])
 }
-

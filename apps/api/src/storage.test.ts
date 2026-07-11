@@ -6,19 +6,23 @@ import {
   createTemplate,
   listTemplates,
   listProjectAssets,
-  readProjectOwner,
   readOrCreateTimeline,
   readProjectScript,
   readSettings,
   saveProjectAsset,
-  saveProjectOwner,
   saveProjectScript,
   saveTimeline,
   writeSettings,
 } from "./storage";
 
 const createWorkspace = async () => {
-  const root = path.join(process.cwd(), "outputs", "test_evidence", "task4", `storage-${Date.now()}`);
+  const root = path.join(
+    process.cwd(),
+    "outputs",
+    "test_evidence",
+    "task4",
+    `storage-${Date.now()}`,
+  );
   await fs.mkdir(root, { recursive: true });
   return root;
 };
@@ -38,16 +42,21 @@ describe("api storage", () => {
 
     const script = await readProjectScript(workspaceRoot, "project-1");
     expect(script?.lines.length).toBe(2);
-    await saveProjectOwner(workspaceRoot, "project-1", "user-a");
-    await expect(readProjectOwner(workspaceRoot, "project-1")).resolves.toBe("user-a");
-
-    const timeline = await readOrCreateTimeline(workspaceRoot, "project-1", script!);
+    const timeline = await readOrCreateTimeline(
+      workspaceRoot,
+      "project-1",
+      script!,
+    );
     const moved = {
       ...timeline,
       playbackRange: { inMs: 1000, outMs: 7000 },
     };
     await saveTimeline(workspaceRoot, "project-1", moved);
-    const loadedTimeline = await readOrCreateTimeline(workspaceRoot, "project-1", script!);
+    const loadedTimeline = await readOrCreateTimeline(
+      workspaceRoot,
+      "project-1",
+      script!,
+    );
     expect(loadedTimeline.playbackRange.inMs).toBe(1000);
 
     await writeSettings(workspaceRoot, {
@@ -58,7 +67,10 @@ describe("api storage", () => {
     expect(settings.outputPreset.width).toBe(1280);
     expect(settings.apiKeys).toEqual({});
     const rawSettings = JSON.parse(
-      await fs.readFile(path.join(workspaceRoot, "outputs", "system", "settings.json"), "utf-8")
+      await fs.readFile(
+        path.join(workspaceRoot, "outputs", "system", "settings.json"),
+        "utf-8",
+      ),
     ) as { apiKeys?: Record<string, string> };
     expect(rawSettings.apiKeys).toEqual({});
 
@@ -84,7 +96,12 @@ describe("api storage", () => {
       outputPreset: { width: 1280, height: 720, fps: 30 },
       automationProfile: {
         mode: "renderOnly",
-        skipSteps: ["theme_selection", "script_generation", "title_generation", "youtube_upload"],
+        skipSteps: [
+          "theme_selection",
+          "script_generation",
+          "title_generation",
+          "youtube_upload",
+        ],
       },
     });
     const templates = await listTemplates(workspaceRoot);
