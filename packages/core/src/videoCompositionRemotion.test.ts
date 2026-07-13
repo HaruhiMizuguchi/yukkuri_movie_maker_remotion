@@ -30,7 +30,11 @@ const createPrismaMock = (projectId: string, theme: string) => {
   return prisma;
 };
 
-const createContext = (projectId: string, theme: string, outputRoot: string): WorkflowContext =>
+const createContext = (
+  projectId: string,
+  theme: string,
+  outputRoot: string,
+): WorkflowContext =>
   ({
     jobId: "job-remotion-video",
     prisma: createPrismaMock(projectId, theme),
@@ -38,9 +42,19 @@ const createContext = (projectId: string, theme: string, outputRoot: string): Wo
   }) as WorkflowContext;
 
 const createTempRoot = (suffix: string): string =>
-  path.join(process.cwd(), "outputs", "test_evidence", "remotion_video", `${suffix}-${Date.now()}`);
+  path.join(
+    process.cwd(),
+    "outputs",
+    "test_evidence",
+    "remotion_video",
+    `${suffix}-${Date.now()}`,
+  );
 
-const runCommand = async (command: string, args: string[], cwd: string): Promise<string> =>
+const runCommand = async (
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<string> =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -67,29 +81,74 @@ const runCommand = async (command: string, args: string[], cwd: string): Promise
 
 const writeJson = async (filePath: string, payload: unknown): Promise<void> => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    filePath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 };
 
 const prepareMinimalInputs = async (projectRoot: string): Promise<void> => {
-  await writeJson(path.join(projectRoot, "output", "script_generation", "latest", "script.json"), {
-    title: "Remotion テスト",
-    theme: "Remotion 標準経路",
-    lines: [
-      { speaker: "reimu", text: "最初の字幕です。" },
-      { speaker: "marisa", text: "二つ目の字幕です。" },
-    ],
-  });
-  await writeJson(path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.json"), [
-    { index: 0, speaker: "reimu", text: "最初の字幕です。", startMs: 0, endMs: 1400 },
-    { index: 1, speaker: "marisa", text: "二つ目の字幕です。", startMs: 1400, endMs: 2800 },
-  ]);
-  await fs.mkdir(path.join(projectRoot, "output", "subtitle_generation", "latest"), { recursive: true });
-  await fs.writeFile(
-    path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.ass"),
-    "[Script Info]\n[V4+ Styles]\n[Events]\nDialogue: 0,0:00:00.00,0:00:01.40,Default,,0,0,0,,reimu: 最初の字幕です。\nDialogue: 0,0:00:01.40,0:00:02.80,Default,,0,0,0,,marisa: 二つ目の字幕です。\n",
-    "utf-8"
+  await writeJson(
+    path.join(
+      projectRoot,
+      "output",
+      "script_generation",
+      "latest",
+      "script.json",
+    ),
+    {
+      title: "Remotion テスト",
+      theme: "Remotion 標準経路",
+      lines: [
+        { speaker: "reimu", text: "最初の字幕です。" },
+        { speaker: "marisa", text: "二つ目の字幕です。" },
+      ],
+    },
   );
-  await fs.mkdir(path.join(projectRoot, "output", "tts_generation", "latest"), { recursive: true });
+  await writeJson(
+    path.join(
+      projectRoot,
+      "output",
+      "subtitle_generation",
+      "latest",
+      "subtitles.json",
+    ),
+    [
+      {
+        index: 0,
+        speaker: "reimu",
+        text: "最初の字幕です。",
+        startMs: 0,
+        endMs: 1400,
+      },
+      {
+        index: 1,
+        speaker: "marisa",
+        text: "二つ目の字幕です。",
+        startMs: 1400,
+        endMs: 2800,
+      },
+    ],
+  );
+  await fs.mkdir(
+    path.join(projectRoot, "output", "subtitle_generation", "latest"),
+    { recursive: true },
+  );
+  await fs.writeFile(
+    path.join(
+      projectRoot,
+      "output",
+      "subtitle_generation",
+      "latest",
+      "subtitles.ass",
+    ),
+    "[Script Info]\n[V4+ Styles]\n[Events]\nDialogue: 0,0:00:00.00,0:00:01.40,Default,,0,0,0,,reimu: 最初の字幕です。\nDialogue: 0,0:00:01.40,0:00:02.80,Default,,0,0,0,,marisa: 二つ目の字幕です。\n",
+    "utf-8",
+  );
+  await fs.mkdir(path.join(projectRoot, "output", "tts_generation", "latest"), {
+    recursive: true,
+  });
   await runCommand(
     "ffmpeg",
     [
@@ -100,7 +159,7 @@ const prepareMinimalInputs = async (projectRoot: string): Promise<void> => {
       "sine=frequency=440:duration=2.8",
       path.join(projectRoot, "output", "tts_generation", "latest", "audio.wav"),
     ],
-    process.cwd()
+    process.cwd(),
   );
 };
 
@@ -157,8 +216,16 @@ describe("video composition remotion", () => {
     });
     await implementations.video_composition?.(ctx);
 
-    const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
-    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+    const compositionPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "composition.json",
+    );
+    const composition = JSON.parse(
+      await fs.readFile(compositionPath, "utf-8"),
+    ) as {
       durationMs: number;
       manualEditSummary?: {
         playbackRangeApplied: boolean;
@@ -181,6 +248,54 @@ describe("video composition remotion", () => {
     const ctx = createContext(projectId, "Remotion 標準経路", outputRoot);
     const projectRoot = path.join(outputRoot, "projects", projectId);
     await prepareMinimalInputs(projectRoot);
+    await writeJson(path.join(projectRoot, "intermediate", "timeline.json"), {
+      playbackRange: { inMs: 0, outMs: 2400 },
+      markers: [{ id: "mk-start", timeMs: 0, label: "start" }],
+      tracks: [
+        {
+          id: "track-audio",
+          name: "音声",
+          type: "audio",
+          clips: [
+            {
+              id: "audio-main",
+              assetType: "audio",
+              assetPath: "output/tts_generation/latest/audio.wav",
+              startMs: 0,
+              durationMs: 2400,
+              inMs: 0,
+              outMs: 2400,
+              volume: 1,
+            },
+          ],
+        },
+        {
+          id: "track-subtitle",
+          name: "字幕",
+          type: "subtitle",
+          clips: [
+            {
+              id: "sub-1",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 0,
+              durationMs: 1200,
+              text: "最初の字幕です。",
+              style: "reimu",
+            },
+            {
+              id: "sub-2",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 1200,
+              durationMs: 1200,
+              text: "二つ目の字幕です。",
+              style: "marisa",
+            },
+          ],
+        },
+      ],
+    });
 
     const implementations = createDefaultWorkflowImplementations({
       outputRoot,
@@ -188,66 +303,98 @@ describe("video composition remotion", () => {
     });
     await implementations.video_composition?.(ctx);
 
-    const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
-    const previewPath = path.join(projectRoot, "output", "video_composition", "latest", "preview.mp4");
-    const shotPlanPath = path.join(projectRoot, "output", "video_composition", "latest", "shot-plan.json");
+    const compositionPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "composition.json",
+    );
+    const previewPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "preview.mp4",
+    );
+    const shotPlanPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "shot-plan.json",
+    );
     const characterPerformancePath = path.join(
       projectRoot,
       "output",
       "video_composition",
       "latest",
-      "character-performance.json"
+      "character-performance.json",
     );
     const subtitlePresentationPath = path.join(
       projectRoot,
       "output",
       "video_composition",
       "latest",
-      "subtitle-presentation.json"
+      "subtitle-presentation.json",
     );
     const audioMixPlanPath = path.join(
       projectRoot,
       "output",
       "video_composition",
       "latest",
-      "audio-mix-plan.json"
+      "audio-mix-plan.json",
     );
     const chapterPlanPath = path.join(
       projectRoot,
       "output",
       "video_composition",
       "latest",
-      "chapter-plan.json"
+      "chapter-plan.json",
     );
-    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+    const composition = JSON.parse(
+      await fs.readFile(compositionPath, "utf-8"),
+    ) as {
       renderer: string;
       shotCount: number;
       characterCueCount: number;
       emphasisCount: number;
       audioCueCount: number;
       chapterCount: number;
+      durationMs: number;
+      timelineSynchronization: {
+        audioClipsAdjusted: number;
+        subtitleClipsAdjusted: number;
+        playbackRangeAdjusted: boolean;
+      };
     };
-    const shotPlan = JSON.parse(await fs.readFile(shotPlanPath, "utf-8")) as Array<{
+    const shotPlan = JSON.parse(
+      await fs.readFile(shotPlanPath, "utf-8"),
+    ) as Array<{
       startMs: number;
       endMs: number;
     }>;
     const characterPerformance = JSON.parse(
-      await fs.readFile(characterPerformancePath, "utf-8")
+      await fs.readFile(characterPerformancePath, "utf-8"),
     ) as {
       mouthCues: Array<unknown>;
       blinkCues: Array<unknown>;
       expressionCues: Array<unknown>;
     };
     const subtitlePresentation = JSON.parse(
-      await fs.readFile(subtitlePresentationPath, "utf-8")
+      await fs.readFile(subtitlePresentationPath, "utf-8"),
     ) as {
       items: Array<{ tokens: Array<{ kind: string }> }>;
     };
-    const audioMixPlan = JSON.parse(await fs.readFile(audioMixPlanPath, "utf-8")) as {
+    const audioMixPlan = JSON.parse(
+      await fs.readFile(audioMixPlanPath, "utf-8"),
+    ) as {
       seCues: Array<unknown>;
       bgmWindows: Array<unknown>;
     };
-    const chapterPlan = JSON.parse(await fs.readFile(chapterPlanPath, "utf-8")) as {
+    const chapterPlan = JSON.parse(
+      await fs.readFile(chapterPlanPath, "utf-8"),
+    ) as {
       chapters: Array<unknown>;
     };
     const codecName = await runCommand(
@@ -263,10 +410,16 @@ describe("video composition remotion", () => {
         "default=noprint_wrappers=1:nokey=1",
         previewPath,
       ],
-      process.cwd()
+      process.cwd(),
     );
 
     expect(composition.renderer).toBe("remotion");
+    expect(composition.durationMs).toBe(2800);
+    expect(composition.timelineSynchronization).toMatchObject({
+      audioClipsAdjusted: 1,
+      subtitleClipsAdjusted: 2,
+      playbackRangeAdjusted: true,
+    });
     expect(composition.shotCount).toBeGreaterThanOrEqual(2);
     expect(composition.characterCueCount).toBeGreaterThan(0);
     expect(composition.emphasisCount).toBeGreaterThan(0);
@@ -278,8 +431,8 @@ describe("video composition remotion", () => {
     expect(characterPerformance.expressionCues.length).toBeGreaterThan(0);
     expect(
       subtitlePresentation.items.some((item) =>
-        item.tokens.some((token) => token.kind === "emphasis")
-      )
+        item.tokens.some((token) => token.kind === "emphasis"),
+      ),
     ).toBe(true);
     expect(audioMixPlan.seCues.length).toBeGreaterThan(0);
     expect(audioMixPlan.bgmWindows.length).toBeGreaterThan(0);
@@ -302,13 +455,31 @@ describe("video composition remotion", () => {
     });
     await implementations.video_composition?.(ctx);
 
-    const compositionPath = path.join(projectRoot, "output", "video_composition", "latest", "composition.json");
-    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+    const compositionPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "composition.json",
+    );
+    const composition = JSON.parse(
+      await fs.readFile(compositionPath, "utf-8"),
+    ) as {
       outputPreset?: { width: number; height: number; fps: number };
     };
-    expect(composition.outputPreset).toEqual({ width: 640, height: 360, fps: 24 });
+    expect(composition.outputPreset).toEqual({
+      width: 640,
+      height: 360,
+      fps: 24,
+    });
 
-    const previewPath = path.join(projectRoot, "output", "video_composition", "latest", "preview.mp4");
+    const previewPath = path.join(
+      projectRoot,
+      "output",
+      "video_composition",
+      "latest",
+      "preview.mp4",
+    );
     const dimensions = await runCommand(
       "ffprobe",
       [
@@ -322,7 +493,7 @@ describe("video composition remotion", () => {
         "csv=p=0",
         previewPath,
       ],
-      process.cwd()
+      process.cwd(),
     );
     expect(dimensions).toContain("640,360,24/1");
   }, 120000);

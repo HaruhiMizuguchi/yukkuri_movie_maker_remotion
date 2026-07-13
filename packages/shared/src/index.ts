@@ -196,6 +196,7 @@ export const TimelineClipSchema = z.object({
   fadeOutMs: z.number().int().nonnegative().optional(),
   text: z.string().optional(),
   style: z.string().optional(),
+  timingMode: z.enum(["generated", "manual"]).optional(),
 });
 
 export const TimelineTrackSchema = z.object({

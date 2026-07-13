@@ -304,6 +304,7 @@ const createTimelineFromScript = (script: Script): TimelineData => {
       durationMs,
       text: line.text,
       style: line.speaker,
+      timingMode: "generated" as const,
     };
     cursor += durationMs;
     return clip;
@@ -328,6 +329,7 @@ const createTimelineFromScript = (script: Script): TimelineData => {
             inMs: 0,
             outMs: totalDuration,
             volume: 1,
+            timingMode: "generated" as const,
           },
         ],
       },

@@ -30,9 +30,10 @@ test("実API/DB/Workerで制作開始からfinal.mp4生成まで通せる", asyn
   await page.getByTestId("wizard-create-button").click();
 
   await expect(page.getByTestId("screen-project")).toBeVisible();
-  const projectId = (
-    await page.getByTestId("selected-project-id").innerText()
-  ).trim();
+  const projectId = await page
+    .getByTestId("selected-project-id")
+    .getAttribute("data-project-id");
+  if (!projectId) throw new Error("selected project id was not exposed");
   expect(projectId).toMatch(/^[0-9a-f-]{36}$/);
 
   await page.getByTestId("nav-script").click();
@@ -132,16 +133,14 @@ const waitForApiHealth = async (request: any) => {
 };
 
 const waitForJobId = async (page: any) => {
-  // レンダリング作成メッセージが切り替わるまで待って jobId を抜き出す
+  // 人間向けメッセージへUUIDを露出せず、テスト用属性からjobIdを読む
   let jobId = "";
   await expect
     .poll(
       async () => {
-        const message = await page.getByTestId("app-message").innerText();
         jobId =
-          message.match(
-            /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
-          )?.[0] ?? "";
+          (await page.getByTestId("app-message").getAttribute("data-job-id")) ??
+          "";
         return jobId;
       },
       {

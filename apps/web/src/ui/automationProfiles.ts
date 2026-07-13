@@ -31,6 +31,14 @@ export const automationModeLabels: Record<AutomationMode, string> = {
   custom: "カスタム",
 };
 
+export const automationModeDescriptions: Record<AutomationMode, string> = {
+  full: "おすすめ。テーマから完成動画まで自動で進め、あとから好きな部分だけ直せます。",
+  scriptOnly:
+    "まず台本だけ作ります。内容を確認してから、音声や映像の生成へ進めます。",
+  renderOnly: "すでに台本や素材がある場合に、編集と動画出力を中心に進めます。",
+  custom: "工程ごとに自動化する範囲を細かく指定したい上級者向けです。",
+};
+
 export const buildJobRequest = (
   mode: AutomationMode,
   skipSteps: string[],

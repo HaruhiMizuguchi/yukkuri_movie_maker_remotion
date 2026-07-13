@@ -12,7 +12,11 @@ import { registerProjectFiles } from "./projectFile";
 import type { WorkflowContext, WorkflowStepImplementations } from "./index";
 import { createShotPlan } from "./shotPlanning";
 import { createSubtitlePresentationPlan } from "./subtitlePresentation";
-import { timelineToRemotionProps } from "./timeline";
+import {
+  synchronizeGeneratedTimelineTiming,
+  timelineToRemotionProps,
+  type TimelineSynchronizationSummary,
+} from "./timeline";
 import { syncLatestAtomically } from "./atomicLatest";
 import {
   type ScriptTimestamp,
@@ -255,6 +259,7 @@ export function createDefaultWorkflowImplementations(
       const timestamps = (await readJson(timestampsPath)) as ScriptTimestamp[];
 
       const subtitleItems = script.lines.map((line, index) => ({
+        index,
         speaker: line.speaker,
         text: line.text,
         startMs: timestamps[index]?.startMs ?? 0,
@@ -372,7 +377,17 @@ export function createDefaultWorkflowImplementations(
       const subtitleTracks = (await readJson(
         subtitlesJsonPath,
       )) as ScriptTimestamp[];
-      const timelineProps = await readTimelineRemotionProps(projectRoot);
+      const sourceAudioDurationMs = await probeMediaDurationMs(audioPath);
+      const timelineState = await readTimelineRemotionProps({
+        projectRoot,
+        generatedSubtitleTracks: subtitleTracks,
+        audioDurationMs: sourceAudioDurationMs,
+        fps: outputPreset.fps,
+      });
+      const timelineProps = timelineState?.props ?? null;
+      const timelineSynchronization =
+        timelineState?.synchronization ??
+        createEmptyTimelineSynchronization(sourceAudioDurationMs);
       const effectiveSubtitleTracks = toEffectiveSubtitleTracks(
         timelineProps?.subtitleTracks ?? [],
         subtitleTracks,
@@ -479,9 +494,7 @@ export function createDefaultWorkflowImplementations(
         script.title ?? "ゆっくり解説",
       );
 
-      const durationMs =
-        timelineProps?.durationMs ??
-        (await probeMediaDurationMs(audioCopyPath));
+      const durationMs = timelineProps?.durationMs ?? sourceAudioDurationMs;
       const usingRemotion = options.disableRemotion !== true;
       const audioMixPlan = createAudioMixPlan({
         durationMs,
@@ -568,6 +581,7 @@ export function createDefaultWorkflowImplementations(
         chapterCount: chapterPlan.chapters.length,
         backgroundAnimation,
         manualEditSummary: timelineProps?.manualEditSummary,
+        timelineSynchronization,
       });
       await syncLatest(stepDir);
 
@@ -662,6 +676,7 @@ export function createDefaultWorkflowImplementations(
           audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
+        timelineSynchronization,
       });
 
       logger.info("video_composition completed", {
@@ -677,6 +692,7 @@ export function createDefaultWorkflowImplementations(
           audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
+        timelineSynchronization,
       });
       return {
         previewPath: toRelativePath(outputRoot, previewPath),
@@ -693,6 +709,7 @@ export function createDefaultWorkflowImplementations(
           audioMixPlan.seCues.length + audioMixPlan.bgmWindows.length,
         chapterCount: chapterPlan.chapters.length,
         manualEditSummary: timelineProps?.manualEditSummary,
+        timelineSynchronization,
       };
     },
     final_encoding: async (ctx) => {
@@ -1327,16 +1344,50 @@ const renderWithRemotion = async ({
   }
 };
 
-const readTimelineRemotionProps = async (
-  projectRoot: string,
-): Promise<TimelineRemotionProps | null> => {
+const readTimelineRemotionProps = async ({
+  projectRoot,
+  generatedSubtitleTracks,
+  audioDurationMs,
+  fps,
+}: {
+  projectRoot: string;
+  generatedSubtitleTracks: ScriptTimestamp[];
+  audioDurationMs: number;
+  fps: number;
+}): Promise<{
+  props: TimelineRemotionProps;
+  synchronization: TimelineSynchronizationSummary;
+} | null> => {
   const timelinePath = path.join(projectRoot, "intermediate", "timeline.json");
   if (!(await fileExists(timelinePath))) {
     return null;
   }
   const timeline = TimelineDataSchema.parse(await readJson(timelinePath));
-  return timelineToRemotionProps(timeline);
+  const synchronized = synchronizeGeneratedTimelineTiming(timeline, {
+    timestamps: generatedSubtitleTracks,
+    audioDurationMs,
+  });
+  if (
+    synchronized.summary.audioClipsAdjusted > 0 ||
+    synchronized.summary.subtitleClipsAdjusted > 0 ||
+    synchronized.summary.playbackRangeAdjusted
+  ) {
+    await writeJson(timelinePath, synchronized.timeline);
+  }
+  return {
+    props: timelineToRemotionProps(synchronized.timeline, fps),
+    synchronization: synchronized.summary,
+  };
 };
+
+const createEmptyTimelineSynchronization = (
+  audioDurationMs: number,
+): TimelineSynchronizationSummary => ({
+  audioClipsAdjusted: 0,
+  subtitleClipsAdjusted: 0,
+  playbackRangeAdjusted: false,
+  audioDurationMs,
+});
 
 const toEffectiveSubtitleTracks = (
   manualSubtitleTracks: TimelineRemotionProps["subtitleTracks"],

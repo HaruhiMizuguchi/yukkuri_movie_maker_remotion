@@ -11,6 +11,7 @@ export type TimelineClip = {
   fadeOutMs?: number;
   text?: string;
   style?: string;
+  timingMode?: "generated" | "manual";
 };
 
 export type TimelineMarker = {
@@ -53,7 +54,7 @@ export const updateTimelineClipLocal = (
   timeline: TimelineData,
   trackId: string,
   clipId: string,
-  patch: Partial<TimelineClip>
+  patch: Partial<TimelineClip>,
 ): TimelineData => ({
   ...timeline,
   tracks: timeline.tracks.map((track) =>
@@ -82,19 +83,20 @@ export const updateTimelineClipLocal = (
                       patch.outMs === undefined
                         ? clip.outMs
                         : clampNonNegativeInt(patch.outMs),
+                    timingMode: "manual",
                   }
-                : clip
-            )
+                : clip,
+            ),
           ),
         }
-      : track
+      : track,
   ),
 });
 
 export const duplicateTimelineClipLocal = (
   timeline: TimelineData,
   trackId: string,
-  clipId: string
+  clipId: string,
 ): TimelineData => ({
   ...timeline,
   tracks: timeline.tracks.map((track) => {
@@ -113,7 +115,9 @@ export const duplicateTimelineClipLocal = (
         {
           ...source,
           id: duplicateId,
-          startMs: source.startMs + Math.max(100, Math.floor(source.durationMs / 4)),
+          startMs:
+            source.startMs + Math.max(100, Math.floor(source.durationMs / 4)),
+          timingMode: "manual",
         },
       ]),
     };
@@ -123,26 +127,26 @@ export const duplicateTimelineClipLocal = (
 export const deleteTimelineClipLocal = (
   timeline: TimelineData,
   trackId: string,
-  clipId: string
+  clipId: string,
 ): TimelineData => ({
   ...timeline,
   tracks: timeline.tracks.map((track) =>
     track.id === trackId
       ? { ...track, clips: track.clips.filter((clip) => clip.id !== clipId) }
-      : track
+      : track,
   ),
 });
 
 export const addManualSubtitleClipLocal = (
   timeline: TimelineData,
   text: string,
-  clipId: string
+  clipId: string,
 ): TimelineData => {
   const cleanText = text.trim();
   const playbackStart = timeline.playbackRange.inMs;
   const durationMs = Math.min(
     4000,
-    Math.max(1200, timeline.playbackRange.outMs - playbackStart)
+    Math.max(1200, timeline.playbackRange.outMs - playbackStart),
   );
   const nextClip: TimelineClip = {
     id: clipId,
@@ -152,24 +156,32 @@ export const addManualSubtitleClipLocal = (
     durationMs,
     text: cleanText,
     style: "manual",
+    timingMode: "manual",
   };
-  const hasSubtitleTrack = timeline.tracks.some((track) => track.id === "track-subtitle");
+  const hasSubtitleTrack = timeline.tracks.some(
+    (track) => track.id === "track-subtitle",
+  );
   const tracks = hasSubtitleTrack
     ? timeline.tracks.map((track) =>
         track.id === "track-subtitle"
           ? { ...track, clips: sortTimelineClips([...track.clips, nextClip]) }
-          : track
+          : track,
       )
     : [
         ...timeline.tracks,
-        { id: "track-subtitle", name: "字幕", type: "subtitle", clips: [nextClip] },
+        {
+          id: "track-subtitle",
+          name: "字幕",
+          type: "subtitle",
+          clips: [nextClip],
+        },
       ];
   return { ...timeline, tracks };
 };
 
 export const addTimelineMarkerLocal = (
   timeline: TimelineData,
-  marker: TimelineMarker
+  marker: TimelineMarker,
 ): TimelineData => ({
   ...timeline,
   markers: sortTimelineMarkers([
@@ -186,7 +198,7 @@ export const splitTimelineClipLocal = (
   timeline: TimelineData,
   trackId: string,
   clipId: string,
-  splitAtMs: number
+  splitAtMs: number,
 ): TimelineData => ({
   ...timeline,
   tracks: timeline.tracks.map((track) => {
@@ -199,7 +211,7 @@ export const splitTimelineClipLocal = (
     }
     const splitMs = Math.max(
       source.startMs + 100,
-      Math.min(splitAtMs, source.startMs + source.durationMs - 100)
+      Math.min(splitAtMs, source.startMs + source.durationMs - 100),
     );
     const firstDuration = splitMs - source.startMs;
     const secondDuration = source.durationMs - firstDuration;
@@ -207,20 +219,26 @@ export const splitTimelineClipLocal = (
     const firstClip = {
       ...source,
       durationMs: firstDuration,
-      outMs: source.inMs === undefined ? source.outMs : source.inMs + firstDuration,
+      outMs:
+        source.inMs === undefined ? source.outMs : source.inMs + firstDuration,
+      timingMode: "manual" as const,
     };
     const secondClip = {
       ...source,
       id: nextClipId,
       startMs: splitMs,
       durationMs: secondDuration,
-      inMs: source.inMs === undefined ? source.inMs : source.inMs + firstDuration,
+      inMs:
+        source.inMs === undefined ? source.inMs : source.inMs + firstDuration,
       outMs: source.outMs,
+      timingMode: "manual" as const,
     };
     return {
       ...track,
       clips: sortTimelineClips(
-        track.clips.flatMap((clip) => (clip.id === clipId ? [firstClip, secondClip] : [clip]))
+        track.clips.flatMap((clip) =>
+          clip.id === clipId ? [firstClip, secondClip] : [clip],
+        ),
       ),
     };
   }),
@@ -228,27 +246,34 @@ export const splitTimelineClipLocal = (
 
 export const findTimelineClip = (
   timeline: TimelineData | null,
-  selectedClip: SelectedTimelineClip | null
+  selectedClip: SelectedTimelineClip | null,
 ): { track: TimelineTrack; clip: TimelineClip } | null => {
   if (!timeline || !selectedClip) {
     return null;
   }
-  const track = timeline.tracks.find((candidate) => candidate.id === selectedClip.trackId);
-  const clip = track?.clips.find((candidate) => candidate.id === selectedClip.clipId);
+  const track = timeline.tracks.find(
+    (candidate) => candidate.id === selectedClip.trackId,
+  );
+  const clip = track?.clips.find(
+    (candidate) => candidate.id === selectedClip.clipId,
+  );
   return track && clip ? { track, clip } : null;
 };
 
 export const getTimelineViewport = (
   timeline: TimelineData,
   playheadMs: number,
-  zoomWindowMs: number
+  zoomWindowMs: number,
 ) => {
   const durationMs = Math.max(timeline.playbackRange.outMs, 1000);
   const viewportDurationMs = Math.min(Math.max(1000, zoomWindowMs), durationMs);
   const clampedPlayheadMs = Math.min(Math.max(0, playheadMs), durationMs);
   const viewportStartMs = Math.max(
     0,
-    Math.min(clampedPlayheadMs - viewportDurationMs / 2, durationMs - viewportDurationMs)
+    Math.min(
+      clampedPlayheadMs - viewportDurationMs / 2,
+      durationMs - viewportDurationMs,
+    ),
   );
   const viewportEndMs = viewportStartMs + viewportDurationMs;
   return {
@@ -262,7 +287,7 @@ export const getTimelineViewport = (
 
 export const getVisibleClipLayout = (
   clip: TimelineClip,
-  viewport: ReturnType<typeof getTimelineViewport>
+  viewport: ReturnType<typeof getTimelineViewport>,
 ): {
   leftPercent: number;
   widthPercent: number;
@@ -278,10 +303,12 @@ export const getVisibleClipLayout = (
   }
   return {
     leftPercent:
-      ((visibleStartMs - viewport.viewportStartMs) / viewport.viewportDurationMs) * 100,
+      ((visibleStartMs - viewport.viewportStartMs) /
+        viewport.viewportDurationMs) *
+      100,
     widthPercent: Math.max(
       1.4,
-      ((visibleEndMs - visibleStartMs) / viewport.viewportDurationMs) * 100
+      ((visibleEndMs - visibleStartMs) / viewport.viewportDurationMs) * 100,
     ),
     trimmedLeft: visibleStartMs > clipStartMs,
     trimmedRight: visibleEndMs < clipEndMs,
@@ -301,28 +328,35 @@ export const getTimelineTickStepMs = (viewportDurationMs: number) => {
   return 2000;
 };
 
-export const formatTimelineTime = (timeMs: number) => `${(timeMs / 1000).toFixed(1)}s`;
+export const formatTimelineTime = (timeMs: number) =>
+  `${(timeMs / 1000).toFixed(1)}s`;
 
 export const getTrackAccent = (trackType: string) => {
   if (trackType === "audio" || trackType === "bgm") {
     return {
-      solid: "linear-gradient(120deg, rgba(34,197,94,0.88), rgba(74,222,128,0.8))",
+      solid:
+        "linear-gradient(120deg, rgba(34,197,94,0.88), rgba(74,222,128,0.8))",
       glow: "rgba(74, 222, 128, 0.32)",
     };
   }
   if (trackType === "subtitle") {
     return {
-      solid: "linear-gradient(120deg, rgba(56,189,248,0.88), rgba(59,130,246,0.82))",
+      solid:
+        "linear-gradient(120deg, rgba(56,189,248,0.88), rgba(59,130,246,0.82))",
       glow: "rgba(96, 165, 250, 0.28)",
     };
   }
   return {
-    solid: "linear-gradient(120deg, rgba(168,85,247,0.82), rgba(236,72,153,0.78))",
+    solid:
+      "linear-gradient(120deg, rgba(168,85,247,0.82), rgba(236,72,153,0.78))",
     glow: "rgba(216, 180, 254, 0.26)",
   };
 };
 
-export const predictNextSplitClipId = (clips: TimelineClip[], sourceClipId: string) => {
+export const predictNextSplitClipId = (
+  clips: TimelineClip[],
+  sourceClipId: string,
+) => {
   const baseId = `${sourceClipId}-split-2`;
   if (!clips.some((clip) => clip.id === baseId)) {
     return baseId;
@@ -334,7 +368,10 @@ export const predictNextSplitClipId = (clips: TimelineClip[], sourceClipId: stri
   return `${sourceClipId}-split-${suffix}`;
 };
 
-export const predictNextDuplicateClipId = (clips: TimelineClip[], sourceClipId: string) => {
+export const predictNextDuplicateClipId = (
+  clips: TimelineClip[],
+  sourceClipId: string,
+) => {
   const duplicateIdBase = `${sourceClipId}-copy`;
   if (!clips.some((clip) => clip.id === duplicateIdBase)) {
     return duplicateIdBase;

@@ -5,6 +5,7 @@
 - タスクを進めた時は、docs/dev_tasks_breakdown.mdを更新すること
 - テスト駆動で開発すること
 - apiを利用する系のテストは、モックだけでなく、実際にapi接続→成果物生成を行うこと
+- 開発タスクの最終テストでは、モック確認だけで終えず、実際の動画生成経路を通して再生可能な `final.mp4` を最低1本生成・検証すること。詳細は `docs/testing_policy.md` を参照すること
 - コード中には、日本語でコメントを書くと
 - 開発中に「今後の開発で役立つ知見」や「一般的には正しいがこのプロジェクト／環境では失敗した事例」を得たら、内容を要約して本ファイルに追記すること
 - Observabilityに注意して開発すること
@@ -36,6 +37,7 @@
 - Prisma の `BigInt` を含むレコードを Fastify からそのまま返すと `Do not know how to serialize a BigInt` で 500 になる。`Job`/`Project` 系の API 応答は JSON 返却前に `BigInt` を文字列化する。
 - Remotion の `OffthreadVideo` は、短尺MP4を多数クリップへ分割して使う構成だと Windows 環境で `No frame found at position ...` を起こすことがある。完全版の安定生成を優先する場合は、生成画像中心の静止画ショットへ寄せると通しやすい。
 - Gemini API の Imagen は `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict` に `instances[].prompt` と `parameters.sampleCount` を渡すと base64 画像を返せる。OpenAI画像APIが課金上限で止まる環境では、同じ `GOOGLE_API_KEY` で画像生成まで賄える。
+- プロジェクト作成時のタイムラインはTTS前なので文字数ベースの推定尺になる。実音声生成後も推定尺を優先すると字幕と音声がずれるため、自動生成クリップはTTS実測タイムスタンプへ同期し、手動編集クリップは `timingMode: "manual"` として保持する。
 - Vitestで `test.exclude` を明示すると既定の `node_modules` 除外が置き換わる。pnpm workspaceのsymlink先まで依存パッケージのテストを拾うため、`**/node_modules/**` を必ず明示する。
 - `pnpm audit` のtransitive dependency overrideは、脆弱性表示を消せてもESLint等の利用側が要求するAPI互換性を壊すことがある。直接依存の更新を優先し、override後はauditだけでなく実際のlint/testも通す。
 - Windowsでは生成物ディレクトリのrenameがDefender等に一時的に `EPERM` / `EBUSY` で拒否されることがある。原子的latest切替は限定回数の短い指数backoffを入れると安定する。

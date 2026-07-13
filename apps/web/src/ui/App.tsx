@@ -12,6 +12,7 @@ import type {
   Template,
 } from "./apiTypes";
 import {
+  automationModeDescriptions,
   automationModeLabels,
   buildJobRequest,
   workflowStepLabels,
@@ -19,7 +20,12 @@ import {
   type AutomationMode,
   type WorkflowStepName,
 } from "./automationProfiles";
-import { screens, type ScreenId } from "./screenConfig";
+import {
+  getRecommendedAction,
+  getWorkflowPosition,
+  primaryWorkflowNavigation,
+} from "./guidedWorkflow";
+import type { ScreenId } from "./screenConfig";
 import { styleText, styles } from "./styles";
 import {
   addManualSubtitleClipLocal,
@@ -62,8 +68,40 @@ const statusLabels: Record<string, string> = {
 
 const formatStatus = (status: string): string => statusLabels[status] ?? status;
 
+const assetTypeLabels: Record<string, string> = {
+  image: "画像",
+  audio: "音声",
+  video: "動画",
+  subtitle: "字幕",
+};
+
+const assetUsageLabels: Record<string, string> = {
+  background: "背景",
+  character: "立ち絵",
+  bgm: "BGM",
+  se: "効果音",
+  reference: "参考素材",
+  other: "その他",
+};
+
 const buildJobFileUrl = (jobId: string, fileId: string) =>
   `/api/jobs/${jobId}/files/${fileId}`;
+
+const projectRequiredScreens = new Set<ScreenId>([
+  "script",
+  "assets",
+  "timeline",
+  "preview",
+  "project",
+]);
+
+const formatUpdatedAt = (value: string): string =>
+  new Intl.DateTimeFormat("ja-JP", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 
 export function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
@@ -114,6 +152,7 @@ export function App() {
   const [timelinePlayheadMs, setTimelinePlayheadMs] = useState(0);
   const [timelineZoomWindowMs, setTimelineZoomWindowMs] = useState(6000);
   const [message, setMessage] = useState("");
+  const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
   const [pendingActions, setPendingActions] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -165,6 +204,31 @@ export function App() {
     latestFinalJob && finalFile
       ? `${buildJobFileUrl(latestFinalJob.id, finalFile.id)}?download=1`
       : null;
+  const hasRunningJob = Boolean(
+    projectDetail?.jobs.some((job) =>
+      ["PENDING", "RUNNING"].includes(job.status),
+    ),
+  );
+  const recommendedAction = getRecommendedAction({
+    hasProject: Boolean(selectedProjectId),
+    hasScript: Boolean(
+      projectDetail?.script?.lines.some((line) => line.text.trim()),
+    ),
+    hasFinalVideo: Boolean(finalVideoUrl),
+    hasRunningJob,
+  });
+  const workflowPosition = getWorkflowPosition(activeScreen);
+
+  const navigateToScreen = (screen: ScreenId) => {
+    if (projectRequiredScreens.has(screen) && !selectedProjectId) {
+      setMessage(
+        "先にホームでプロジェクトを選ぶか、新しい動画を作成してください。",
+      );
+      setActiveScreen("dashboard");
+      return;
+    }
+    setActiveScreen(screen);
+  };
   const timelineViewport = useMemo(
     () =>
       timelineDraft
@@ -335,7 +399,9 @@ export function App() {
         templateId: wizardTemplateId || undefined,
       }),
     });
-    setMessage(`プロジェクトを作成しました: ${created.projectId}`);
+    setMessage(
+      "動画の制作を開始しました。内容を確認しながら順番に進められます。",
+    );
     await refreshDashboard();
     await loadProjectDetail(created.projectId);
     setActiveScreen("project");
@@ -351,7 +417,8 @@ export function App() {
         body: JSON.stringify(buildJobRequest(wizardMode, customSkipSteps)),
       },
     );
-    setMessage(`レンダリングジョブを作成しました: ${created.jobId}`);
+    setLastCreatedJobId(created.jobId);
+    setMessage("完成動画の生成を開始しました。進捗は自動で更新されます。");
     await loadProjectDetail(selectedProjectId, { preservePreview: true });
   };
 
@@ -374,9 +441,8 @@ export function App() {
         }),
       },
     );
-    setMessage(
-      `${workflowStepLabels[stepName]} から再実行しました: ${created.jobId}`,
-    );
+    setLastCreatedJobId(created.jobId);
+    setMessage(`${workflowStepLabels[stepName]} から再生成を開始しました。`);
     await loadProjectDetail(selectedProjectId, { preservePreview: true });
   };
 
@@ -394,8 +460,9 @@ export function App() {
         body: JSON.stringify(buildJobRequest("custom", [stepName])),
       },
     );
+    setLastCreatedJobId(created.jobId);
     setMessage(
-      `${workflowStepLabels[stepName]} をスキップして実行しました: ${created.jobId}`,
+      `${workflowStepLabels[stepName]} を省略して生成を開始しました。`,
     );
     await loadProjectDetail(selectedProjectId, { preservePreview: true });
   };
@@ -412,6 +479,11 @@ export function App() {
     );
     setMessage("台本を保存しました");
     await loadProjectDetail(selectedProjectId);
+  };
+
+  const saveScriptAndContinue = async () => {
+    await saveScript();
+    setActiveScreen("assets");
   };
 
   const addAsset = async () => {
@@ -754,7 +826,7 @@ export function App() {
       }),
     });
     await loadTemplates();
-    setMessage(`テンプレートを作成しました: ${templateId}`);
+    setMessage("現在の設定をテンプレートとして保存しました。");
   };
 
   return (
@@ -762,1136 +834,1224 @@ export function App() {
       <style>{styleText}</style>
       <div style={styles.backgroundShapeOne} />
       <div style={styles.backgroundShapeTwo} />
-      <header style={styles.header}>
-        <div>
-          <div style={styles.kicker}>Yukkuri Movie Maker</div>
-          <h1 style={styles.title}>制作コントロールパネル</h1>
-        </div>
-        <div style={styles.statusCard}>
-          <div>選択中プロジェクト</div>
-          <strong data-testid="selected-project-id">
-            {selectedProject?.id ?? "未選択"}
-          </strong>
-          <small>{selectedProject?.theme ?? "テーマ未設定"}</small>
-        </div>
-      </header>
-
-      <nav style={styles.navBar}>
-        {screens.map((screen) => (
+      <div style={styles.shell}>
+        <header style={styles.header}>
           <button
-            key={screen.id}
-            data-testid={`nav-${screen.id}`}
-            onClick={() => setActiveScreen(screen.id)}
-            className={screen.id === activeScreen ? "tab-active" : "tab"}
+            style={styles.brandButton}
+            onClick={() => navigateToScreen("dashboard")}
+            aria-label="ホームへ戻る"
           >
-            {screen.label}
+            <span style={styles.brandMark} aria-hidden="true">
+              ゆ
+            </span>
+            <span>
+              <span style={styles.kicker}>Yukkuri Movie Maker</span>
+              <span style={styles.title}>ゆっくり動画スタジオ</span>
+              <span style={styles.brandDescription}>
+                テーマから完成動画まで、順番に進める制作ツール
+              </span>
+            </span>
           </button>
-        ))}
-      </nav>
+          {selectedProject ? (
+            <button
+              style={styles.statusCard}
+              data-testid="nav-project"
+              data-project-id={selectedProject.id}
+              onClick={() => navigateToScreen("project")}
+            >
+              <span style={styles.statusCardLabel}>編集中の動画</span>
+              <strong
+                data-testid="selected-project-id"
+                data-project-id={selectedProject.id}
+              >
+                {selectedProject.theme ?? "テーマ未設定"}
+              </strong>
+              <small>
+                {formatStatus(
+                  selectedProject.latestJob?.status ?? selectedProject.status,
+                )}{" "}
+                · 詳細を見る →
+              </small>
+            </button>
+          ) : (
+            <div style={styles.statusCard} data-testid="selected-project-id">
+              <span style={styles.statusCardLabel}>編集中の動画</span>
+              <strong>まだ選ばれていません</strong>
+              <small>ホームから選ぶか、新しく作成してください</small>
+            </div>
+          )}
+        </header>
 
-      {message ? (
-        <div style={styles.message} role="status" data-testid="app-message">
-          {message}
-        </div>
-      ) : null}
-      {errorMessage ? (
-        <div style={styles.errorMessage} role="alert" data-testid="app-error">
-          {errorMessage}
-          {retryActionRef.current ? (
+        <nav
+          style={styles.navBar}
+          className="main-navigation"
+          aria-label="制作ナビゲーション"
+        >
+          <button
+            data-testid="nav-dashboard"
+            onClick={() => navigateToScreen("dashboard")}
+            className={
+              activeScreen === "dashboard" ? "home-tab-active" : "home-tab"
+            }
+          >
+            ホーム
+          </button>
+          <div style={styles.stageNavigation} className="stage-navigation">
+            {primaryWorkflowNavigation.map((item) => {
+              const locked = Boolean(
+                item.step && item.step > 1 && !selectedProjectId,
+              );
+              return (
+                <button
+                  key={item.screen}
+                  data-testid={`nav-${item.screen}`}
+                  onClick={() => navigateToScreen(item.screen)}
+                  disabled={locked}
+                  title={
+                    locked
+                      ? "先にプロジェクトを作成または選択してください"
+                      : item.description
+                  }
+                  className={
+                    item.screen === activeScreen
+                      ? "stage-tab-active"
+                      : "stage-tab"
+                  }
+                >
+                  <span className="stage-number">{item.step}</span>
+                  <span className="stage-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            data-testid="nav-settings"
+            onClick={() => navigateToScreen("settings")}
+            className={
+              activeScreen === "settings" ? "home-tab-active" : "home-tab"
+            }
+          >
+            設定
+          </button>
+        </nav>
+
+        {workflowPosition ? (
+          <div style={styles.currentStepBar}>
+            <span>制作ステップ {workflowPosition} / 5</span>
+            <strong>
+              {primaryWorkflowNavigation[workflowPosition - 1]?.label}
+            </strong>
+            <span>
+              {primaryWorkflowNavigation[workflowPosition - 1]?.description}
+            </span>
+          </div>
+        ) : null}
+
+        {message ? (
+          <div
+            style={styles.message}
+            role="status"
+            data-testid="app-message"
+            data-job-id={lastCreatedJobId ?? undefined}
+          >
+            {message}
+          </div>
+        ) : null}
+        {errorMessage ? (
+          <div style={styles.errorMessage} role="alert" data-testid="app-error">
+            {errorMessage}
+            {retryActionRef.current ? (
+              <button
+                style={styles.inlineButton}
+                onClick={() => void runUiAction(retryActionRef.current!)}
+              >
+                再試行
+              </button>
+            ) : null}
             <button
               style={styles.inlineButton}
-              onClick={() => void runUiAction(retryActionRef.current!)}
+              onClick={() => setErrorMessage("")}
             >
-              再試行
+              閉じる
             </button>
-          ) : null}
-          <button
-            style={styles.inlineButton}
-            onClick={() => setErrorMessage("")}
+          </div>
+        ) : null}
+        {pendingActions > 0 ? (
+          <div style={styles.busyMessage} role="status" aria-live="polite">
+            処理中…
+          </div>
+        ) : null}
+
+        <main style={styles.main} aria-busy={pendingActions > 0}>
+          <fieldset
+            disabled={pendingActions > 0}
+            style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
           >
-            閉じる
-          </button>
-        </div>
-      ) : null}
-      {pendingActions > 0 ? (
-        <div style={styles.busyMessage} role="status" aria-live="polite">
-          処理中…
-        </div>
-      ) : null}
-
-      <main style={styles.main} aria-busy={pendingActions > 0}>
-        <fieldset
-          disabled={pendingActions > 0}
-          style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-        >
-          {activeScreen === "dashboard" ? (
-            <section style={styles.panel} data-testid="screen-dashboard">
-              <h2 style={styles.panelTitle}>プロジェクト一覧</h2>
-              <div style={styles.metricRow}>
-                <Metric
-                  label="プロジェクト数"
-                  value={dashboardStats.projectCount}
-                />
-                <Metric
-                  label="実行中ジョブ"
-                  value={dashboardStats.runningJobCount}
-                />
-                <Metric
-                  label="失敗ジョブ"
-                  value={dashboardStats.failedJobCount}
-                />
-              </div>
-              <button
-                style={styles.secondaryButton}
-                onClick={() => void runUiAction(refreshDashboard)}
-              >
-                最新化
-              </button>
-              {projects.length === 0 ? (
-                <div style={styles.infoCard}>
-                  プロジェクトがありません。「作成ウィザード」から最初の動画テーマを登録してください。
-                  <button
-                    style={styles.inlineButton}
-                    onClick={() => setActiveScreen("wizard")}
-                  >
-                    作成へ進む
-                  </button>
-                </div>
-              ) : null}
-              <div style={styles.list}>
-                {projects.map((project) => (
-                  <button
-                    key={project.id}
-                    style={styles.listItem}
-                    onClick={() => {
-                      void runUiAction(() => loadProjectDetail(project.id));
-                      setActiveScreen("project");
-                    }}
-                  >
-                    <div>{project.theme ?? "(テーマ未設定)"}</div>
-                    <small>{project.id}</small>
-                    <small>
-                      最新ジョブ:{" "}
-                      {project.latestJob
-                        ? formatStatus(project.latestJob.status)
-                        : "なし"}
-                    </small>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {activeScreen === "wizard" ? (
-            <section style={styles.panel} data-testid="screen-wizard">
-              <h2 style={styles.panelTitle}>プロジェクト作成ウィザード</h2>
-              <label style={styles.label}>テーマ</label>
-              <input
-                data-testid="wizard-theme-input"
-                style={styles.input}
-                value={wizardTheme}
-                onChange={(event) => setWizardTheme(event.target.value)}
-              />
-              <label style={styles.label}>モード</label>
-              <select
-                data-testid="wizard-mode-select"
-                style={styles.input}
-                value={wizardMode}
-                onChange={(event) =>
-                  setWizardMode(event.target.value as AutomationMode)
-                }
-              >
-                {Object.entries(automationModeLabels).map(([mode, label]) => (
-                  <option key={mode} value={mode}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              {wizardMode === "custom" ? (
-                <div style={styles.checkGrid} data-testid="wizard-custom-steps">
-                  {workflowSteps.map((stepName) => (
-                    <label key={stepName} style={styles.checkItem}>
-                      <input
-                        type="checkbox"
-                        checked={customSkipSteps.includes(stepName)}
-                        onChange={(event) => {
-                          setCustomSkipSteps((current) =>
-                            event.target.checked
-                              ? [...new Set([...current, stepName])]
-                              : current.filter((step) => step !== stepName),
-                          );
-                        }}
-                      />
-                      <span>{workflowStepLabels[stepName]}</span>
-                      <small>skip</small>
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-              <label style={styles.label}>テンプレート</label>
-              <select
-                style={styles.input}
-                value={wizardTemplateId}
-                onChange={(event) => {
-                  const templateId = event.target.value;
-                  setWizardTemplateId(templateId);
-                  const template = templates.find(
-                    (candidate) => candidate.id === templateId,
-                  );
-                  if (template?.automationProfile) {
-                    setWizardMode(template.automationProfile.mode);
-                    setCustomSkipSteps(
-                      template.automationProfile.skipSteps ?? [],
-                    );
-                  }
-                }}
-              >
-                <option value="">なし</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                style={styles.primaryButton}
-                data-testid="wizard-create-button"
-                onClick={() => void runUiAction(createProject)}
-              >
-                作成
-              </button>
-            </section>
-          ) : null}
-
-          {activeScreen === "project" ? (
-            <section style={styles.panel} data-testid="screen-project">
-              <h2 style={styles.panelTitle}>プロジェクト詳細</h2>
-              {!projectDetail ? (
-                <div>プロジェクトを選択してください</div>
-              ) : null}
-              {projectDetail ? (
-                <>
-                  <div style={styles.cardGrid}>
-                    <InfoCard
-                      label="テーマ"
-                      value={projectDetail.project.theme ?? "未設定"}
-                    />
-                    <InfoCard
-                      label="ステータス"
-                      value={formatStatus(projectDetail.project.status)}
-                    />
-                    <InfoCard
-                      label="ジョブ数"
-                      value={String(projectDetail.jobs.length)}
-                    />
-                  </div>
-                  <button
-                    style={styles.primaryButton}
-                    onClick={() => void runUiAction(createRenderJob)}
-                  >
-                    {projectDetail.jobs.length === 0
-                      ? "この設定で生成"
-                      : "同じ設定で再実行"}
-                  </button>
-                  <h3 style={styles.subTitle}>ジョブ履歴</h3>
-                  {projectDetail.jobs.map((job) => (
-                    <div key={job.id} style={styles.jobCard}>
-                      <strong>{job.id}</strong>
-                      <div>{formatStatus(job.status)}</div>
-                      <div style={styles.stepWrap}>
-                        {job.steps.map((step) => {
-                          const stepName = step.stepName as WorkflowStepName;
-                          const label =
-                            workflowStepLabels[stepName] ?? step.stepName;
-                          return (
-                            <span
-                              key={`${job.id}-${step.stepName}`}
-                              style={styles.stepBadge}
-                            >
-                              {label}: {formatStatus(step.status)}
-                              <button
-                                style={styles.inlineButton}
-                                onClick={() =>
-                                  void runUiAction(() =>
-                                    createRenderJobFromStep(stepName),
-                                  )
-                                }
-                              >
-                                ここから
-                              </button>
-                              <button
-                                style={styles.inlineButton}
-                                onClick={() =>
-                                  void runUiAction(() =>
-                                    createRenderJobSkippingStep(stepName),
-                                  )
-                                }
-                              >
-                                skip
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {job.files.length > 0 ? (
-                        <div style={styles.fileGrid}>
-                          {job.files.map((file) => (
-                            <a
-                              key={file.id}
-                              style={styles.fileLink}
-                              href={buildJobFileUrl(job.id, file.id)}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {file.fileCategory}/{file.fileType}:{" "}
-                              {file.relativePath.split("/").at(-1)}
-                            </a>
-                          ))}
-                        </div>
+            {activeScreen === "dashboard" ? (
+              <div style={styles.screenStack} data-testid="screen-dashboard">
+                <section style={styles.welcomePanel} className="welcome-panel">
+                  <div style={styles.welcomeCopy}>
+                    <span style={styles.eyebrow}>
+                      はじめてでも、5つのステップで完成
+                    </span>
+                    <h2 style={styles.welcomeTitle}>
+                      解説したいテーマを、動画にしよう。
+                    </h2>
+                    <p style={styles.leadText}>
+                      難しい設定はあと回しで大丈夫です。まずテーマを入力すると、台本・音声・字幕・映像の下書きを自動で作れます。
+                    </p>
+                    <div style={styles.actionBar}>
+                      <button
+                        style={styles.primaryButtonLarge}
+                        data-testid="dashboard-create-button"
+                        onClick={() => navigateToScreen("wizard")}
+                      >
+                        ＋ 新しい動画を作る
+                      </button>
+                      {selectedProject ? (
+                        <button
+                          style={styles.secondaryButton}
+                          onClick={() =>
+                            navigateToScreen(recommendedAction.screen)
+                          }
+                        >
+                          {recommendedAction.label}
+                        </button>
                       ) : null}
                     </div>
-                  ))}
-                  <h3 style={styles.subTitle}>ログ</h3>
-                  <pre style={styles.logBox}>
-                    {(projectDetail.logs ?? []).join("\n")}
-                  </pre>
-                </>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeScreen === "script" ? (
-            <section style={styles.panel} data-testid="screen-script">
-              <h2 style={styles.panelTitle}>台本編集</h2>
-              <label style={styles.label}>タイトル</label>
-              <input
-                data-testid="script-title-input"
-                style={styles.input}
-                value={scriptDraft.title ?? ""}
-                onChange={(event) =>
-                  setScriptDraft({ ...scriptDraft, title: event.target.value })
-                }
-              />
-              <label style={styles.label}>テーマ</label>
-              <input
-                data-testid="script-theme-input"
-                style={styles.input}
-                value={scriptDraft.theme ?? ""}
-                onChange={(event) =>
-                  setScriptDraft({ ...scriptDraft, theme: event.target.value })
-                }
-              />
-              <h3 style={styles.subTitle}>セリフ</h3>
-              {scriptDraft.lines.map((line, index) => (
-                <div key={`line-${index}`} style={styles.lineRow}>
-                  <input
-                    data-testid={`script-line-speaker-${index}`}
-                    style={styles.inputSmall}
-                    value={line.speaker}
-                    onChange={(event) => {
-                      const lines = [...scriptDraft.lines];
-                      lines[index] = { ...line, speaker: event.target.value };
-                      setScriptDraft({ ...scriptDraft, lines });
-                    }}
-                  />
-                  <input
-                    data-testid={`script-line-text-${index}`}
-                    style={styles.input}
-                    value={line.text}
-                    onChange={(event) => {
-                      const lines = [...scriptDraft.lines];
-                      lines[index] = { ...line, text: event.target.value };
-                      setScriptDraft({ ...scriptDraft, lines });
-                    }}
-                  />
-                </div>
-              ))}
-              <button
-                style={styles.secondaryButton}
-                data-testid="script-add-line-button"
-                onClick={() =>
-                  setScriptDraft({
-                    ...scriptDraft,
-                    lines: [
-                      ...scriptDraft.lines,
-                      { speaker: "reimu", text: "" },
-                    ],
-                  })
-                }
-              >
-                行を追加
-              </button>
-              <button
-                style={styles.primaryButton}
-                data-testid="script-save-button"
-                onClick={() => void runUiAction(saveScript)}
-              >
-                保存
-              </button>
-            </section>
-          ) : null}
-
-          {activeScreen === "assets" ? (
-            <section style={styles.panel} data-testid="screen-assets">
-              <h2 style={styles.panelTitle}>素材管理</h2>
-              <div style={styles.lineRow}>
-                <select
-                  data-testid="asset-type-select"
-                  style={styles.inputSmall}
-                  value={assetForm.type}
-                  onChange={(event) =>
-                    setAssetForm({ ...assetForm, type: event.target.value })
-                  }
-                >
-                  <option value="image">image</option>
-                  <option value="audio">audio</option>
-                  <option value="video">video</option>
-                  <option value="subtitle">subtitle</option>
-                </select>
-                <select
-                  data-testid="asset-usage-select"
-                  style={styles.inputSmall}
-                  value={assetForm.usage}
-                  onChange={(event) =>
-                    setAssetForm({ ...assetForm, usage: event.target.value })
-                  }
-                >
-                  <option value="background">背景</option>
-                  <option value="character">立ち絵</option>
-                  <option value="bgm">BGM</option>
-                  <option value="se">SE</option>
-                  <option value="reference">参考素材</option>
-                  <option value="other">その他</option>
-                </select>
-                <input
-                  data-testid="asset-name-input"
-                  style={styles.inputSmall}
-                  placeholder="表示名"
-                  value={assetForm.name}
-                  onChange={(event) =>
-                    setAssetForm({ ...assetForm, name: event.target.value })
-                  }
-                />
-                <input
-                  data-testid="asset-file-input"
-                  style={styles.input}
-                  type="file"
-                  onChange={(event) =>
-                    setAssetUploadFile(event.target.files?.[0] ?? null)
-                  }
-                />
-                <input
-                  data-testid="asset-path-input"
-                  style={styles.input}
-                  placeholder="既存relativePath"
-                  value={assetForm.relativePath}
-                  onChange={(event) =>
-                    setAssetForm({
-                      ...assetForm,
-                      relativePath: event.target.value,
-                    })
-                  }
-                />
-                <button
-                  style={styles.secondaryButton}
-                  data-testid="asset-add-button"
-                  onClick={() => void runUiAction(addAsset)}
-                >
-                  登録
-                </button>
-              </div>
-              <div style={styles.list} data-testid="asset-list">
-                {assets.map((asset) => (
-                  <div key={asset.id} style={styles.assetRow}>
-                    {selectedProjectId && asset.type === "image" ? (
-                      <img
-                        src={`/api/projects/${selectedProjectId}/assets/${asset.id}/file`}
-                        alt={asset.name}
-                        style={styles.assetThumb}
-                      />
-                    ) : null}
-                    <strong>{asset.name}</strong>
-                    <span>
-                      {asset.type} / {asset.usage ?? "other"}
-                    </span>
-                    <small>{asset.relativePath}</small>
                   </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {activeScreen === "timeline" ? (
-            <section style={styles.panel} data-testid="screen-timeline">
-              <h2 style={styles.panelTitle}>タイムライン編集</h2>
-              {!timelineDraft ? (
-                <div>台本保存後にタイムラインを読み込めます。</div>
-              ) : null}
-              {timelineDraft ? (
-                <>
-                  <div style={styles.actionBar}>
-                    <button
-                      style={styles.secondaryButton}
-                      disabled={timelinePast.length === 0}
-                      onClick={undoTimeline}
-                    >
-                      元に戻す
-                    </button>
-                    <button
-                      style={styles.secondaryButton}
-                      disabled={timelineFuture.length === 0}
-                      onClick={redoTimeline}
-                    >
-                      やり直す
-                    </button>
-                    <span style={styles.stepBadge}>
-                      {timelineDirty ? "未保存の変更あり" : "保存済み"}
-                    </span>
-                  </div>
-                  <div style={styles.timelineHeroGrid}>
-                    <div
-                      style={styles.previewCard}
-                      data-testid="timeline-edit-summary"
-                    >
-                      <div>
-                        字幕クリップ:{" "}
-                        {
-                          summarizeTimelineDraft(timelineDraft)
-                            .subtitleClipCount
-                        }
-                      </div>
-                      <div>
-                        音声クリップ:{" "}
-                        {summarizeTimelineDraft(timelineDraft).audioClipCount}
-                      </div>
-                      <div>
-                        マーカー:{" "}
-                        {summarizeTimelineDraft(timelineDraft).markerCount}
-                      </div>
-                      {timelineViewport ? (
-                        <div>
-                          表示窓:{" "}
-                          {formatTimelineTime(timelineViewport.viewportStartMs)}{" "}
-                          - {formatTimelineTime(timelineViewport.viewportEndMs)}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div style={styles.previewCard}>
-                      <div style={styles.lineRow}>
-                        <label style={styles.labelInline}>in</label>
-                        <input
-                          data-testid="timeline-in-input"
-                          style={styles.inputSmall}
-                          type="number"
-                          value={timelineDraft.playbackRange.inMs}
-                          onChange={(event) =>
-                            mutateTimelineDraft((current) => ({
-                              ...current,
-                              playbackRange: {
-                                inMs: clampNonNegativeInt(
-                                  Number(event.target.value),
-                                ),
-                                outMs: Math.max(
-                                  clampNonNegativeInt(
-                                    Number(event.target.value),
-                                  ),
-                                  current.playbackRange.outMs,
-                                ),
-                              },
-                            }))
-                          }
-                        />
-                        <label style={styles.labelInline}>out</label>
-                        <input
-                          data-testid="timeline-out-input"
-                          style={styles.inputSmall}
-                          type="number"
-                          value={timelineDraft.playbackRange.outMs}
-                          onChange={(event) =>
-                            mutateTimelineDraft((current) => ({
-                              ...current,
-                              playbackRange: {
-                                inMs: current.playbackRange.inMs,
-                                outMs: Math.max(
-                                  current.playbackRange.inMs,
-                                  clampNonNegativeInt(
-                                    Number(event.target.value),
-                                  ),
-                                ),
-                              },
-                            }))
-                          }
-                        />
-                      </div>
-                      <div style={styles.lineRow}>
-                        <label style={styles.labelInline}>playhead</label>
-                        <input
-                          data-testid="timeline-playhead-input"
-                          style={styles.slider}
-                          type="range"
-                          min={timelineDraft.playbackRange.inMs}
-                          max={timelineDraft.playbackRange.outMs}
-                          value={
-                            timelineViewport?.clampedPlayheadMs ??
-                            timelineDraft.playbackRange.inMs
-                          }
-                          onChange={(event) =>
-                            setTimelinePlayheadMs(Number(event.target.value))
-                          }
-                        />
+                  <ol style={styles.quickSteps} aria-label="動画制作の流れ">
+                    {primaryWorkflowNavigation.map((item) => (
+                      <li key={item.screen} style={styles.quickStep}>
+                        <span style={styles.quickStepNumber}>{item.step}</span>
                         <span>
-                          {formatTimelineTime(
-                            timelineViewport?.clampedPlayheadMs ?? 0,
-                          )}
+                          <strong>{item.label}</strong>
+                          <small>{item.description}</small>
                         </span>
-                      </div>
-                      <div style={styles.lineRow}>
-                        <label style={styles.labelInline}>zoom</label>
-                        <input
-                          data-testid="timeline-zoom-input"
-                          style={styles.slider}
-                          type="range"
-                          min={1200}
-                          max={Math.max(
-                            1200,
-                            timelineDraft.playbackRange.outMs -
-                              timelineDraft.playbackRange.inMs,
-                          )}
-                          value={Math.min(
-                            timelineZoomWindowMs,
-                            Math.max(
-                              1200,
-                              timelineDraft.playbackRange.outMs -
-                                timelineDraft.playbackRange.inMs,
-                            ),
-                          )}
-                          onChange={(event) =>
-                            setTimelineZoomWindowMs(Number(event.target.value))
-                          }
-                        />
-                        <span>{formatTimelineTime(timelineZoomWindowMs)}</span>
-                      </div>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+
+                <section style={styles.panel}>
+                  <div style={styles.sectionHeadingRow}>
+                    <div>
+                      <span style={styles.eyebrow}>最近の動画</span>
+                      <h2 style={styles.panelTitle}>続きから編集する</h2>
                     </div>
-                  </div>
-                  <div style={styles.timelineWorkspace}>
-                    <div
-                      style={styles.timelineVisualPanel}
-                      data-testid="timeline-visual-editor"
+                    <button
+                      style={styles.quietButton}
+                      onClick={() => void runUiAction(refreshDashboard)}
                     >
-                      <div style={styles.timelineRuler}>
-                        {timelineTicks.map((tickMs) => (
-                          <div
-                            key={`tick-${tickMs}`}
-                            style={{
-                              ...styles.timelineTick,
-                              left: `${(
-                                ((tickMs -
-                                  (timelineViewport?.viewportStartMs ?? 0)) /
-                                  (timelineViewport?.viewportDurationMs ?? 1)) *
-                                100
-                              ).toFixed(3)}%`,
-                            }}
-                          >
-                            <span style={styles.timelineTickLabel}>
-                              {formatTimelineTime(tickMs)}
-                            </span>
-                          </div>
-                        ))}
-                        {timelineViewport
-                          ? timelineDraft.markers
-                              .filter(
-                                (marker) =>
-                                  marker.timeMs >=
-                                    timelineViewport.viewportStartMs &&
-                                  marker.timeMs <=
-                                    timelineViewport.viewportEndMs,
-                              )
-                              .map((marker) => (
-                                <div
-                                  key={marker.id}
-                                  style={{
-                                    ...styles.timelineMarkerLine,
-                                    left: `${(
-                                      ((marker.timeMs -
-                                        timelineViewport.viewportStartMs) /
-                                        timelineViewport.viewportDurationMs) *
-                                      100
-                                    ).toFixed(3)}%`,
-                                  }}
-                                  title={`${marker.label} ${marker.timeMs}ms`}
-                                />
-                              ))
-                          : null}
-                        {timelineViewport ? (
-                          <div
-                            style={{
-                              ...styles.timelinePlayheadLine,
-                              left: `${(
-                                ((timelineViewport.clampedPlayheadMs -
-                                  timelineViewport.viewportStartMs) /
-                                  timelineViewport.viewportDurationMs) *
-                                100
-                              ).toFixed(3)}%`,
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                      {timelineDraft.tracks.map((track) => {
-                        const accent = getTrackAccent(track.type);
-                        return (
-                          <div
-                            key={`visual-${track.id}`}
-                            style={styles.timelineLane}
-                          >
-                            <div style={styles.timelineLaneHeader}>
-                              <strong>{track.name}</strong>
-                              <small>{track.type}</small>
-                            </div>
-                            <div
-                              style={styles.timelineLaneCanvas}
-                              onDragOver={(event) => event.preventDefault()}
-                              onDrop={(event) =>
-                                handleTimelineDrop(event, track.id)
+                      ↻ 最新の状態に更新
+                    </button>
+                  </div>
+                  <div style={styles.metricStrip} aria-label="プロジェクト状況">
+                    <span>動画 {dashboardStats.projectCount}本</span>
+                    <span>生成中 {dashboardStats.runningJobCount}本</span>
+                    {dashboardStats.failedJobCount > 0 ? (
+                      <span style={styles.dangerText}>
+                        要確認 {dashboardStats.failedJobCount}本
+                      </span>
+                    ) : (
+                      <span>エラーなし</span>
+                    )}
+                  </div>
+                  {projects.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <span style={styles.emptyStateIcon} aria-hidden="true">
+                        🎬
+                      </span>
+                      <strong>まだ動画がありません</strong>
+                      <span>最初はテーマをひとつ決めるだけで大丈夫です。</span>
+                      <button
+                        style={styles.primaryButton}
+                        onClick={() => navigateToScreen("wizard")}
+                      >
+                        最初の動画を作る
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={styles.projectGrid}>
+                      {projects.map((project) => (
+                        <button
+                          key={project.id}
+                          style={styles.projectCard}
+                          onClick={() => {
+                            void runUiAction(() =>
+                              loadProjectDetail(project.id),
+                            );
+                            setActiveScreen("project");
+                          }}
+                          aria-label={`${project.theme ?? "テーマ未設定"}を開く`}
+                        >
+                          <span style={styles.projectCardTop}>
+                            <span
+                              style={styles.statusPill}
+                              data-status={
+                                project.latestJob?.status ?? project.status
                               }
                             >
-                              {timelineViewport ? (
-                                <div
-                                  style={{
-                                    ...styles.timelinePlayheadLine,
-                                    left: `${(
-                                      ((timelineViewport.clampedPlayheadMs -
-                                        timelineViewport.viewportStartMs) /
-                                        timelineViewport.viewportDurationMs) *
-                                      100
-                                    ).toFixed(3)}%`,
-                                  }}
-                                />
-                              ) : null}
-                              {track.clips.map((clip) => {
-                                const layout = timelineViewport
-                                  ? getVisibleClipLayout(clip, timelineViewport)
-                                  : null;
-                                if (!layout) {
-                                  return null;
-                                }
-                                const isSelected =
-                                  selectedTimelineClip?.trackId === track.id &&
-                                  selectedTimelineClip?.clipId === clip.id;
+                              {formatStatus(
+                                project.latestJob?.status ?? project.status,
+                              )}
+                            </span>
+                            <small>
+                              {formatUpdatedAt(project.updatedAt)} 更新
+                            </small>
+                          </span>
+                          <strong style={styles.projectCardTitle}>
+                            {project.theme ?? "テーマ未設定"}
+                          </strong>
+                          <span style={styles.projectCardAction}>
+                            編集を続ける →
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            ) : null}
+
+            {activeScreen === "wizard" ? (
+              <section style={styles.panel} data-testid="screen-wizard">
+                <ScreenIntro
+                  step="STEP 1"
+                  title="どんな動画を作りますか？"
+                  description="テーマと作り方を選びます。細かな設定や素材は、あとからいつでも変更できます。"
+                />
+                <div style={styles.formSection}>
+                  <label style={styles.fieldLabel} htmlFor="wizard-theme">
+                    <strong>解説したいテーマ</strong>
+                    <span>短い言葉でも、具体的な依頼でも構いません。</span>
+                  </label>
+                  <input
+                    id="wizard-theme"
+                    data-testid="wizard-theme-input"
+                    style={styles.inputLarge}
+                    value={wizardTheme}
+                    placeholder="例：本能寺の変を5分でわかりやすく解説"
+                    onChange={(event) => setWizardTheme(event.target.value)}
+                  />
+                </div>
+                <div style={styles.formSection}>
+                  <label style={styles.fieldLabel} htmlFor="wizard-mode">
+                    <strong>どこまで自動で作りますか？</strong>
+                    <span>迷ったら「全自動」がおすすめです。</span>
+                  </label>
+                  <select
+                    id="wizard-mode"
+                    data-testid="wizard-mode-select"
+                    style={styles.input}
+                    value={wizardMode}
+                    onChange={(event) =>
+                      setWizardMode(event.target.value as AutomationMode)
+                    }
+                  >
+                    {Object.entries(automationModeLabels).map(
+                      ([mode, label]) => (
+                        <option key={mode} value={mode}>
+                          {label}
+                          {mode === "full" ? "（おすすめ）" : ""}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                  <div style={styles.choiceExplanation}>
+                    <strong>{automationModeLabels[wizardMode]}</strong>
+                    <span>{automationModeDescriptions[wizardMode]}</span>
+                  </div>
+                </div>
+                {wizardMode === "custom" ? (
+                  <details style={styles.advancedDetails} open>
+                    <summary>自動化する工程を細かく選ぶ</summary>
+                    <p style={styles.helpText}>
+                      チェックした工程は今回の生成でスキップします。
+                    </p>
+                    <div
+                      style={styles.checkGrid}
+                      data-testid="wizard-custom-steps"
+                    >
+                      {workflowSteps.map((stepName) => (
+                        <label key={stepName} style={styles.checkItem}>
+                          <input
+                            type="checkbox"
+                            checked={customSkipSteps.includes(stepName)}
+                            onChange={(event) => {
+                              setCustomSkipSteps((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, stepName])]
+                                  : current.filter((step) => step !== stepName),
+                              );
+                            }}
+                          />
+                          <span>{workflowStepLabels[stepName]}</span>
+                          <small>省略</small>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+                <details style={styles.advancedDetails}>
+                  <summary>以前の設定やテンプレートを使う（任意）</summary>
+                  <label style={styles.label}>テンプレート</label>
+                  <select
+                    style={styles.input}
+                    value={wizardTemplateId}
+                    onChange={(event) => {
+                      const templateId = event.target.value;
+                      setWizardTemplateId(templateId);
+                      const template = templates.find(
+                        (candidate) => candidate.id === templateId,
+                      );
+                      if (template?.automationProfile) {
+                        setWizardMode(template.automationProfile.mode);
+                        setCustomSkipSteps(
+                          template.automationProfile.skipSteps ?? [],
+                        );
+                      }
+                    }}
+                  >
+                    <option value="">使わない</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                </details>
+                <button
+                  style={styles.primaryButtonLarge}
+                  data-testid="wizard-create-button"
+                  onClick={() => void runUiAction(createProject)}
+                  disabled={!wizardTheme.trim()}
+                >
+                  この内容で制作を始める →
+                </button>
+              </section>
+            ) : null}
+
+            {activeScreen === "project" ? (
+              <section style={styles.panel} data-testid="screen-project">
+                <ScreenIntro
+                  step="動画の概要"
+                  title={
+                    projectDetail?.project.theme ?? "動画を選択してください"
+                  }
+                  description="現在の状態と、次におすすめの操作をまとめています。細かな再実行やログは下部の詳細から確認できます。"
+                />
+                {!projectDetail ? (
+                  <div style={styles.emptyState}>
+                    <strong>編集する動画が選ばれていません</strong>
+                    <span>ホームから続きの動画を選んでください。</span>
+                    <button
+                      style={styles.primaryButton}
+                      onClick={() => navigateToScreen("dashboard")}
+                    >
+                      ホームへ戻る
+                    </button>
+                  </div>
+                ) : null}
+                {projectDetail ? (
+                  <>
+                    <div style={styles.projectOverviewGrid}>
+                      <div style={styles.nextActionCard}>
+                        <span style={styles.eyebrow}>次におすすめ</span>
+                        <strong style={styles.nextActionTitle}>
+                          {recommendedAction.label}
+                        </strong>
+                        <span>{recommendedAction.description}</span>
+                        {hasRunningJob ? (
+                          <div style={styles.runningIndicator}>
+                            <span />{" "}
+                            動画を生成しています。画面は自動更新されます。
+                          </div>
+                        ) : (
+                          <button
+                            style={styles.primaryButton}
+                            onClick={() =>
+                              navigateToScreen(recommendedAction.screen)
+                            }
+                          >
+                            {recommendedAction.label} →
+                          </button>
+                        )}
+                      </div>
+                      <div style={styles.progressCard}>
+                        <span style={styles.eyebrow}>制作状況</span>
+                        <strong>
+                          {formatStatus(
+                            projectDetail.jobs[0]?.status ??
+                              projectDetail.project.status,
+                          )}
+                        </strong>
+                        <div
+                          style={styles.progressTrack}
+                          aria-label="工程の進捗"
+                        >
+                          <span
+                            style={{
+                              ...styles.progressFill,
+                              width: `${Math.round(((projectDetail.jobs[0]?.steps.filter((step) => ["COMPLETED", "SKIPPED"].includes(step.status)).length ?? 0) / Math.max(1, workflowSteps.length)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <small>
+                          {projectDetail.jobs[0]?.steps.filter((step) =>
+                            ["COMPLETED", "SKIPPED"].includes(step.status),
+                          ).length ?? 0}
+                          / {workflowSteps.length} 工程
+                        </small>
+                      </div>
+                    </div>
+                    <div style={styles.actionBar}>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => navigateToScreen("script")}
+                      >
+                        台本を編集
+                      </button>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => navigateToScreen("timeline")}
+                      >
+                        タイミングを調整
+                      </button>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => navigateToScreen("preview")}
+                      >
+                        動画を確認
+                      </button>
+                    </div>
+                    <details style={styles.advancedDetails}>
+                      <summary>再実行・工程・成果物の詳細</summary>
+                      <div style={styles.advancedContent}>
+                        <button
+                          style={styles.secondaryButton}
+                          onClick={() => void runUiAction(createRenderJob)}
+                        >
+                          同じ設定でもう一度生成
+                        </button>
+                        {projectDetail.jobs.map((job, jobIndex) => (
+                          <details
+                            key={job.id}
+                            style={styles.jobCard}
+                            open={jobIndex === 0}
+                          >
+                            <summary>
+                              実行 {projectDetail.jobs.length - jobIndex} ·{" "}
+                              {formatStatus(job.status)} ·{" "}
+                              {formatUpdatedAt(job.createdAt)}
+                            </summary>
+                            <div style={styles.stepList}>
+                              {job.steps.map((step) => {
+                                const stepName =
+                                  step.stepName as WorkflowStepName;
+                                const label =
+                                  workflowStepLabels[stepName] ?? step.stepName;
                                 return (
-                                  <button
-                                    key={clip.id}
-                                    type="button"
-                                    data-testid={`timeline-clip-block-${track.id}-${clip.id}`}
-                                    draggable
-                                    onDragStart={(event) =>
-                                      handleTimelineClipDragStart(
-                                        event,
-                                        track.id,
-                                        clip.id,
-                                        clip.durationMs,
-                                      )
-                                    }
-                                    onClick={() =>
-                                      selectTimelineClip(track.id, clip.id)
-                                    }
-                                    style={{
-                                      ...styles.timelineClipBlock,
-                                      left: `${layout.leftPercent}%`,
-                                      width: `${layout.widthPercent}%`,
-                                      background: accent.solid,
-                                      boxShadow: isSelected
-                                        ? `0 0 0 2px rgba(255,255,255,0.88), 0 14px 26px ${accent.glow}`
-                                        : `0 10px 22px ${accent.glow}`,
-                                      opacity:
-                                        layout.trimmedLeft ||
-                                        layout.trimmedRight
-                                          ? 0.85
-                                          : 1,
-                                    }}
-                                    title={`${clip.id} ${clip.startMs}ms - ${clip.startMs + clip.durationMs}ms`}
+                                  <div
+                                    key={`${job.id}-${step.stepName}`}
+                                    style={styles.stepRow}
                                   >
-                                    <span style={styles.timelineClipTitle}>
-                                      {clip.id}
+                                    <span>
+                                      <strong>{label}</strong>
+                                      <small>{formatStatus(step.status)}</small>
                                     </span>
-                                    <span style={styles.timelineClipSubtitle}>
-                                      {clip.text ?? clip.assetType}
+                                    <span style={styles.stepActions}>
+                                      <button
+                                        style={styles.inlineButton}
+                                        onClick={() =>
+                                          void runUiAction(() =>
+                                            createRenderJobFromStep(stepName),
+                                          )
+                                        }
+                                      >
+                                        ここからやり直す
+                                      </button>
+                                      <button
+                                        style={styles.inlineButton}
+                                        onClick={() =>
+                                          void runUiAction(() =>
+                                            createRenderJobSkippingStep(
+                                              stepName,
+                                            ),
+                                          )
+                                        }
+                                      >
+                                        今回は省略
+                                      </button>
                                     </span>
-                                  </button>
+                                  </div>
                                 );
                               })}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <aside
-                      style={styles.timelineInspector}
-                      data-testid="timeline-selected-clip"
-                    >
-                      <div style={styles.timelineInspectorHeader}>
-                        選択中クリップ
-                      </div>
-                      {selectedClipDetail ? (
-                        <>
-                          <strong>
-                            {selectedClipDetail.track.name} /{" "}
-                            {selectedClipDetail.clip.id}
-                          </strong>
-                          <small>
-                            {selectedClipDetail.clip.startMs}ms -{" "}
-                            {selectedClipDetail.clip.startMs +
-                              selectedClipDetail.clip.durationMs}
-                            ms
-                          </small>
-                          <div style={styles.stepWrap}>
-                            <span style={styles.stepBadge}>
-                              {selectedClipDetail.track.type}
-                            </span>
-                            {selectedClipDetail.clip.style ? (
-                              <span style={styles.stepBadge}>
-                                {selectedClipDetail.clip.style}
-                              </span>
+                            {job.files.length > 0 ? (
+                              <details style={styles.nestedDetails}>
+                                <summary>
+                                  生成ファイル {job.files.length}件
+                                </summary>
+                                <div style={styles.fileGrid}>
+                                  {job.files.map((file) => (
+                                    <a
+                                      key={file.id}
+                                      style={styles.fileLink}
+                                      href={buildJobFileUrl(job.id, file.id)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      {file.relativePath.split("/").at(-1)}
+                                    </a>
+                                  ))}
+                                </div>
+                              </details>
                             ) : null}
-                          </div>
-                          <div style={styles.lineRow}>
-                            <button
-                              style={styles.secondaryButton}
-                              data-testid="timeline-split-button"
-                              onClick={splitSelectedTimelineClip}
-                            >
-                              プレイヘッドで分割
-                            </button>
-                            <button
-                              style={styles.secondaryButton}
-                              onClick={() => nudgeSelectedTimelineClip(-100)}
-                            >
-                              -100ms
-                            </button>
-                            <button
-                              style={styles.secondaryButton}
-                              onClick={() => nudgeSelectedTimelineClip(100)}
-                            >
-                              +100ms
-                            </button>
-                          </div>
-                          <div style={styles.lineRow}>
-                            <button
-                              style={styles.secondaryButton}
-                              onClick={duplicateSelectedTimelineClip}
-                            >
-                              複製
-                            </button>
-                            <button
-                              style={styles.secondaryButton}
-                              onClick={deleteSelectedTimelineClip}
-                            >
-                              削除
-                            </button>
-                          </div>
-                          <label style={styles.label}>開始位置</label>
-                          <input
-                            style={styles.inputSmall}
-                            type="number"
-                            value={selectedClipDetail.clip.startMs}
-                            onChange={(event) =>
-                              mutateTimelineDraft((current) =>
-                                updateTimelineClipLocal(
-                                  current,
-                                  selectedClipDetail.track.id,
-                                  selectedClipDetail.clip.id,
-                                  {
-                                    startMs: Number(event.target.value),
-                                  },
-                                ),
-                              )
-                            }
-                          />
-                          <label style={styles.label}>長さ</label>
-                          <input
-                            style={styles.inputSmall}
-                            type="number"
-                            value={selectedClipDetail.clip.durationMs}
-                            onChange={(event) =>
-                              mutateTimelineDraft((current) =>
-                                updateTimelineClipLocal(
-                                  current,
-                                  selectedClipDetail.track.id,
-                                  selectedClipDetail.clip.id,
-                                  {
-                                    durationMs: Number(event.target.value),
-                                  },
-                                ),
-                              )
-                            }
-                          />
-                          {selectedClipDetail.track.type === "subtitle" ? (
-                            <>
-                              <label style={styles.label}>字幕本文</label>
-                              <input
-                                style={styles.input}
-                                data-testid={`timeline-text-${selectedClipDetail.clip.id}`}
-                                value={selectedClipDetail.clip.text ?? ""}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      selectedClipDetail.track.id,
-                                      selectedClipDetail.clip.id,
-                                      {
-                                        text: event.target.value,
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                              <label style={styles.label}>スタイル</label>
-                              <input
-                                style={styles.inputSmall}
-                                value={selectedClipDetail.clip.style ?? ""}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      selectedClipDetail.track.id,
-                                      selectedClipDetail.clip.id,
-                                      {
-                                        style: event.target.value,
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                            </>
-                          ) : null}
-                          {selectedClipDetail.track.type === "audio" ||
-                          selectedClipDetail.track.type === "bgm" ? (
-                            <>
-                              <label style={styles.label}>音量</label>
-                              <input
-                                style={styles.inputSmall}
-                                type="number"
-                                step="0.1"
-                                value={selectedClipDetail.clip.volume ?? 1}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      selectedClipDetail.track.id,
-                                      selectedClipDetail.clip.id,
-                                      {
-                                        volume: Number(event.target.value),
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                              <div style={styles.lineRow}>
-                                <div style={styles.compactField}>
-                                  <label style={styles.labelInline}>
-                                    fade in
-                                  </label>
-                                  <input
-                                    style={styles.inputSmall}
-                                    type="number"
-                                    value={
-                                      selectedClipDetail.clip.fadeInMs ?? 0
-                                    }
-                                    onChange={(event) =>
-                                      mutateTimelineDraft((current) =>
-                                        updateTimelineClipLocal(
-                                          current,
-                                          selectedClipDetail.track.id,
-                                          selectedClipDetail.clip.id,
-                                          {
-                                            fadeInMs: Number(
-                                              event.target.value,
-                                            ),
-                                          },
-                                        ),
-                                      )
-                                    }
-                                  />
-                                </div>
-                                <div style={styles.compactField}>
-                                  <label style={styles.labelInline}>
-                                    fade out
-                                  </label>
-                                  <input
-                                    style={styles.inputSmall}
-                                    type="number"
-                                    value={
-                                      selectedClipDetail.clip.fadeOutMs ?? 0
-                                    }
-                                    onChange={(event) =>
-                                      mutateTimelineDraft((current) =>
-                                        updateTimelineClipLocal(
-                                          current,
-                                          selectedClipDetail.track.id,
-                                          selectedClipDetail.clip.id,
-                                          {
-                                            fadeOutMs: Number(
-                                              event.target.value,
-                                            ),
-                                          },
-                                        ),
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            </>
-                          ) : null}
-                        </>
-                      ) : (
-                        <div>
-                          レーン上のクリップをクリックすると詳細編集できます。
-                        </div>
-                      )}
-                    </aside>
+                          </details>
+                        ))}
+                      </div>
+                    </details>
+                    <details style={styles.advancedDetails}>
+                      <summary>トラブル調査用ログ</summary>
+                      <pre style={styles.logBox}>
+                        {(projectDetail.logs ?? []).join("\n")}
+                      </pre>
+                    </details>
+                  </>
+                ) : null}
+              </section>
+            ) : null}
+
+            {activeScreen === "script" ? (
+              <section style={styles.panel} data-testid="screen-script">
+                <ScreenIntro
+                  step="STEP 2"
+                  title="台本を読みやすく整える"
+                  description="自動生成された内容を確認し、話し言葉として自然になるように直します。話者名とセリフは行ごとに編集できます。"
+                />
+                <label style={styles.fieldLabel}>
+                  <strong>動画タイトル</strong>
+                  <span>視聴者に内容がひと目で伝わる名前にします。</span>
+                </label>
+                <input
+                  data-testid="script-title-input"
+                  style={styles.input}
+                  value={scriptDraft.title ?? ""}
+                  onChange={(event) =>
+                    setScriptDraft({
+                      ...scriptDraft,
+                      title: event.target.value,
+                    })
+                  }
+                />
+                <label style={styles.fieldLabel}>
+                  <strong>動画のテーマ</strong>
+                  <span>台本を作るときの中心となる話題です。</span>
+                </label>
+                <input
+                  data-testid="script-theme-input"
+                  style={styles.input}
+                  value={scriptDraft.theme ?? ""}
+                  onChange={(event) =>
+                    setScriptDraft({
+                      ...scriptDraft,
+                      theme: event.target.value,
+                    })
+                  }
+                />
+                <h3 style={styles.subTitle}>会話の内容</h3>
+                {scriptDraft.lines.map((line, index) => (
+                  <div key={`line-${index}`} style={styles.dialogueCard}>
+                    <span style={styles.dialogueNumber}>{index + 1}</span>
+                    <label style={styles.compactField}>
+                      <span style={styles.labelInline}>話すキャラクター</span>
+                      <select
+                        data-testid={`script-line-speaker-${index}`}
+                        style={styles.inputSmall}
+                        value={line.speaker}
+                        onChange={(event) => {
+                          const lines = [...scriptDraft.lines];
+                          lines[index] = {
+                            ...line,
+                            speaker: event.target.value,
+                          };
+                          setScriptDraft({ ...scriptDraft, lines });
+                        }}
+                      >
+                        <option value="reimu">霊夢</option>
+                        <option value="marisa">魔理沙</option>
+                        {!["reimu", "marisa"].includes(line.speaker) ? (
+                          <option value={line.speaker}>{line.speaker}</option>
+                        ) : null}
+                      </select>
+                    </label>
+                    <label
+                      style={{ ...styles.compactField, flex: "1 1 420px" }}
+                    >
+                      <span style={styles.labelInline}>セリフ</span>
+                      <textarea
+                        data-testid={`script-line-text-${index}`}
+                        style={{
+                          ...styles.input,
+                          minHeight: 72,
+                          resize: "vertical",
+                        }}
+                        value={line.text}
+                        onChange={(event) => {
+                          const lines = [...scriptDraft.lines];
+                          lines[index] = { ...line, text: event.target.value };
+                          setScriptDraft({ ...scriptDraft, lines });
+                        }}
+                      />
+                    </label>
                   </div>
-                  <div style={styles.timelineUtilityGrid}>
-                    <div style={styles.timelineUtilityCard}>
-                      <div style={styles.lineRow}>
-                        <input
-                          data-testid="timeline-manual-subtitle-input"
-                          style={styles.input}
-                          placeholder="手動テロップ本文"
-                          value={manualSubtitleText}
-                          onChange={(event) =>
-                            setManualSubtitleText(event.target.value)
-                          }
-                        />
-                        <button
-                          style={styles.secondaryButton}
-                          data-testid="timeline-add-subtitle-button"
-                          onClick={addManualSubtitle}
-                        >
-                          手動テロップ追加
-                        </button>
-                      </div>
+                ))}
+                <button
+                  style={styles.secondaryButton}
+                  data-testid="script-add-line-button"
+                  onClick={() =>
+                    setScriptDraft({
+                      ...scriptDraft,
+                      lines: [
+                        ...scriptDraft.lines,
+                        { speaker: "reimu", text: "" },
+                      ],
+                    })
+                  }
+                >
+                  ＋ セリフを追加
+                </button>
+                <div style={styles.stickyActionBar}>
+                  <span>変更内容を保存して、次の素材選びへ進みます。</span>
+                  <button
+                    style={styles.primaryButton}
+                    data-testid="script-save-button"
+                    onClick={() => void runUiAction(saveScriptAndContinue)}
+                  >
+                    保存して素材へ進む →
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {activeScreen === "assets" ? (
+              <section style={styles.panel} data-testid="screen-assets">
+                <ScreenIntro
+                  step="STEP 3"
+                  title="使いたい画像や音を追加する"
+                  description="背景、立ち絵、BGMなどを追加できます。素材がなくても自動生成できるので、この工程はそのまま次へ進んでも大丈夫です。"
+                />
+                <div style={styles.lineRow}>
+                  <select
+                    data-testid="asset-type-select"
+                    style={styles.inputSmall}
+                    value={assetForm.type}
+                    onChange={(event) =>
+                      setAssetForm({ ...assetForm, type: event.target.value })
+                    }
+                  >
+                    <option value="image">画像</option>
+                    <option value="audio">音声</option>
+                    <option value="video">動画</option>
+                    <option value="subtitle">字幕</option>
+                  </select>
+                  <select
+                    data-testid="asset-usage-select"
+                    style={styles.inputSmall}
+                    value={assetForm.usage}
+                    onChange={(event) =>
+                      setAssetForm({ ...assetForm, usage: event.target.value })
+                    }
+                  >
+                    <option value="background">背景</option>
+                    <option value="character">立ち絵</option>
+                    <option value="bgm">BGM</option>
+                    <option value="se">SE</option>
+                    <option value="reference">参考素材</option>
+                    <option value="other">その他</option>
+                  </select>
+                  <input
+                    data-testid="asset-name-input"
+                    style={styles.inputSmall}
+                    placeholder="表示名"
+                    value={assetForm.name}
+                    onChange={(event) =>
+                      setAssetForm({ ...assetForm, name: event.target.value })
+                    }
+                  />
+                  <input
+                    data-testid="asset-file-input"
+                    style={styles.input}
+                    type="file"
+                    onChange={(event) =>
+                      setAssetUploadFile(event.target.files?.[0] ?? null)
+                    }
+                  />
+                  <button
+                    style={styles.secondaryButton}
+                    data-testid="asset-add-button"
+                    onClick={() => void runUiAction(addAsset)}
+                  >
+                    素材を追加
+                  </button>
+                </div>
+                <details style={styles.advancedDetails}>
+                  <summary>
+                    すでにプロジェクト内にあるファイルを指定する
+                  </summary>
+                  <input
+                    data-testid="asset-path-input"
+                    style={styles.input}
+                    placeholder="例：projects/.../input/assets/background.png"
+                    value={assetForm.relativePath}
+                    onChange={(event) =>
+                      setAssetForm({
+                        ...assetForm,
+                        relativePath: event.target.value,
+                      })
+                    }
+                  />
+                </details>
+                <div style={styles.list} data-testid="asset-list">
+                  {assets.length === 0 ? (
+                    <div style={styles.emptyStateCompact}>
+                      追加済みの素材はありません。自動生成を使う場合は、このまま次へ進めます。
                     </div>
-                    <div style={styles.timelineUtilityCard}>
-                      <div style={styles.lineRow}>
-                        <input
-                          data-testid="timeline-marker-label-input"
-                          style={styles.inputSmall}
-                          placeholder="マーカー名"
-                          value={manualMarkerLabel}
-                          onChange={(event) =>
-                            setManualMarkerLabel(event.target.value)
-                          }
+                  ) : null}
+                  {assets.map((asset) => (
+                    <div key={asset.id} style={styles.assetRow}>
+                      {selectedProjectId && asset.type === "image" ? (
+                        <img
+                          src={`/api/projects/${selectedProjectId}/assets/${asset.id}/file`}
+                          alt={asset.name}
+                          style={styles.assetThumb}
                         />
-                        <input
-                          data-testid="timeline-marker-time-input"
-                          style={styles.inputSmall}
-                          type="number"
-                          placeholder="timeMs"
-                          value={manualMarkerTimeMs}
-                          onChange={(event) =>
-                            setManualMarkerTimeMs(event.target.value)
-                          }
-                        />
-                        <button
-                          style={styles.secondaryButton}
-                          data-testid="timeline-add-marker-button"
-                          onClick={addTimelineMarker}
-                        >
-                          マーカー追加
-                        </button>
-                      </div>
-                      {timelineDraft.markers.length > 0 ? (
-                        <div style={styles.stepWrap}>
-                          {timelineDraft.markers.map((marker) => (
-                            <span key={marker.id} style={styles.stepBadge}>
-                              {marker.label}: {marker.timeMs}ms
-                            </span>
-                          ))}
-                        </div>
                       ) : null}
+                      <strong>{asset.name}</strong>
+                      <span>
+                        {assetTypeLabels[asset.type] ?? asset.type} /{" "}
+                        {assetUsageLabels[asset.usage ?? "other"] ??
+                          asset.usage ??
+                          "その他"}
+                      </span>
+                      <small>{asset.relativePath}</small>
                     </div>
-                  </div>
-                  {timelineDraft.tracks.map((track) => (
-                    <div key={track.id} style={styles.timelineTrack}>
-                      <h3 style={styles.subTitle}>{track.name} 詳細一覧</h3>
-                      {track.clips.map((clip) => (
-                        <div key={clip.id} style={styles.clipEditor}>
-                          <div style={styles.lineRow}>
-                            <strong>{clip.id}</strong>
-                            <button
-                              style={styles.secondaryButton}
-                              data-testid={`timeline-duplicate-${track.id}-${clip.id}`}
-                              onClick={() => {
-                                mutateTimelineDraft((current) =>
-                                  duplicateTimelineClipLocal(
-                                    current,
-                                    track.id,
-                                    clip.id,
-                                  ),
-                                );
-                                setSelectedTimelineClip({
-                                  trackId: track.id,
-                                  clipId: predictNextDuplicateClipId(
-                                    track.clips,
-                                    clip.id,
-                                  ),
-                                });
-                              }}
-                            >
-                              複製
-                            </button>
-                            <button
-                              style={styles.secondaryButton}
-                              data-testid={`timeline-delete-${track.id}-${clip.id}`}
-                              onClick={() => {
-                                if (
-                                  !window.confirm(
-                                    `クリップ「${clip.id}」を削除しますか？`,
-                                  )
-                                )
-                                  return;
-                                mutateTimelineDraft((current) =>
-                                  deleteTimelineClipLocal(
-                                    current,
-                                    track.id,
-                                    clip.id,
-                                  ),
-                                );
-                                if (
-                                  selectedTimelineClip?.trackId === track.id &&
-                                  selectedTimelineClip?.clipId === clip.id
-                                ) {
-                                  setSelectedTimelineClip(null);
-                                }
-                              }}
-                            >
-                              削除
-                            </button>
-                            <button
-                              style={styles.secondaryButton}
-                              onClick={() =>
-                                selectTimelineClip(track.id, clip.id)
-                              }
-                            >
-                              選択
-                            </button>
+                  ))}
+                </div>
+                <div style={styles.stickyActionBar}>
+                  <span>
+                    {assets.length > 0
+                      ? `${assets.length}件の素材を使用します。`
+                      : "素材は自動生成されます。"}
+                  </span>
+                  <button
+                    style={styles.primaryButton}
+                    onClick={() => navigateToScreen("timeline")}
+                  >
+                    編集へ進む →
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {activeScreen === "timeline" ? (
+              <section style={styles.panel} data-testid="screen-timeline">
+                <ScreenIntro
+                  step="STEP 4"
+                  title="タイミングと見せ方を調整する"
+                  description="字幕や音声の位置を見ながら、必要なところだけ調整します。自動生成のままでよければ、保存して確認へ進んでください。"
+                />
+                {!timelineDraft ? (
+                  <div>台本保存後にタイムラインを読み込めます。</div>
+                ) : null}
+                {timelineDraft ? (
+                  <>
+                    <div style={styles.actionBar}>
+                      <button
+                        style={styles.secondaryButton}
+                        disabled={timelinePast.length === 0}
+                        onClick={undoTimeline}
+                      >
+                        元に戻す
+                      </button>
+                      <button
+                        style={styles.secondaryButton}
+                        disabled={timelineFuture.length === 0}
+                        onClick={redoTimeline}
+                      >
+                        やり直す
+                      </button>
+                      <span style={styles.stepBadge}>
+                        {timelineDirty ? "未保存の変更あり" : "保存済み"}
+                      </span>
+                    </div>
+                    <div style={styles.timelineHeroGrid}>
+                      <div
+                        style={styles.previewCard}
+                        data-testid="timeline-edit-summary"
+                      >
+                        <div>
+                          字幕クリップ:{" "}
+                          {
+                            summarizeTimelineDraft(timelineDraft)
+                              .subtitleClipCount
+                          }
+                        </div>
+                        <div>
+                          音声クリップ:{" "}
+                          {summarizeTimelineDraft(timelineDraft).audioClipCount}
+                        </div>
+                        <div>
+                          マーカー:{" "}
+                          {summarizeTimelineDraft(timelineDraft).markerCount}
+                        </div>
+                        {timelineViewport ? (
+                          <div>
+                            表示窓:{" "}
+                            {formatTimelineTime(
+                              timelineViewport.viewportStartMs,
+                            )}{" "}
+                            -{" "}
+                            {formatTimelineTime(timelineViewport.viewportEndMs)}
                           </div>
-                          <div style={styles.sliderRow}>
-                            <span>開始</span>
+                        ) : null}
+                      </div>
+                      <div style={styles.previewCard}>
+                        <div style={styles.lineRow}>
+                          <label style={styles.labelInline}>in</label>
+                          <input
+                            data-testid="timeline-in-input"
+                            style={styles.inputSmall}
+                            type="number"
+                            value={timelineDraft.playbackRange.inMs}
+                            onChange={(event) =>
+                              mutateTimelineDraft((current) => ({
+                                ...current,
+                                playbackRange: {
+                                  inMs: clampNonNegativeInt(
+                                    Number(event.target.value),
+                                  ),
+                                  outMs: Math.max(
+                                    clampNonNegativeInt(
+                                      Number(event.target.value),
+                                    ),
+                                    current.playbackRange.outMs,
+                                  ),
+                                },
+                              }))
+                            }
+                          />
+                          <label style={styles.labelInline}>out</label>
+                          <input
+                            data-testid="timeline-out-input"
+                            style={styles.inputSmall}
+                            type="number"
+                            value={timelineDraft.playbackRange.outMs}
+                            onChange={(event) =>
+                              mutateTimelineDraft((current) => ({
+                                ...current,
+                                playbackRange: {
+                                  inMs: current.playbackRange.inMs,
+                                  outMs: Math.max(
+                                    current.playbackRange.inMs,
+                                    clampNonNegativeInt(
+                                      Number(event.target.value),
+                                    ),
+                                  ),
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div style={styles.lineRow}>
+                          <label style={styles.labelInline}>playhead</label>
+                          <input
+                            data-testid="timeline-playhead-input"
+                            style={styles.slider}
+                            type="range"
+                            min={timelineDraft.playbackRange.inMs}
+                            max={timelineDraft.playbackRange.outMs}
+                            value={
+                              timelineViewport?.clampedPlayheadMs ??
+                              timelineDraft.playbackRange.inMs
+                            }
+                            onChange={(event) =>
+                              setTimelinePlayheadMs(Number(event.target.value))
+                            }
+                          />
+                          <span>
+                            {formatTimelineTime(
+                              timelineViewport?.clampedPlayheadMs ?? 0,
+                            )}
+                          </span>
+                        </div>
+                        <div style={styles.lineRow}>
+                          <label style={styles.labelInline}>zoom</label>
+                          <input
+                            data-testid="timeline-zoom-input"
+                            style={styles.slider}
+                            type="range"
+                            min={1200}
+                            max={Math.max(
+                              1200,
+                              timelineDraft.playbackRange.outMs -
+                                timelineDraft.playbackRange.inMs,
+                            )}
+                            value={Math.min(
+                              timelineZoomWindowMs,
+                              Math.max(
+                                1200,
+                                timelineDraft.playbackRange.outMs -
+                                  timelineDraft.playbackRange.inMs,
+                              ),
+                            )}
+                            onChange={(event) =>
+                              setTimelineZoomWindowMs(
+                                Number(event.target.value),
+                              )
+                            }
+                          />
+                          <span>
+                            {formatTimelineTime(timelineZoomWindowMs)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.timelineWorkspace}>
+                      <div
+                        style={styles.timelineVisualPanel}
+                        data-testid="timeline-visual-editor"
+                      >
+                        <div style={styles.timelineRuler}>
+                          {timelineTicks.map((tickMs) => (
+                            <div
+                              key={`tick-${tickMs}`}
+                              style={{
+                                ...styles.timelineTick,
+                                left: `${(
+                                  ((tickMs -
+                                    (timelineViewport?.viewportStartMs ?? 0)) /
+                                    (timelineViewport?.viewportDurationMs ??
+                                      1)) *
+                                  100
+                                ).toFixed(3)}%`,
+                              }}
+                            >
+                              <span style={styles.timelineTickLabel}>
+                                {formatTimelineTime(tickMs)}
+                              </span>
+                            </div>
+                          ))}
+                          {timelineViewport
+                            ? timelineDraft.markers
+                                .filter(
+                                  (marker) =>
+                                    marker.timeMs >=
+                                      timelineViewport.viewportStartMs &&
+                                    marker.timeMs <=
+                                      timelineViewport.viewportEndMs,
+                                )
+                                .map((marker) => (
+                                  <div
+                                    key={marker.id}
+                                    style={{
+                                      ...styles.timelineMarkerLine,
+                                      left: `${(
+                                        ((marker.timeMs -
+                                          timelineViewport.viewportStartMs) /
+                                          timelineViewport.viewportDurationMs) *
+                                        100
+                                      ).toFixed(3)}%`,
+                                    }}
+                                    title={`${marker.label} ${marker.timeMs}ms`}
+                                  />
+                                ))
+                            : null}
+                          {timelineViewport ? (
+                            <div
+                              style={{
+                                ...styles.timelinePlayheadLine,
+                                left: `${(
+                                  ((timelineViewport.clampedPlayheadMs -
+                                    timelineViewport.viewportStartMs) /
+                                    timelineViewport.viewportDurationMs) *
+                                  100
+                                ).toFixed(3)}%`,
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        {timelineDraft.tracks.map((track) => {
+                          const accent = getTrackAccent(track.type);
+                          return (
+                            <div
+                              key={`visual-${track.id}`}
+                              style={styles.timelineLane}
+                            >
+                              <div style={styles.timelineLaneHeader}>
+                                <strong>{track.name}</strong>
+                                <small>{track.type}</small>
+                              </div>
+                              <div
+                                style={styles.timelineLaneCanvas}
+                                onDragOver={(event) => event.preventDefault()}
+                                onDrop={(event) =>
+                                  handleTimelineDrop(event, track.id)
+                                }
+                              >
+                                {timelineViewport ? (
+                                  <div
+                                    style={{
+                                      ...styles.timelinePlayheadLine,
+                                      left: `${(
+                                        ((timelineViewport.clampedPlayheadMs -
+                                          timelineViewport.viewportStartMs) /
+                                          timelineViewport.viewportDurationMs) *
+                                        100
+                                      ).toFixed(3)}%`,
+                                    }}
+                                  />
+                                ) : null}
+                                {track.clips.map((clip) => {
+                                  const layout = timelineViewport
+                                    ? getVisibleClipLayout(
+                                        clip,
+                                        timelineViewport,
+                                      )
+                                    : null;
+                                  if (!layout) {
+                                    return null;
+                                  }
+                                  const isSelected =
+                                    selectedTimelineClip?.trackId ===
+                                      track.id &&
+                                    selectedTimelineClip?.clipId === clip.id;
+                                  return (
+                                    <button
+                                      key={clip.id}
+                                      type="button"
+                                      data-testid={`timeline-clip-block-${track.id}-${clip.id}`}
+                                      draggable
+                                      onDragStart={(event) =>
+                                        handleTimelineClipDragStart(
+                                          event,
+                                          track.id,
+                                          clip.id,
+                                          clip.durationMs,
+                                        )
+                                      }
+                                      onClick={() =>
+                                        selectTimelineClip(track.id, clip.id)
+                                      }
+                                      style={{
+                                        ...styles.timelineClipBlock,
+                                        left: `${layout.leftPercent}%`,
+                                        width: `${layout.widthPercent}%`,
+                                        background: accent.solid,
+                                        boxShadow: isSelected
+                                          ? `0 0 0 2px rgba(255,255,255,0.88), 0 14px 26px ${accent.glow}`
+                                          : `0 10px 22px ${accent.glow}`,
+                                        opacity:
+                                          layout.trimmedLeft ||
+                                          layout.trimmedRight
+                                            ? 0.85
+                                            : 1,
+                                      }}
+                                      title={`${clip.id} ${clip.startMs}ms - ${clip.startMs + clip.durationMs}ms`}
+                                    >
+                                      <span style={styles.timelineClipTitle}>
+                                        {clip.id}
+                                      </span>
+                                      <span style={styles.timelineClipSubtitle}>
+                                        {clip.text ?? clip.assetType}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <aside
+                        style={styles.timelineInspector}
+                        data-testid="timeline-selected-clip"
+                      >
+                        <div style={styles.timelineInspectorHeader}>
+                          選択中クリップ
+                        </div>
+                        {selectedClipDetail ? (
+                          <>
+                            <strong>
+                              {selectedClipDetail.track.name} /{" "}
+                              {selectedClipDetail.clip.id}
+                            </strong>
+                            <small>
+                              {selectedClipDetail.clip.startMs}ms -{" "}
+                              {selectedClipDetail.clip.startMs +
+                                selectedClipDetail.clip.durationMs}
+                              ms
+                            </small>
+                            <div style={styles.stepWrap}>
+                              <span style={styles.stepBadge}>
+                                {selectedClipDetail.track.type}
+                              </span>
+                              {selectedClipDetail.clip.style ? (
+                                <span style={styles.stepBadge}>
+                                  {selectedClipDetail.clip.style}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div style={styles.lineRow}>
+                              <button
+                                style={styles.secondaryButton}
+                                data-testid="timeline-split-button"
+                                onClick={splitSelectedTimelineClip}
+                              >
+                                プレイヘッドで分割
+                              </button>
+                              <button
+                                style={styles.secondaryButton}
+                                onClick={() => nudgeSelectedTimelineClip(-100)}
+                              >
+                                -100ms
+                              </button>
+                              <button
+                                style={styles.secondaryButton}
+                                onClick={() => nudgeSelectedTimelineClip(100)}
+                              >
+                                +100ms
+                              </button>
+                            </div>
+                            <div style={styles.lineRow}>
+                              <button
+                                style={styles.secondaryButton}
+                                onClick={duplicateSelectedTimelineClip}
+                              >
+                                複製
+                              </button>
+                              <button
+                                style={styles.secondaryButton}
+                                onClick={deleteSelectedTimelineClip}
+                              >
+                                削除
+                              </button>
+                            </div>
+                            <label style={styles.label}>開始位置</label>
                             <input
-                              style={styles.slider}
-                              type="range"
-                              min={0}
-                              max={Math.max(
-                                12000,
-                                timelineDraft.playbackRange.outMs + 1000,
-                              )}
-                              value={clip.startMs}
+                              style={styles.inputSmall}
+                              type="number"
+                              value={selectedClipDetail.clip.startMs}
                               onChange={(event) =>
                                 mutateTimelineDraft((current) =>
                                   updateTimelineClipLocal(
                                     current,
-                                    track.id,
-                                    clip.id,
+                                    selectedClipDetail.track.id,
+                                    selectedClipDetail.clip.id,
                                     {
                                       startMs: Number(event.target.value),
                                     },
@@ -1899,22 +2059,17 @@ export function App() {
                                 )
                               }
                             />
-                            <span>{clip.startMs}ms</span>
-                          </div>
-                          <div style={styles.sliderRow}>
-                            <span>長さ</span>
+                            <label style={styles.label}>長さ</label>
                             <input
-                              style={styles.slider}
-                              type="range"
-                              min={100}
-                              max={15000}
-                              value={clip.durationMs}
+                              style={styles.inputSmall}
+                              type="number"
+                              value={selectedClipDetail.clip.durationMs}
                               onChange={(event) =>
                                 mutateTimelineDraft((current) =>
                                   updateTimelineClipLocal(
                                     current,
-                                    track.id,
-                                    clip.id,
+                                    selectedClipDetail.track.id,
+                                    selectedClipDetail.clip.id,
                                     {
                                       durationMs: Number(event.target.value),
                                     },
@@ -1922,324 +2077,642 @@ export function App() {
                                 )
                               }
                             />
-                            <span>{clip.durationMs}ms</span>
+                            {selectedClipDetail.track.type === "subtitle" ? (
+                              <>
+                                <label style={styles.label}>字幕本文</label>
+                                <input
+                                  style={styles.input}
+                                  data-testid={`timeline-text-${selectedClipDetail.clip.id}`}
+                                  value={selectedClipDetail.clip.text ?? ""}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        selectedClipDetail.track.id,
+                                        selectedClipDetail.clip.id,
+                                        {
+                                          text: event.target.value,
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                                <label style={styles.label}>スタイル</label>
+                                <input
+                                  style={styles.inputSmall}
+                                  value={selectedClipDetail.clip.style ?? ""}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        selectedClipDetail.track.id,
+                                        selectedClipDetail.clip.id,
+                                        {
+                                          style: event.target.value,
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                              </>
+                            ) : null}
+                            {selectedClipDetail.track.type === "audio" ||
+                            selectedClipDetail.track.type === "bgm" ? (
+                              <>
+                                <label style={styles.label}>音量</label>
+                                <input
+                                  style={styles.inputSmall}
+                                  type="number"
+                                  step="0.1"
+                                  value={selectedClipDetail.clip.volume ?? 1}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        selectedClipDetail.track.id,
+                                        selectedClipDetail.clip.id,
+                                        {
+                                          volume: Number(event.target.value),
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                                <div style={styles.lineRow}>
+                                  <div style={styles.compactField}>
+                                    <label style={styles.labelInline}>
+                                      fade in
+                                    </label>
+                                    <input
+                                      style={styles.inputSmall}
+                                      type="number"
+                                      value={
+                                        selectedClipDetail.clip.fadeInMs ?? 0
+                                      }
+                                      onChange={(event) =>
+                                        mutateTimelineDraft((current) =>
+                                          updateTimelineClipLocal(
+                                            current,
+                                            selectedClipDetail.track.id,
+                                            selectedClipDetail.clip.id,
+                                            {
+                                              fadeInMs: Number(
+                                                event.target.value,
+                                              ),
+                                            },
+                                          ),
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <div style={styles.compactField}>
+                                    <label style={styles.labelInline}>
+                                      fade out
+                                    </label>
+                                    <input
+                                      style={styles.inputSmall}
+                                      type="number"
+                                      value={
+                                        selectedClipDetail.clip.fadeOutMs ?? 0
+                                      }
+                                      onChange={(event) =>
+                                        mutateTimelineDraft((current) =>
+                                          updateTimelineClipLocal(
+                                            current,
+                                            selectedClipDetail.track.id,
+                                            selectedClipDetail.clip.id,
+                                            {
+                                              fadeOutMs: Number(
+                                                event.target.value,
+                                              ),
+                                            },
+                                          ),
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div>
+                            レーン上のクリップをクリックすると詳細編集できます。
                           </div>
-                          {track.type === "subtitle" ? (
-                            <>
-                              <input
-                                style={styles.input}
-                                data-testid={`timeline-text-${clip.id}`}
-                                value={clip.text ?? ""}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      track.id,
-                                      clip.id,
-                                      {
-                                        text: event.target.value,
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                style={styles.inputSmall}
-                                value={clip.style ?? ""}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      track.id,
-                                      clip.id,
-                                      {
-                                        style: event.target.value,
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                            </>
-                          ) : null}
-                          {track.type === "audio" || track.type === "bgm" ? (
-                            <div style={styles.lineRow}>
-                              <input
-                                style={styles.inputSmall}
-                                type="number"
-                                step="0.1"
-                                value={clip.volume ?? 1}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      track.id,
-                                      clip.id,
-                                      {
-                                        volume: Number(event.target.value),
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                style={styles.inputSmall}
-                                type="number"
-                                value={clip.fadeInMs ?? 0}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      track.id,
-                                      clip.id,
-                                      {
-                                        fadeInMs: Number(event.target.value),
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                              <input
-                                style={styles.inputSmall}
-                                type="number"
-                                value={clip.fadeOutMs ?? 0}
-                                onChange={(event) =>
-                                  mutateTimelineDraft((current) =>
-                                    updateTimelineClipLocal(
-                                      current,
-                                      track.id,
-                                      clip.id,
-                                      {
-                                        fadeOutMs: Number(event.target.value),
-                                      },
-                                    ),
-                                  )
-                                }
-                              />
-                            </div>
-                          ) : null}
-                          {clip.text ? <small>{clip.text}</small> : null}
+                        )}
+                      </aside>
+                    </div>
+                    <div style={styles.timelineUtilityGrid}>
+                      <div style={styles.timelineUtilityCard}>
+                        <div style={styles.lineRow}>
+                          <input
+                            data-testid="timeline-manual-subtitle-input"
+                            style={styles.input}
+                            placeholder="手動テロップ本文"
+                            value={manualSubtitleText}
+                            onChange={(event) =>
+                              setManualSubtitleText(event.target.value)
+                            }
+                          />
+                          <button
+                            style={styles.secondaryButton}
+                            data-testid="timeline-add-subtitle-button"
+                            onClick={addManualSubtitle}
+                          >
+                            手動テロップ追加
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                      <div style={styles.timelineUtilityCard}>
+                        <div style={styles.lineRow}>
+                          <input
+                            data-testid="timeline-marker-label-input"
+                            style={styles.inputSmall}
+                            placeholder="マーカー名"
+                            value={manualMarkerLabel}
+                            onChange={(event) =>
+                              setManualMarkerLabel(event.target.value)
+                            }
+                          />
+                          <input
+                            data-testid="timeline-marker-time-input"
+                            style={styles.inputSmall}
+                            type="number"
+                            placeholder="timeMs"
+                            value={manualMarkerTimeMs}
+                            onChange={(event) =>
+                              setManualMarkerTimeMs(event.target.value)
+                            }
+                          />
+                          <button
+                            style={styles.secondaryButton}
+                            data-testid="timeline-add-marker-button"
+                            onClick={addTimelineMarker}
+                          >
+                            マーカー追加
+                          </button>
+                        </div>
+                        {timelineDraft.markers.length > 0 ? (
+                          <div style={styles.stepWrap}>
+                            {timelineDraft.markers.map((marker) => (
+                              <span key={marker.id} style={styles.stepBadge}>
+                                {marker.label}: {marker.timeMs}ms
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  ))}
-                  <button
-                    style={styles.primaryButton}
-                    data-testid="timeline-save-button"
-                    onClick={() => void runUiAction(saveTimelineAll)}
-                  >
-                    タイムライン保存
-                  </button>
-                  <button
-                    style={styles.secondaryButton}
-                    onClick={() => void runUiAction(createTemplateFromCurrent)}
-                  >
-                    テンプレート化
-                  </button>
-                </>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeScreen === "preview" ? (
-            <section style={styles.panel} data-testid="screen-preview">
-              <h2 style={styles.panelTitle}>プレビュー & レンダリング</h2>
-              <div style={styles.actionBar}>
-                <button
-                  style={styles.secondaryButton}
-                  data-testid="preview-load-button"
-                  onClick={() => void runUiAction(loadPreview)}
-                >
-                  プレビュー情報を取得
-                </button>
-                <button
-                  style={styles.primaryButton}
-                  data-testid="preview-render-button"
-                  onClick={() => void runUiAction(createRenderJob)}
-                >
-                  レンダリング実行
-                </button>
-                {finalVideoUrl ? (
-                  <a
-                    style={styles.downloadButton}
-                    href={finalVideoUrl}
-                    download
-                  >
-                    final.mp4
-                  </a>
-                ) : null}
-              </div>
-              {previewVideoUrl ? (
-                <video
-                  data-testid="preview-video"
-                  ref={previewVideoRef}
-                  style={styles.videoPlayer}
-                  src={previewVideoUrl}
-                  controls
-                  onLoadedMetadata={(event) => {
-                    event.currentTarget.currentTime = timelinePlayheadMs / 1000;
-                  }}
-                  onTimeUpdate={(event) => {
-                    setTimelinePlayheadMs(
-                      Math.round(event.currentTarget.currentTime * 1000),
-                    );
-                  }}
-                />
-              ) : null}
-              {preview ? (
-                <div style={styles.previewCard} data-testid="preview-summary">
-                  <div>
-                    durationInFrames: {preview.remotionProps.durationInFrames}
-                  </div>
-                  <div>durationMs: {preview.remotionProps.durationMs}</div>
-                  {preview.outputPreset ? (
-                    <div>
-                      出力: {preview.outputPreset.width}x
-                      {preview.outputPreset.height} / {preview.outputPreset.fps}
-                      fps
-                    </div>
-                  ) : null}
-                  <div>
-                    字幕クリップ数:{" "}
-                    {preview.remotionProps.subtitleTracks.length}
-                  </div>
-                  <div>
-                    音声クリップ数: {preview.remotionProps.audioTracks.length}
-                  </div>
-                  <div data-testid="preview-manual-summary">
-                    手動編集: 字幕{" "}
-                    {preview.remotionProps.manualEditSummary.subtitleClipCount}{" "}
-                    / 音声{" "}
-                    {preview.remotionProps.manualEditSummary.audioClipCount} /
-                    マーカー{" "}
-                    {preview.remotionProps.manualEditSummary.markerCount} /
-                    トリム{" "}
-                    {preview.remotionProps.manualEditSummary
-                      .playbackRangeApplied
-                      ? "あり"
-                      : "なし"}
-                  </div>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeScreen === "settings" ? (
-            <section style={styles.panel} data-testid="screen-settings">
-              <h2 style={styles.panelTitle}>設定</h2>
-              <div style={styles.actionBar}>
-                <button
-                  style={styles.secondaryButton}
-                  data-testid="settings-diagnostics-button"
-                  onClick={() => void runUiAction(loadSettingsDiagnostics)}
-                >
-                  接続診断
-                </button>
-                {settingsDiagnostics ? (
-                  <>
-                    <span
-                      style={styles.stepBadge}
-                      data-testid="settings-google-status"
+                    {timelineDraft.tracks.map((track) => (
+                      <div key={track.id} style={styles.timelineTrack}>
+                        <h3 style={styles.subTitle}>{track.name} 詳細一覧</h3>
+                        {track.clips.map((clip) => (
+                          <div key={clip.id} style={styles.clipEditor}>
+                            <div style={styles.lineRow}>
+                              <strong>{clip.id}</strong>
+                              <button
+                                style={styles.secondaryButton}
+                                data-testid={`timeline-duplicate-${track.id}-${clip.id}`}
+                                onClick={() => {
+                                  mutateTimelineDraft((current) =>
+                                    duplicateTimelineClipLocal(
+                                      current,
+                                      track.id,
+                                      clip.id,
+                                    ),
+                                  );
+                                  setSelectedTimelineClip({
+                                    trackId: track.id,
+                                    clipId: predictNextDuplicateClipId(
+                                      track.clips,
+                                      clip.id,
+                                    ),
+                                  });
+                                }}
+                              >
+                                複製
+                              </button>
+                              <button
+                                style={styles.secondaryButton}
+                                data-testid={`timeline-delete-${track.id}-${clip.id}`}
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `クリップ「${clip.id}」を削除しますか？`,
+                                    )
+                                  )
+                                    return;
+                                  mutateTimelineDraft((current) =>
+                                    deleteTimelineClipLocal(
+                                      current,
+                                      track.id,
+                                      clip.id,
+                                    ),
+                                  );
+                                  if (
+                                    selectedTimelineClip?.trackId ===
+                                      track.id &&
+                                    selectedTimelineClip?.clipId === clip.id
+                                  ) {
+                                    setSelectedTimelineClip(null);
+                                  }
+                                }}
+                              >
+                                削除
+                              </button>
+                              <button
+                                style={styles.secondaryButton}
+                                onClick={() =>
+                                  selectTimelineClip(track.id, clip.id)
+                                }
+                              >
+                                選択
+                              </button>
+                            </div>
+                            <div style={styles.sliderRow}>
+                              <span>開始</span>
+                              <input
+                                style={styles.slider}
+                                type="range"
+                                min={0}
+                                max={Math.max(
+                                  12000,
+                                  timelineDraft.playbackRange.outMs + 1000,
+                                )}
+                                value={clip.startMs}
+                                onChange={(event) =>
+                                  mutateTimelineDraft((current) =>
+                                    updateTimelineClipLocal(
+                                      current,
+                                      track.id,
+                                      clip.id,
+                                      {
+                                        startMs: Number(event.target.value),
+                                      },
+                                    ),
+                                  )
+                                }
+                              />
+                              <span>{clip.startMs}ms</span>
+                            </div>
+                            <div style={styles.sliderRow}>
+                              <span>長さ</span>
+                              <input
+                                style={styles.slider}
+                                type="range"
+                                min={100}
+                                max={15000}
+                                value={clip.durationMs}
+                                onChange={(event) =>
+                                  mutateTimelineDraft((current) =>
+                                    updateTimelineClipLocal(
+                                      current,
+                                      track.id,
+                                      clip.id,
+                                      {
+                                        durationMs: Number(event.target.value),
+                                      },
+                                    ),
+                                  )
+                                }
+                              />
+                              <span>{clip.durationMs}ms</span>
+                            </div>
+                            {track.type === "subtitle" ? (
+                              <>
+                                <input
+                                  style={styles.input}
+                                  data-testid={`timeline-text-${clip.id}`}
+                                  value={clip.text ?? ""}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        track.id,
+                                        clip.id,
+                                        {
+                                          text: event.target.value,
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                                <input
+                                  style={styles.inputSmall}
+                                  value={clip.style ?? ""}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        track.id,
+                                        clip.id,
+                                        {
+                                          style: event.target.value,
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                              </>
+                            ) : null}
+                            {track.type === "audio" || track.type === "bgm" ? (
+                              <div style={styles.lineRow}>
+                                <input
+                                  style={styles.inputSmall}
+                                  type="number"
+                                  step="0.1"
+                                  value={clip.volume ?? 1}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        track.id,
+                                        clip.id,
+                                        {
+                                          volume: Number(event.target.value),
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                                <input
+                                  style={styles.inputSmall}
+                                  type="number"
+                                  value={clip.fadeInMs ?? 0}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        track.id,
+                                        clip.id,
+                                        {
+                                          fadeInMs: Number(event.target.value),
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                                <input
+                                  style={styles.inputSmall}
+                                  type="number"
+                                  value={clip.fadeOutMs ?? 0}
+                                  onChange={(event) =>
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        track.id,
+                                        clip.id,
+                                        {
+                                          fadeOutMs: Number(event.target.value),
+                                        },
+                                      ),
+                                    )
+                                  }
+                                />
+                              </div>
+                            ) : null}
+                            {clip.text ? <small>{clip.text}</small> : null}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    <button
+                      style={styles.primaryButton}
+                      data-testid="timeline-save-button"
+                      onClick={() =>
+                        void runUiAction(async () => {
+                          await saveTimelineAll();
+                          setActiveScreen("preview");
+                        })
+                      }
                     >
-                      Gemini:{" "}
-                      {settingsDiagnostics.googleApiKey.configured
-                        ? "設定済み"
-                        : "未設定"}
-                    </span>
-                    <span
-                      style={styles.stepBadge}
-                      data-testid="settings-aivis-status"
+                      保存して動画確認へ →
+                    </button>
+                    <button
+                      style={styles.secondaryButton}
+                      onClick={() =>
+                        void runUiAction(createTemplateFromCurrent)
+                      }
                     >
-                      Aivis:{" "}
-                      {settingsDiagnostics.aivisSpeech.reachable
-                        ? "接続OK"
-                        : settingsDiagnostics.aivisSpeech.configured
-                          ? "未接続"
-                          : "未設定"}
-                    </span>
+                      テンプレート化
+                    </button>
                   </>
                 ) : null}
-              </div>
-              <div style={styles.lineRow}>
-                <label style={styles.labelInline}>Width</label>
-                <input
-                  data-testid="settings-width-input"
-                  style={styles.inputSmall}
-                  type="number"
-                  value={settings.outputPreset.width}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      outputPreset: {
-                        ...settings.outputPreset,
-                        width: Number(event.target.value),
-                      },
-                    })
-                  }
+              </section>
+            ) : null}
+
+            {activeScreen === "preview" ? (
+              <section style={styles.panel} data-testid="screen-preview">
+                <ScreenIntro
+                  step="STEP 5"
+                  title="動画を確認して完成版を書き出す"
+                  description="プレビューで内容を確認し、問題がなければ完成動画を生成します。生成には数分かかることがあります。"
                 />
-                <label style={styles.labelInline}>Height</label>
-                <input
-                  data-testid="settings-height-input"
-                  style={styles.inputSmall}
-                  type="number"
-                  value={settings.outputPreset.height}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      outputPreset: {
-                        ...settings.outputPreset,
-                        height: Number(event.target.value),
-                      },
-                    })
-                  }
+                <div style={styles.actionBar}>
+                  <button
+                    style={styles.secondaryButton}
+                    data-testid="preview-load-button"
+                    onClick={() => void runUiAction(loadPreview)}
+                  >
+                    内容を更新
+                  </button>
+                  <button
+                    style={styles.primaryButton}
+                    data-testid="preview-render-button"
+                    onClick={() => void runUiAction(createRenderJob)}
+                  >
+                    完成動画を生成
+                  </button>
+                  {finalVideoUrl ? (
+                    <a
+                      style={styles.downloadButton}
+                      href={finalVideoUrl}
+                      download
+                    >
+                      完成動画をダウンロード
+                    </a>
+                  ) : null}
+                </div>
+                {previewVideoUrl ? (
+                  <video
+                    data-testid="preview-video"
+                    ref={previewVideoRef}
+                    style={styles.videoPlayer}
+                    src={previewVideoUrl}
+                    controls
+                    onLoadedMetadata={(event) => {
+                      event.currentTarget.currentTime =
+                        timelinePlayheadMs / 1000;
+                    }}
+                    onTimeUpdate={(event) => {
+                      setTimelinePlayheadMs(
+                        Math.round(event.currentTarget.currentTime * 1000),
+                      );
+                    }}
+                  />
+                ) : null}
+                {preview ? (
+                  <div style={styles.previewCard} data-testid="preview-summary">
+                    <strong>今回の動画</strong>
+                    <div>
+                      長さ:{" "}
+                      {formatTimelineTime(preview.remotionProps.durationMs)}
+                    </div>
+                    {preview.outputPreset ? (
+                      <div>
+                        出力: {preview.outputPreset.width}x
+                        {preview.outputPreset.height} /{" "}
+                        {preview.outputPreset.fps}
+                        fps
+                      </div>
+                    ) : null}
+                    <div>
+                      字幕 {preview.remotionProps.subtitleTracks.length}件 /
+                      音声 {preview.remotionProps.audioTracks.length}件
+                    </div>
+                    <div data-testid="preview-manual-summary">
+                      手動編集: 字幕{" "}
+                      {
+                        preview.remotionProps.manualEditSummary
+                          .subtitleClipCount
+                      }{" "}
+                      / 音声{" "}
+                      {preview.remotionProps.manualEditSummary.audioClipCount} /
+                      マーカー{" "}
+                      {preview.remotionProps.manualEditSummary.markerCount} /
+                      トリム{" "}
+                      {preview.remotionProps.manualEditSummary
+                        .playbackRangeApplied
+                        ? "あり"
+                        : "なし"}
+                    </div>
+                    <details style={styles.nestedDetails}>
+                      <summary>技術情報</summary>
+                      <div>
+                        durationInFrames:{" "}
+                        {preview.remotionProps.durationInFrames}
+                      </div>
+                      <div>durationMs: {preview.remotionProps.durationMs}</div>
+                    </details>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {activeScreen === "settings" ? (
+              <section style={styles.panel} data-testid="screen-settings">
+                <ScreenIntro
+                  step="アプリ設定"
+                  title="アプリの設定"
+                  description="外部サービスとの接続状態と、動画の出力サイズを確認できます。通常は初期値のままで利用できます。"
                 />
-                <label style={styles.labelInline}>FPS</label>
-                <input
-                  data-testid="settings-fps-input"
-                  style={styles.inputSmall}
-                  type="number"
-                  value={settings.outputPreset.fps}
-                  onChange={(event) =>
-                    setSettings({
-                      ...settings,
-                      outputPreset: {
-                        ...settings.outputPreset,
-                        fps: Number(event.target.value),
-                      },
-                    })
-                  }
-                />
-              </div>
-              <button
-                style={styles.primaryButton}
-                data-testid="settings-save-button"
-                onClick={() => void runUiAction(saveSettings)}
-              >
-                保存
-              </button>
-            </section>
-          ) : null}
-        </fieldset>
-      </main>
+                <div style={styles.actionBar}>
+                  <button
+                    style={styles.secondaryButton}
+                    data-testid="settings-diagnostics-button"
+                    onClick={() => void runUiAction(loadSettingsDiagnostics)}
+                  >
+                    接続診断
+                  </button>
+                  {settingsDiagnostics ? (
+                    <>
+                      <span
+                        style={styles.stepBadge}
+                        data-testid="settings-google-status"
+                      >
+                        Gemini:{" "}
+                        {settingsDiagnostics.googleApiKey.configured
+                          ? "設定済み"
+                          : "未設定"}
+                      </span>
+                      <span
+                        style={styles.stepBadge}
+                        data-testid="settings-aivis-status"
+                      >
+                        Aivis:{" "}
+                        {settingsDiagnostics.aivisSpeech.reachable
+                          ? "接続OK"
+                          : settingsDiagnostics.aivisSpeech.configured
+                            ? "未接続"
+                            : "未設定"}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+                <div style={styles.lineRow}>
+                  <label style={styles.labelInline}>Width</label>
+                  <input
+                    data-testid="settings-width-input"
+                    style={styles.inputSmall}
+                    type="number"
+                    value={settings.outputPreset.width}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        outputPreset: {
+                          ...settings.outputPreset,
+                          width: Number(event.target.value),
+                        },
+                      })
+                    }
+                  />
+                  <label style={styles.labelInline}>Height</label>
+                  <input
+                    data-testid="settings-height-input"
+                    style={styles.inputSmall}
+                    type="number"
+                    value={settings.outputPreset.height}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        outputPreset: {
+                          ...settings.outputPreset,
+                          height: Number(event.target.value),
+                        },
+                      })
+                    }
+                  />
+                  <label style={styles.labelInline}>FPS</label>
+                  <input
+                    data-testid="settings-fps-input"
+                    style={styles.inputSmall}
+                    type="number"
+                    value={settings.outputPreset.fps}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        outputPreset: {
+                          ...settings.outputPreset,
+                          fps: Number(event.target.value),
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <button
+                  style={styles.primaryButton}
+                  data-testid="settings-save-button"
+                  onClick={() => void runUiAction(saveSettings)}
+                >
+                  保存
+                </button>
+              </section>
+            ) : null}
+          </fieldset>
+        </main>
+      </div>
     </div>
   );
 }
 
-const Metric: React.FC<{ label: string; value: number }> = ({
-  label,
-  value,
-}) => (
-  <div style={styles.metricCard}>
-    <div>{label}</div>
-    <strong style={styles.metricValue}>{value}</strong>
-  </div>
-);
-
-const InfoCard: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div style={styles.infoCard}>
-    <small>{label}</small>
-    <strong>{value}</strong>
+const ScreenIntro: React.FC<{
+  step: string;
+  title: string;
+  description: string;
+}> = ({ step, title, description }) => (
+  <div style={styles.screenIntro}>
+    <span style={styles.eyebrow}>{step}</span>
+    <h2 style={styles.panelTitle}>{title}</h2>
+    <p style={styles.leadText}>{description}</p>
   </div>
 );

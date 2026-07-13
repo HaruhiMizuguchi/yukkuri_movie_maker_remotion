@@ -65,6 +65,10 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.goto("/");
   await expect(page.getByTestId("screen-dashboard")).toBeVisible();
+  await expect(page.getByTestId("dashboard-create-button")).toContainText(
+    "新しい動画を作る",
+  );
+  await expect(page.getByLabel("動画制作の流れ")).toContainText("確認・出力");
   await visual.capture(page, "01-dashboard", "ダッシュボード", [
     "プロジェクト数・実行中ジョブ・失敗ジョブの状態が確認できる",
     "作成前なのでプロジェクト一覧は空に見える",
@@ -80,7 +84,8 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
 
   await page.getByTestId("wizard-create-button").click();
   await expect(page.getByTestId("screen-project")).toBeVisible();
-  await expect(page.getByTestId("selected-project-id")).toContainText(
+  await expect(page.getByTestId("selected-project-id")).toHaveAttribute(
+    "data-project-id",
     projectId,
   );
   await visual.capture(page, "03-project-created", "プロジェクト詳細", [
@@ -98,7 +103,10 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     .getByTestId("script-line-text-1")
     .fill("編集と確認まで一気に進めるぜ。");
   await page.getByTestId("script-save-button").click();
-  await expect(page.getByRole("status")).toContainText("台本を保存しました");
+  await expect(page.getByTestId("app-message")).toContainText(
+    "台本を保存しました",
+  );
+  await expect(page.getByTestId("screen-assets")).toBeVisible();
   await visual.capture(page, "04-script-saved", "台本編集", [
     "タイトル・テーマ・セリフを編集して保存できる",
     "保存後も入力内容が画面に残る",
@@ -139,9 +147,10 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page.getByTestId("timeline-marker-time-input").fill("4200");
   await page.getByTestId("timeline-add-marker-button").click();
   await page.getByTestId("timeline-save-button").click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.getByTestId("app-message")).toContainText(
     "タイムラインを保存しました",
   );
+  await expect(page.getByTestId("screen-preview")).toBeVisible();
   await visual.capture(page, "06-timeline", "タイムライン編集", [
     "視覚タイムラインからクリップ選択と分割ができる",
     "手動テロップとマーカーを追加して保存できる",
@@ -159,8 +168,8 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "字幕 4",
   );
   await page.getByTestId("preview-render-button").click();
-  await expect(page.getByRole("status")).toContainText(
-    "レンダリングジョブを作成しました",
+  await expect(page.getByTestId("app-message")).toContainText(
+    "完成動画の生成を開始しました",
   );
   await expect(page.getByTestId("preview-summary")).toContainText(
     "durationInFrames",
@@ -179,7 +188,9 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page.getByTestId("settings-width-input").fill("1280");
   await page.getByTestId("settings-height-input").fill("720");
   await page.getByTestId("settings-save-button").click();
-  await expect(page.getByRole("status")).toContainText("設定を保存しました");
+  await expect(page.getByTestId("app-message")).toContainText(
+    "設定を保存しました",
+  );
   await visual.capture(page, "08-settings", "設定", [
     "環境変数ベースのAPI接続状態を確認できる",
     "出力プリセットを保存できる",

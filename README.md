@@ -124,4 +124,6 @@ pnpm test:real  # Gemini/AivisSpeech等を実際に呼ぶため、キー・起�
 
 通常テストと実外部接続テストは分離しています。アップロードはstreaming multipart、動画配信はHTTP Rangeに対応し、プロジェクト設定と入力revisionはJob作成時にsnapshot保存されます。
 
+開発タスクの最終確認では、モックだけで終えず完成動画を最低1本生成します。詳しい完了条件は [docs/testing_policy.md](docs/testing_policy.md) を参照してください。
+
 詳しい説明は `reproduction_kit/` を参照してください。

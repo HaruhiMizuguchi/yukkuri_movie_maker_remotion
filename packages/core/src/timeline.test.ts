@@ -9,6 +9,7 @@ import {
   resizeClip,
   setPlaybackRange,
   splitClip,
+  synchronizeGeneratedTimelineTiming,
   timelineToRemotionProps,
   type TimelineData,
   updateClip,
@@ -56,9 +57,14 @@ const sampleTimeline: TimelineData = {
 
 describe("timeline operations", () => {
   it("クリップを指定位置に移動できる", () => {
-    const updated = moveClip(sampleTimeline, { trackId: "t-audio", clipId: "clip-1", newStartMs: 2200 });
+    const updated = moveClip(sampleTimeline, {
+      trackId: "t-audio",
+      clipId: "clip-1",
+      newStartMs: 2200,
+    });
 
     expect(updated.tracks[0].clips[0].startMs).toBe(2200);
+    expect(updated.tracks[0].clips[0].timingMode).toBe("manual");
   });
 
   it("クリップの長さを変更できる", () => {
@@ -69,10 +75,14 @@ describe("timeline operations", () => {
     });
 
     expect(updated.tracks[0].clips[0].durationMs).toBe(8300);
+    expect(updated.tracks[0].clips[0].timingMode).toBe("manual");
   });
 
   it("再生範囲を設定できる", () => {
-    const updated = setPlaybackRange(sampleTimeline, { inMs: 1000, outMs: 9000 });
+    const updated = setPlaybackRange(sampleTimeline, {
+      inMs: 1000,
+      outMs: 9000,
+    });
 
     expect(updated.playbackRange).toEqual({ inMs: 1000, outMs: 9000 });
   });
@@ -125,7 +135,9 @@ describe("timeline operations", () => {
       clipId: "clip-sub-2",
     });
     expect(deleted.tracks[1].clips).toHaveLength(2);
-    expect(deleted.tracks[1].clips.some((clip) => clip.id === "clip-sub-2")).toBe(false);
+    expect(
+      deleted.tracks[1].clips.some((clip) => clip.id === "clip-sub-2"),
+    ).toBe(false);
   });
 
   it("クリップを指定位置で分割できる", () => {
@@ -269,6 +281,135 @@ describe("timeline operations", () => {
         fadeOutMs: 400,
       },
     ]);
-    expect(remotionProps.markers).toEqual([{ id: "m2", timeMs: 2000, label: "残す" }]);
+    expect(remotionProps.markers).toEqual([
+      { id: "m2", timeMs: 2000, label: "残す" },
+    ]);
+  });
+
+  it("推定尺の自動タイムラインをTTS実測タイムスタンプへ同期する", () => {
+    const estimatedTimeline: TimelineData = {
+      playbackRange: { inMs: 0, outMs: 2400 },
+      markers: [{ id: "mk-start", timeMs: 0, label: "start" }],
+      tracks: [
+        {
+          id: "track-audio",
+          name: "音声",
+          type: "audio",
+          clips: [
+            {
+              id: "audio-main",
+              assetType: "audio",
+              assetPath: "output/tts_generation/latest/audio.wav",
+              startMs: 0,
+              durationMs: 2400,
+              inMs: 0,
+              outMs: 2400,
+              volume: 1,
+            },
+          ],
+        },
+        {
+          id: "track-subtitle",
+          name: "字幕",
+          type: "subtitle",
+          clips: [
+            {
+              id: "sub-1",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 0,
+              durationMs: 1200,
+              text: "一つ目の字幕",
+              style: "霊夢",
+            },
+            {
+              id: "sub-2",
+              assetType: "subtitle",
+              assetPath: "output/subtitle_generation/latest/subtitles.json",
+              startMs: 1200,
+              durationMs: 1200,
+              text: "二つ目の字幕",
+              style: "魔理沙",
+            },
+          ],
+        },
+      ],
+    };
+
+    const synchronized = synchronizeGeneratedTimelineTiming(estimatedTimeline, {
+      audioDurationMs: 9000,
+      timestamps: [
+        {
+          index: 0,
+          speaker: "霊夢",
+          text: "一つ目の字幕",
+          startMs: 0,
+          endMs: 4000,
+        },
+        {
+          index: 1,
+          speaker: "魔理沙",
+          text: "二つ目の字幕",
+          startMs: 4000,
+          endMs: 9000,
+        },
+      ],
+    });
+
+    expect(synchronized.timeline.playbackRange).toEqual({
+      inMs: 0,
+      outMs: 9000,
+    });
+    expect(synchronized.timeline.tracks[0].clips[0]).toMatchObject({
+      startMs: 0,
+      durationMs: 9000,
+      outMs: 9000,
+      timingMode: "generated",
+    });
+    expect(synchronized.timeline.tracks[1].clips).toMatchObject([
+      { id: "sub-1", startMs: 0, durationMs: 4000, timingMode: "generated" },
+      { id: "sub-2", startMs: 4000, durationMs: 5000, timingMode: "generated" },
+    ]);
+    expect(synchronized.summary).toEqual({
+      audioClipsAdjusted: 1,
+      subtitleClipsAdjusted: 2,
+      playbackRangeAdjusted: true,
+      audioDurationMs: 9000,
+    });
+  });
+
+  it("手動で調整したタイミングと明示的な再生範囲は保持する", () => {
+    const manualTimeline: TimelineData = {
+      ...sampleTimeline,
+      playbackRange: { inMs: 1000, outMs: 5000 },
+      tracks: sampleTimeline.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => ({
+          ...clip,
+          timingMode: "manual" as const,
+        })),
+      })),
+    };
+
+    const synchronized = synchronizeGeneratedTimelineTiming(manualTimeline, {
+      audioDurationMs: 9000,
+      timestamps: [
+        {
+          index: 0,
+          speaker: "default",
+          text: "サンプル字幕",
+          startMs: 0,
+          endMs: 9000,
+        },
+      ],
+    });
+
+    expect(synchronized.timeline).toEqual(manualTimeline);
+    expect(synchronized.summary).toEqual({
+      audioClipsAdjusted: 0,
+      subtitleClipsAdjusted: 0,
+      playbackRangeAdjusted: false,
+      audioDurationMs: 9000,
+    });
   });
 });

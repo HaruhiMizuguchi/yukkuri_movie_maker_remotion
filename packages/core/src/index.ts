@@ -42,8 +42,10 @@ export {
   resizeClip,
   setPlaybackRange,
   splitClip,
+  synchronizeGeneratedTimelineTiming,
   timelineToRemotionProps,
   type RemotionTimelineProps,
+  type TimelineSynchronizationSummary,
   updateClip,
 } from "./timeline";
 
