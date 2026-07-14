@@ -218,9 +218,26 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   ]);
 
   await page.getByTestId("nav-settings").click();
+  await expect(page.getByTestId("settings-google-status")).toContainText(
+    "未設定",
+  );
+  await page
+    .getByTestId("settings-script-model-select")
+    .selectOption("gemini-3.1-flash-lite");
+  await page
+    .getByTestId("settings-image-model-select")
+    .selectOption("gemini-3.1-flash-image");
+  await page
+    .getByTestId("settings-google-key-input")
+    .fill("e2e-google-api-key");
+  await page.getByTestId("settings-google-key-save").click();
+  await expect(page.getByTestId("settings-google-key-input")).toHaveValue("");
+  await expect(page.getByTestId("settings-google-status")).toContainText(
+    "保存済み",
+  );
   await page.getByTestId("settings-diagnostics-button").click();
   await expect(page.getByTestId("settings-google-status")).toContainText(
-    "設定済み",
+    "接続OK",
   );
   await page.getByTestId("settings-width-input").fill("1280");
   await page.getByTestId("settings-height-input").fill("720");
@@ -228,9 +245,15 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("app-message")).toContainText(
     "設定を保存しました",
   );
+  await expect(page.getByTestId("settings-script-model-select")).toHaveValue(
+    "gemini-3.1-flash-lite",
+  );
+  await expect(page.getByTestId("settings-image-model-select")).toHaveValue(
+    "gemini-3.1-flash-image",
+  );
   await visual.capture(page, "08-settings", "設定", [
-    "環境変数ベースのAPI接続状態を確認できる",
-    "出力プリセットを保存できる",
+    "APIキーを値の再表示なしで登録し、接続状態を確認できる",
+    "台本・画像モデルと出力プリセットを保存できる",
   ]);
 
   await visual.writeManifest();
@@ -249,9 +272,13 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       createdAt: string;
     }>,
     settings: {
-      apiKeys: {},
+      models: {
+        script: "gemini-3.5-flash",
+        image: "gemini-3.1-flash-lite-image",
+      },
       outputPreset: { width: 1920, height: 1080, fps: 30 },
     },
+    googleApiKeyConfigured: false,
   };
 
   await page.route("**/api/**", async (route) => {
@@ -429,6 +456,23 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       return fulfillJson({ ok: true });
     }
 
+    if (url.pathname === "/api/settings/secrets" && method === "GET") {
+      return fulfillJson({
+        googleApiKey: {
+          configured: state.googleApiKeyConfigured,
+          source: state.googleApiKeyConfigured ? "stored" : null,
+        },
+      });
+    }
+
+    if (url.pathname === "/api/settings/secrets/google" && method === "PUT") {
+      state.googleApiKeyConfigured = Boolean(body.apiKey);
+      return fulfillJson({
+        ok: true,
+        googleApiKey: { configured: true, source: "stored" },
+      });
+    }
+
     if (
       url.pathname === `/api/projects/${projectId}/settings` &&
       method === "GET"
@@ -446,7 +490,12 @@ const installCustomerJourneyApiMock = async (page: Page) => {
 
     if (url.pathname === "/api/settings/diagnostics" && method === "GET") {
       return fulfillJson({
-        googleApiKey: { configured: true },
+        googleApiKey: {
+          configured: state.googleApiKeyConfigured,
+          reachable: state.googleApiKeyConfigured,
+          source: state.googleApiKeyConfigured ? "stored" : null,
+          status: state.googleApiKeyConfigured ? 200 : undefined,
+        },
         aivisSpeech: { configured: true, reachable: true, status: 200 },
       });
     }
@@ -470,7 +519,10 @@ const createProjectDetail = (state: {
   assets: ProjectAsset[];
   jobs: Array<{ id: string; status: string; mode: string; createdAt: string }>;
   settings: {
-    apiKeys: Record<string, string>;
+    models: {
+      script: string;
+      image: string;
+    };
     outputPreset: { width: number; height: number; fps: number };
   };
 }) => ({

@@ -60,19 +60,26 @@ describe("api storage", () => {
     expect(loadedTimeline.playbackRange.inMs).toBe(1000);
 
     await writeSettings(workspaceRoot, {
-      apiKeys: { google: "***" },
+      models: {
+        script: "gemini-3.1-flash-lite",
+        image: "gemini-3.1-flash-image",
+      },
       outputPreset: { width: 1280, height: 720, fps: 30 },
     });
     const settings = await readSettings(workspaceRoot);
     expect(settings.outputPreset.width).toBe(1280);
-    expect(settings.apiKeys).toEqual({});
+    expect(settings.models).toEqual({
+      script: "gemini-3.1-flash-lite",
+      image: "gemini-3.1-flash-image",
+    });
     const rawSettings = JSON.parse(
       await fs.readFile(
         path.join(workspaceRoot, "outputs", "system", "settings.json"),
         "utf-8",
       ),
-    ) as { apiKeys?: Record<string, string> };
-    expect(rawSettings.apiKeys).toEqual({});
+    ) as { apiKeys?: Record<string, string>; models?: unknown };
+    expect(rawSettings.apiKeys).toBeUndefined();
+    expect(rawSettings.models).toEqual(settings.models);
 
     await saveProjectAsset(workspaceRoot, "project-1", {
       id: "asset-1",

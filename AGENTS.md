@@ -42,3 +42,4 @@
 - `pnpm audit` のtransitive dependency overrideは、脆弱性表示を消せてもESLint等の利用側が要求するAPI互換性を壊すことがある。直接依存の更新を優先し、override後はauditだけでなく実際のlint/testも通す。
 - Windowsでは生成物ディレクトリのrenameがDefender等に一時的に `EPERM` / `EBUSY` で拒否されることがある。原子的latest切替は限定回数の短い指数backoffを入れると安定する。
 - Gemini 2.0 Flashは2026-06-01に停止されたため、このプロジェクトの既定モデルは `gemini-3.5-flash` を使う。実接続テストではモデル廃止の404とクォータ不足の429を分けて記録する。
+- Gemini 3.1画像モデルのraw RESTは、`v1` の `generationConfig.responseFormat` が環境によって未知フィールドのHTTP 400になる。`v1beta/models/{model}:generateContent` に `responseModalities` と `imageConfig` を渡す経路で実生成できた。また `inlineData.mimeType` が `image/jpeg` になる場合があるため、拡張子をPNGに固定する成果物はFFmpegで実変換してから保存する。

@@ -36,6 +36,88 @@ const createPrismaMock = (projectId: string, theme: string) => {
 };
 
 describe("production workflow implementations", () => {
+  it("選択した画像モデルで背景を生成し、使用量を返す", async () => {
+    const outputRoot = path.join(
+      process.cwd(),
+      "outputs",
+      "test_evidence",
+      "image-model",
+      `run-${Date.now()}`,
+    );
+    const projectId = `project-${Date.now()}`;
+    const { prisma } = createPrismaMock(projectId, "未来の都市");
+    const imageBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: "image/png",
+                    data: imageBytes.toString("base64"),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        usageMetadata: { promptTokenCount: 400 },
+      }),
+    });
+    const implementations = createProductionWorkflowImplementations({
+      outputRoot,
+      googleApiKey: "test-google-key",
+      imageModel: "gemini-3.1-flash-lite-image",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      cacheEnabled: false,
+    });
+
+    const result = await implementations.background_generation?.({
+      jobId: "job-advanced",
+      prisma,
+      outputRoot,
+    } as WorkflowContext);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/models/gemini-3.1-flash-lite-image:generateContent",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-goog-api-key": "test-google-key",
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      generationSource: "google-api",
+      aiUsage: {
+        kind: "image",
+        model: "gemini-3.1-flash-lite-image",
+        inputTokens: 400,
+        imageCount: 1,
+      },
+    });
+    const generated = await fs.readFile(
+      path.join(
+        outputRoot,
+        "projects",
+        projectId,
+        "output",
+        "background_generation",
+        "latest",
+        "background.png",
+      ),
+    );
+    expect(generated).toEqual(imageBytes);
+  });
+
   it("AI拡張ステップと運用機能を含む成果物を生成できる", async () => {
     const runId = `run-${Date.now()}`;
     const projectId = `project-${Date.now()}`;

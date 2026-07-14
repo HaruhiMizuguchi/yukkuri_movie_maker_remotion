@@ -58,6 +58,14 @@ const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
     inputUsdPerMillion: 1.5,
     outputUsdPerMillion: 9,
   },
+  "gemini-3-flash-preview": {
+    inputUsdPerMillion: 0.5,
+    outputUsdPerMillion: 3,
+  },
+  "gemini-3.1-flash-lite": {
+    inputUsdPerMillion: 0.25,
+    outputUsdPerMillion: 1.5,
+  },
   "gemini-2.5-pro": {
     inputUsdPerMillion: 1.25,
     outputUsdPerMillion: 10,
@@ -73,6 +81,16 @@ const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   "gemini-2.5-flash-image": {
     inputUsdPerMillion: 0.3,
     imageUsdEach: 0.039,
+  },
+  "gemini-3.1-flash-lite-image": {
+    inputUsdPerMillion: 0.25,
+    outputUsdPerMillion: 1.5,
+    imageUsdEach: 0.0336,
+  },
+  "gemini-3.1-flash-image": {
+    inputUsdPerMillion: 0.5,
+    outputUsdPerMillion: 3,
+    imageUsdEach: 0.067,
   },
   "imagen-4.0-fast-generate-001": { imageUsdEach: 0.02 },
   "imagen-4.0-generate-001": { imageUsdEach: 0.04 },

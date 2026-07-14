@@ -10,6 +10,7 @@ import {
   readByteRange,
   resolveSafeChildPath,
   resolveWorkflowJobRequest,
+  settingsBodySchema,
 } from "./apiValidation";
 
 describe("api validation", () => {
@@ -146,20 +147,30 @@ describe("api validation", () => {
     expect(readByteRange("bytes=1000-1200", 1000)).toBe("invalid");
   });
 
-  it("APIキーをローカル設定ファイルへ保存しない", () => {
-    expect(
-      prepareSettingsForStorage({
-        apiKeys: {
-          google: "real-google-key",
-          openai: "real-openai-key",
-          stability: "real-stability-key",
-        },
-        outputPreset: { width: 1280, height: 720, fps: 30 },
-      }),
-    ).toEqual({
-      apiKeys: {},
+  it("モデル設定を検証し、APIキーを通常設定へ混在させない", () => {
+    const settings = settingsBodySchema.parse({
+      apiKeys: { google: "混在させてはいけない値" },
+      models: {
+        script: "gemini-3.1-flash-lite",
+        image: "gemini-3.1-flash-image",
+      },
       outputPreset: { width: 1280, height: 720, fps: 30 },
     });
+    expect(settings).not.toHaveProperty("apiKeys");
+    expect(prepareSettingsForStorage(settings)).toEqual({
+      models: {
+        script: "gemini-3.1-flash-lite",
+        image: "gemini-3.1-flash-image",
+      },
+      outputPreset: { width: 1280, height: 720, fps: 30 },
+    });
+
+    expect(() =>
+      settingsBodySchema.parse({
+        models: { script: "unsupported", image: "unsupported" },
+        outputPreset: { width: 1280, height: 720, fps: 30 },
+      }),
+    ).toThrow();
   });
 
   it("プロジェクト所有者がある場合は異なるユーザーの操作を拒否する", () => {

@@ -1,6 +1,10 @@
 import path from "node:path";
 import {
   AutomationModeSchema,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_SCRIPT_MODEL,
+  ImageGenerationModelSchema,
+  ScriptGenerationModelSchema,
   WorkflowStepNameSchema,
   type WorkflowStepName,
 } from "@ymm/shared";
@@ -17,13 +21,15 @@ export const createJobBodySchema = z.object({
 });
 
 export const settingsBodySchema = z.object({
-  apiKeys: z
+  models: z
     .object({
-      google: z.string().optional(),
-      openai: z.string().optional(),
-      stability: z.string().optional(),
+      script: ScriptGenerationModelSchema,
+      image: ImageGenerationModelSchema,
     })
-    .default({}),
+    .default({
+      script: DEFAULT_SCRIPT_MODEL,
+      image: DEFAULT_IMAGE_MODEL,
+    }),
   outputPreset: z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
@@ -165,7 +171,7 @@ export const normalizeAssetRelativePath = (
 export const prepareSettingsForStorage = (
   settings: ApiSettings,
 ): ApiSettings => ({
-  apiKeys: {},
+  models: settings.models,
   outputPreset: settings.outputPreset,
 });
 

@@ -49,6 +49,12 @@ import {
   writeSettings,
 } from "./storage";
 import { buildSettingsDiagnostics } from "./settingsDiagnostics";
+import {
+  clearGoogleApiKey,
+  getGoogleApiKeyStatus,
+  resolveGoogleApiKey,
+  saveGoogleApiKey,
+} from "./secretStore";
 import { resolveApiWorkspaceRoot } from "./workspaceRoot";
 
 const envSchema = z.object({
@@ -309,9 +315,18 @@ app.get("/api/projects/:projectId", async (req, reply) => {
     job.steps.flatMap((step) => extractAiUsageRecords(step.outputJson)),
   );
   const projectUsageRecords = usageRecordsByJob.flat();
+  const parsedProjectSettings = settingsBodySchema.safeParse(
+    access.project.settingsJson,
+  );
+  const safeProjectSettings = parsedProjectSettings.success
+    ? parsedProjectSettings.data
+    : await readSettings(workspaceRoot);
 
   return toJsonSafeValue({
-    project: access.project,
+    project: {
+      ...access.project,
+      settingsJson: safeProjectSettings,
+    },
     ownerId: access.ownerId,
     jobs,
     script,
@@ -621,6 +636,29 @@ app.put("/api/settings", async (req, reply) => {
   return reply.code(200).send({ ok: true });
 });
 
+app.get("/api/settings/secrets", async () => ({
+  googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
+}));
+
+app.put("/api/settings/secrets/google", async (req, reply) => {
+  const { apiKey } = z
+    .object({ apiKey: z.string().trim().min(10).max(512) })
+    .parse(req.body ?? {});
+  await saveGoogleApiKey(workspaceRoot, apiKey);
+  return reply.code(200).send({
+    ok: true,
+    googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
+  });
+});
+
+app.delete("/api/settings/secrets/google", async (_req, reply) => {
+  await clearGoogleApiKey(workspaceRoot);
+  return reply.code(200).send({
+    ok: true,
+    googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
+  });
+});
+
 app.get("/api/projects/:projectId/settings", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
@@ -645,7 +683,16 @@ app.put("/api/projects/:projectId/settings", async (req, reply) => {
   return reply.code(200).send({ ok: true });
 });
 
-app.get("/api/settings/diagnostics", async () => buildSettingsDiagnostics());
+app.get("/api/settings/diagnostics", async () => {
+  const [googleApiKey, googleApiKeyStatus] = await Promise.all([
+    resolveGoogleApiKey(workspaceRoot),
+    getGoogleApiKeyStatus(workspaceRoot),
+  ]);
+  return buildSettingsDiagnostics({
+    googleApiKey,
+    googleApiKeySource: googleApiKeyStatus.source,
+  });
+});
 
 app.get("/api/templates", async () => {
   return listTemplates(workspaceRoot);

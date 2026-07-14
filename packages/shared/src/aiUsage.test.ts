@@ -27,6 +27,16 @@ describe("AI使用量と概算料金", () => {
     expect(usage.estimatedCostUsd).toBe(0.08);
   });
 
+  it("現行の画像モデルは1K画像と入力トークンの料金を計算する", () => {
+    const usage = createImageUsageRecord({
+      model: "gemini-3.1-flash-lite-image",
+      imageCount: 1,
+      inputTokens: 1_000,
+    });
+
+    expect(usage.estimatedCostUsd).toBeCloseTo(0.03385, 6);
+  });
+
   it("プロジェクト全体とモデル別の使用量を集計する", () => {
     const records = [
       createLlmUsageRecord({

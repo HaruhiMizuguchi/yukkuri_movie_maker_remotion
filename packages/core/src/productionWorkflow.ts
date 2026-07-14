@@ -2,8 +2,17 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ArtifactMetadata, Script } from "@ymm/shared";
-import { ScriptSchema } from "@ymm/shared";
+import type {
+  AiUsageRecord,
+  ArtifactMetadata,
+  ImageGenerationModel,
+  Script,
+} from "@ymm/shared";
+import {
+  createImageUsageRecord,
+  DEFAULT_IMAGE_MODEL,
+  ScriptSchema,
+} from "@ymm/shared";
 import {
   createDefaultWorkflowImplementations,
   type DefaultWorkflowOptions,
@@ -127,6 +136,8 @@ const withReliability = (
       signature: {
         theme: details.theme,
         outputPreset: options.outputPreset,
+        scriptModel: options.scriptModel,
+        imageModel: options.imageModel,
         ttsProvider: options.ttsProvider,
         allowMockTtsFallback: options.allowMockTtsFallback,
         disableRemotion: options.disableRemotion,
@@ -305,29 +316,39 @@ const createBackgroundGenerationImplementation =
     );
 
     const backgroundPath = path.join(stepDir.runDir, "background.png");
-    await runCommand(
-      "ffmpeg",
-      [
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        "color=c=0x0f172a:s=1920x1080:d=1",
-        "-vf",
-        "drawbox=x=0:y=0:w=1920:h=380:color=0x1d4ed8@0.48:t=fill,drawbox=x=0:y=380:w=1920:h=700:color=0x0891b2@0.3:t=fill",
-        "-frames:v",
-        "1",
-        backgroundPath,
-      ],
-      path.dirname(backgroundPath),
-    );
-
+    const prompt = `「${details.theme}」を解説する動画で使う純粋な背景素材。タイトルカードやインフォグラフィックではない。16:9、映画的、主な被写体は左側、右側は字幕用の暗く静かな余白。絶対に文字、数字、記号、ロゴ、看板を描かない。NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO LOGO.`;
+    let aiUsage: AiUsageRecord | undefined;
+    let generationSource: "google-api" | "placeholder" = "placeholder";
+    if (options.googleApiKey?.trim()) {
+      const generated = await generateGoogleImage({
+        prompt,
+        apiKey: options.googleApiKey.trim(),
+        model: options.imageModel ?? DEFAULT_IMAGE_MODEL,
+        fetchFn: options.fetchFn,
+      });
+      await writeGeneratedImageAsPng(backgroundPath, generated);
+      aiUsage = generated.aiUsage;
+      generationSource = "google-api";
+    } else {
+      await runCommand(
+        "ffmpeg",
+        [
+          "-y",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=c=0x0f172a:s=1920x1080:d=1",
+          "-vf",
+          "drawbox=x=0:y=0:w=1920:h=380:color=0x1d4ed8@0.48:t=fill,drawbox=x=0:y=380:w=1920:h=700:color=0x0891b2@0.3:t=fill",
+          "-frames:v",
+          "1",
+          backgroundPath,
+        ],
+        path.dirname(backgroundPath),
+      );
+    }
     const promptPath = path.join(stepDir.runDir, "background_prompt.txt");
-    await fs.writeFile(
-      promptPath,
-      `${details.theme}向けの背景を生成\n`,
-      "utf-8",
-    );
+    await fs.writeFile(promptPath, prompt + "\n", "utf-8");
     await syncLatest(stepDir);
 
     const [imageStat, promptStat] = await Promise.all([
@@ -360,6 +381,8 @@ const createBackgroundGenerationImplementation =
     return {
       backgroundPath: toRelativePath(outputRoot, backgroundPath),
       promptPath: toRelativePath(outputRoot, promptPath),
+      generationSource,
+      ...(aiUsage ? { aiUsage } : {}),
     };
   };
 
@@ -467,22 +490,37 @@ const createIllustrationInsertionImplementation =
     );
 
     const illustrationPath = path.join(stepDir.runDir, "illustration.png");
-    await runCommand(
-      "ffmpeg",
-      [
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        "color=c=0x111827:s=1280x720:d=1",
-        "-vf",
-        "drawbox=x=160:y=130:w=960:h=460:color=0xf59e0b@0.92:t=fill,drawbox=x=220:y=190:w=840:h=340:color=0x0f172a@0.88:t=fill",
-        "-frames:v",
-        "1",
-        illustrationPath,
-      ],
-      path.dirname(illustrationPath),
-    );
+    const prompt = `「${details.theme}」の要点を視覚だけで伝える挿絵。タイトルカードやインフォグラフィックではない。16:9、わかりやすい構図、高品質。絶対に文字、数字、記号、ロゴを描かない。NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO LOGO.`;
+    let aiUsage: AiUsageRecord | undefined;
+    let generationSource: "google-api" | "placeholder" = "placeholder";
+    if (options.googleApiKey?.trim()) {
+      const generated = await generateGoogleImage({
+        prompt,
+        apiKey: options.googleApiKey.trim(),
+        model: options.imageModel ?? DEFAULT_IMAGE_MODEL,
+        fetchFn: options.fetchFn,
+      });
+      await writeGeneratedImageAsPng(illustrationPath, generated);
+      aiUsage = generated.aiUsage;
+      generationSource = "google-api";
+    } else {
+      await runCommand(
+        "ffmpeg",
+        [
+          "-y",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=c=0x111827:s=1280x720:d=1",
+          "-vf",
+          "drawbox=x=160:y=130:w=960:h=460:color=0xf59e0b@0.92:t=fill,drawbox=x=220:y=190:w=840:h=340:color=0x0f172a@0.88:t=fill",
+          "-frames:v",
+          "1",
+          illustrationPath,
+        ],
+        path.dirname(illustrationPath),
+      );
+    }
     await syncLatest(stepDir);
 
     const stat = await fs.stat(illustrationPath);
@@ -502,7 +540,11 @@ const createIllustrationInsertionImplementation =
       ],
     });
 
-    return { illustrationPath: toRelativePath(outputRoot, illustrationPath) };
+    return {
+      illustrationPath: toRelativePath(outputRoot, illustrationPath),
+      generationSource,
+      ...(aiUsage ? { aiUsage } : {}),
+    };
   };
 
 const createAudioEnhancementImplementation =
@@ -804,6 +846,120 @@ const registerCachedProjectFile = async ({
     stepName,
     artifacts: [artifact],
   });
+};
+
+const generateGoogleImage = async ({
+  prompt,
+  apiKey,
+  model,
+  fetchFn = fetch,
+}: {
+  prompt: string;
+  apiKey: string;
+  model: ImageGenerationModel;
+  fetchFn?: typeof fetch;
+}): Promise<{
+  bytes: Buffer;
+  mimeType: "image/png" | "image/jpeg";
+  aiUsage: AiUsageRecord;
+}> => {
+  const response = await fetchFn(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: { aspectRatio: "16:9", imageSize: "1K" },
+        },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    },
+  );
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errorBody = (await response.json()) as {
+        error?: { message?: string };
+      };
+      detail = errorBody.error?.message?.slice(0, 300) ?? "";
+    } catch {
+      // 応答本文がJSONでない場合も、HTTP状態だけで安全に診断できるようにする。
+    }
+    throw new Error(
+      `Google image API error: ${response.status}${detail ? ` - ${detail}` : ""}`,
+    );
+  }
+
+  const body = (await response.json()) as {
+    candidates?: Array<{
+      finishReason?: string;
+      content?: {
+        parts?: Array<{
+          inlineData?: { mimeType?: string; data?: string };
+          inline_data?: { mime_type?: string; data?: string };
+        }>;
+      };
+    }>;
+    usageMetadata?: { promptTokenCount?: number };
+  };
+  const imageParts = (body.candidates ?? []).flatMap(
+    (candidate) => candidate.content?.parts ?? [],
+  );
+  const imagePart = imageParts.find(
+    (part) => part.inlineData?.data || part.inline_data?.data,
+  );
+  const data = imagePart?.inlineData?.data ?? imagePart?.inline_data?.data;
+  const mimeType =
+    imagePart?.inlineData?.mimeType ??
+    imagePart?.inline_data?.mime_type ??
+    "image/png";
+  if (!data || (mimeType !== "image/png" && mimeType !== "image/jpeg")) {
+    const finishReasons = (body.candidates ?? [])
+      .map((candidate) => candidate.finishReason)
+      .filter(Boolean)
+      .join(",");
+    throw new Error(
+      `Google image API response did not contain a PNG image (mime=${mimeType}, data=${Boolean(data)}, finish=${finishReasons || "unknown"})`,
+    );
+  }
+
+  return {
+    bytes: Buffer.from(data, "base64"),
+    mimeType,
+    aiUsage: createImageUsageRecord({
+      model,
+      inputTokens: body.usageMetadata?.promptTokenCount ?? 0,
+      imageCount: 1,
+    }),
+  };
+};
+
+const writeGeneratedImageAsPng = async (
+  targetPath: string,
+  generated: { bytes: Buffer; mimeType: "image/png" | "image/jpeg" },
+): Promise<void> => {
+  if (generated.mimeType === "image/png") {
+    await fs.writeFile(targetPath, generated.bytes);
+    return;
+  }
+
+  const sourcePath = `${targetPath}.source.jpg`;
+  await fs.writeFile(sourcePath, generated.bytes);
+  try {
+    await runCommand(
+      "ffmpeg",
+      ["-y", "-i", sourcePath, "-frames:v", "1", targetPath],
+      path.dirname(targetPath),
+    );
+  } finally {
+    await fs.unlink(sourcePath).catch(() => undefined);
+  }
 };
 
 const appendWorkflowLog = async (

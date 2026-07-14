@@ -3,9 +3,15 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { AiUsageRecord, Script } from "@ymm/shared";
+import type {
+  AiUsageRecord,
+  ImageGenerationModel,
+  Script,
+  ScriptGenerationModel,
+} from "@ymm/shared";
 import {
   createLlmUsageRecord,
+  DEFAULT_SCRIPT_MODEL,
   ScriptSchema,
   TimelineDataSchema,
 } from "@ymm/shared";
@@ -41,6 +47,9 @@ export type DefaultWorkflowOptions = {
   runIdFactory?: () => string;
   disableRemotion?: boolean;
   fetchFn?: typeof fetch;
+  googleApiKey?: string;
+  scriptModel?: ScriptGenerationModel;
+  imageModel?: ImageGenerationModel;
   logger?: Logger;
   ttsProvider?: Task3TtsProvider;
   aivisBaseUrl?: string;
@@ -118,7 +127,11 @@ export function createDefaultWorkflowImplementations(
             source: "manual" as const,
             aiUsage: undefined,
           }
-        : await generateScript(selectedTheme, options.fetchFn);
+        : await generateScript(selectedTheme, {
+            fetchFn: options.fetchFn,
+            googleApiKey: options.googleApiKey,
+            model: options.scriptModel,
+          });
       const script = generation.script;
       const scriptPath = path.join(stepDir.runDir, "script.json");
       await writeJson(scriptPath, script);
@@ -967,29 +980,40 @@ const readGeneratedTitle = async (
 
 const generateScript = async (
   theme: string,
-  fetchFn?: typeof fetch,
+  options: {
+    fetchFn?: typeof fetch;
+    googleApiKey?: string;
+    model?: ScriptGenerationModel;
+  } = {},
 ): Promise<{
   script: Script;
   source: "api" | "fallback";
   aiUsage?: AiUsageRecord;
 }> => {
-  const effectiveFetch = fetchFn ?? fetch;
-  const geminiApiKey = process.env.GOOGLE_API_KEY?.trim();
+  const effectiveFetch = options.fetchFn ?? fetch;
+  const geminiApiKey =
+    options.googleApiKey?.trim() || process.env.GOOGLE_API_KEY?.trim();
   if (!geminiApiKey) {
     return { script: buildFallbackScript(theme), source: "fallback" };
   }
 
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  const model =
+    options.model ??
+    (process.env.GEMINI_MODEL as ScriptGenerationModel | undefined) ??
+    DEFAULT_SCRIPT_MODEL;
   let aiUsage: AiUsageRecord | undefined;
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const prompt =
       "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。" +
       "schema={title:string,theme:string,lines:[{speaker:string,text:string,emotion?:string}]}" +
       `テーマ: ${theme}`;
     const response = await effectiveFetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey,
+      },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {

@@ -1,4 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_SCRIPT_MODEL,
+  IMAGE_MODEL_OPTIONS,
+  SCRIPT_MODEL_OPTIONS,
+} from "@ymm/shared";
 import { fetchJson } from "./apiClient";
 import type {
   AppSettings,
@@ -8,6 +14,7 @@ import type {
   ProjectDetail,
   ProjectSummary,
   ScriptData,
+  SecretSettingsStatus,
   SettingsDiagnostics,
   Template,
 } from "./apiTypes";
@@ -151,9 +158,15 @@ export function App() {
   });
   const [assetUploadFile, setAssetUploadFile] = useState<File | null>(null);
   const [settings, setSettings] = useState<AppSettings>({
-    apiKeys: {},
+    models: {
+      script: DEFAULT_SCRIPT_MODEL,
+      image: DEFAULT_IMAGE_MODEL,
+    },
     outputPreset: { width: 1920, height: 1080, fps: 30 },
   });
+  const [secretSettingsStatus, setSecretSettingsStatus] =
+    useState<SecretSettingsStatus | null>(null);
+  const [googleApiKeyDraft, setGoogleApiKeyDraft] = useState("");
   const [settingsDiagnostics, setSettingsDiagnostics] =
     useState<SettingsDiagnostics | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -241,6 +254,17 @@ export function App() {
     hasRunningJob,
   });
   const workflowPosition = getWorkflowPosition(activeScreen);
+  const googleApiStatusLabel = settingsDiagnostics
+    ? settingsDiagnostics.googleApiKey.reachable
+      ? "接続OK"
+      : settingsDiagnostics.googleApiKey.configured
+        ? `接続失敗${settingsDiagnostics.googleApiKey.status ? ` (HTTP ${settingsDiagnostics.googleApiKey.status})` : ""}`
+        : "未設定"
+    : secretSettingsStatus?.googleApiKey.configured
+      ? secretSettingsStatus.googleApiKey.source === "environment"
+        ? "環境変数で設定済み"
+        : "保存済み"
+      : "未設定";
 
   const beginNewProject = () => {
     setSelectedProjectId(null);
@@ -343,9 +367,21 @@ export function App() {
 
   useEffect(() => {
     void runUiAction(async () => {
-      await Promise.all([refreshDashboard(), loadSettings(), loadTemplates()]);
+      await Promise.all([
+        refreshDashboard(),
+        loadSettings(),
+        loadSecretSettingsStatus(),
+        loadTemplates(),
+      ]);
     });
   }, []);
+
+  useEffect(() => {
+    if (activeScreen !== "settings") return;
+    void runUiAction(async () => {
+      await Promise.all([loadSettings(), loadSecretSettingsStatus()]);
+    });
+  }, [activeScreen, selectedProjectId]);
 
   useEffect(() => {
     if (
@@ -848,6 +884,39 @@ export function App() {
     setMessage("接続状態を確認しました");
   };
 
+  const loadSecretSettingsStatus = async () => {
+    const status = await fetchJson<SecretSettingsStatus>(
+      "/api/settings/secrets",
+    );
+    setSecretSettingsStatus(status);
+  };
+
+  const saveGoogleApiKey = async () => {
+    const response = await fetchJson<SecretSettingsStatus & { ok: boolean }>(
+      "/api/settings/secrets/google",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: googleApiKeyDraft }),
+      },
+    );
+    setSecretSettingsStatus({ googleApiKey: response.googleApiKey });
+    setGoogleApiKeyDraft("");
+    setSettingsDiagnostics(null);
+    setMessage("Google APIキーを安全なローカル領域へ保存しました");
+  };
+
+  const clearGoogleApiKey = async () => {
+    if (!window.confirm("保存したGoogle APIキーを削除しますか？")) return;
+    const response = await fetchJson<SecretSettingsStatus & { ok: boolean }>(
+      "/api/settings/secrets/google",
+      { method: "DELETE" },
+    );
+    setSecretSettingsStatus({ googleApiKey: response.googleApiKey });
+    setSettingsDiagnostics(null);
+    setMessage("保存したGoogle APIキーを削除しました");
+  };
+
   const saveSettings = async () => {
     await fetchJson(
       selectedProjectId
@@ -857,7 +926,7 @@ export function App() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKeys: {},
+          models: settings.models,
           outputPreset: settings.outputPreset,
         }),
       },
@@ -2901,99 +2970,224 @@ export function App() {
               <section style={styles.panel} data-testid="screen-settings">
                 <ScreenIntro
                   step="アプリ設定"
-                  title="アプリの設定"
-                  description="外部サービスとの接続状態と、動画の出力サイズを確認できます。通常は初期値のままで利用できます。"
+                  title="生成と出力の設定"
+                  description="台本・画像に使うAIモデル、Google APIキー、完成動画のサイズを設定します。モデル設定は次に開始する生成から反映されます。"
                 />
-                <div style={styles.actionBar}>
-                  <button
-                    style={styles.secondaryButton}
-                    data-testid="settings-diagnostics-button"
-                    onClick={() => void runUiAction(loadSettingsDiagnostics)}
-                  >
-                    接続診断
-                  </button>
-                  {settingsDiagnostics ? (
-                    <>
+                <div style={styles.settingsGrid}>
+                  <section style={styles.settingsCard}>
+                    <div>
+                      <span style={styles.eyebrow}>AIモデル</span>
+                      <h3 style={styles.subTitle}>品質と料金を選ぶ</h3>
+                    </div>
+                    <label style={styles.fieldLabel}>
+                      <strong>台本生成モデル</strong>
+                      <span>テーマから会話形式の台本を作るモデルです。</span>
+                      <select
+                        style={styles.input}
+                        data-testid="settings-script-model-select"
+                        value={settings.models.script}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            models: {
+                              ...settings.models,
+                              script: event.target
+                                .value as AppSettings["models"]["script"],
+                            },
+                          })
+                        }
+                      >
+                        {SCRIPT_MODEL_OPTIONS.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.label}
+                          </option>
+                        ))}
+                      </select>
+                      <small style={styles.helpText}>
+                        {
+                          SCRIPT_MODEL_OPTIONS.find(
+                            (model) => model.id === settings.models.script,
+                          )?.description
+                        }
+                      </small>
+                    </label>
+                    <label style={styles.fieldLabel}>
+                      <strong>画像生成モデル</strong>
+                      <span>背景と挿絵を16:9の1K画像として作ります。</span>
+                      <select
+                        style={styles.input}
+                        data-testid="settings-image-model-select"
+                        value={settings.models.image}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            models: {
+                              ...settings.models,
+                              image: event.target
+                                .value as AppSettings["models"]["image"],
+                            },
+                          })
+                        }
+                      >
+                        {IMAGE_MODEL_OPTIONS.map((model) => (
+                          <option key={model.id} value={model.id}>
+                            {model.label}
+                          </option>
+                        ))}
+                      </select>
+                      <small style={styles.helpText}>
+                        {
+                          IMAGE_MODEL_OPTIONS.find(
+                            (model) => model.id === settings.models.image,
+                          )?.description
+                        }
+                      </small>
+                    </label>
+                  </section>
+
+                  <section style={styles.settingsCard}>
+                    <div style={styles.sectionHeadingRow}>
+                      <div>
+                        <span style={styles.eyebrow}>API接続</span>
+                        <h3 style={styles.subTitle}>Google APIキー</h3>
+                      </div>
                       <span
                         style={styles.stepBadge}
                         data-testid="settings-google-status"
                       >
-                        Gemini:{" "}
-                        {settingsDiagnostics.googleApiKey.configured
-                          ? "設定済み"
-                          : "未設定"}
+                        {googleApiStatusLabel}
                       </span>
+                    </div>
+                    <p style={styles.helpText}>
+                      キーはローカルの秘密情報ファイルへ分離して保存し、保存後は画面やAPIで再表示しません。
+                    </p>
+                    <label style={styles.fieldLabel}>
+                      <strong>新しいAPIキー</strong>
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        spellCheck={false}
+                        style={styles.input}
+                        data-testid="settings-google-key-input"
+                        value={googleApiKeyDraft}
+                        placeholder="Google AI Studioで発行したキーを貼り付け"
+                        onChange={(event) =>
+                          setGoogleApiKeyDraft(event.target.value)
+                        }
+                      />
+                    </label>
+                    <div style={styles.lineRow}>
+                      <button
+                        style={styles.primaryButton}
+                        data-testid="settings-google-key-save"
+                        disabled={googleApiKeyDraft.trim().length < 10}
+                        onClick={() => void runUiAction(saveGoogleApiKey)}
+                      >
+                        APIキーを登録
+                      </button>
+                      <button
+                        style={styles.secondaryButton}
+                        data-testid="settings-diagnostics-button"
+                        onClick={() =>
+                          void runUiAction(loadSettingsDiagnostics)
+                        }
+                      >
+                        実際に接続診断
+                      </button>
+                      {secretSettingsStatus?.googleApiKey.source ===
+                      "stored" ? (
+                        <button
+                          style={styles.quietDangerButton}
+                          onClick={() => void runUiAction(clearGoogleApiKey)}
+                        >
+                          保存キーを削除
+                        </button>
+                      ) : null}
+                    </div>
+                    <div style={styles.connectionStatusRow}>
                       <span
                         style={styles.stepBadge}
                         data-testid="settings-aivis-status"
                       >
                         Aivis:{" "}
-                        {settingsDiagnostics.aivisSpeech.reachable
+                        {settingsDiagnostics?.aivisSpeech.reachable
                           ? "接続OK"
-                          : settingsDiagnostics.aivisSpeech.configured
+                          : settingsDiagnostics?.aivisSpeech.configured
                             ? "未接続"
                             : "未設定"}
                       </span>
-                    </>
-                  ) : null}
+                    </div>
+                  </section>
                 </div>
-                <div style={styles.lineRow}>
-                  <label style={styles.labelInline}>Width</label>
-                  <input
-                    data-testid="settings-width-input"
-                    style={styles.inputSmall}
-                    type="number"
-                    value={settings.outputPreset.width}
-                    onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        outputPreset: {
-                          ...settings.outputPreset,
-                          width: Number(event.target.value),
-                        },
-                      })
-                    }
-                  />
-                  <label style={styles.labelInline}>Height</label>
-                  <input
-                    data-testid="settings-height-input"
-                    style={styles.inputSmall}
-                    type="number"
-                    value={settings.outputPreset.height}
-                    onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        outputPreset: {
-                          ...settings.outputPreset,
-                          height: Number(event.target.value),
-                        },
-                      })
-                    }
-                  />
-                  <label style={styles.labelInline}>FPS</label>
-                  <input
-                    data-testid="settings-fps-input"
-                    style={styles.inputSmall}
-                    type="number"
-                    value={settings.outputPreset.fps}
-                    onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        outputPreset: {
-                          ...settings.outputPreset,
-                          fps: Number(event.target.value),
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <button
-                  style={styles.primaryButton}
-                  data-testid="settings-save-button"
-                  onClick={() => void runUiAction(saveSettings)}
-                >
-                  保存
-                </button>
+                <section style={styles.settingsCard}>
+                  <div>
+                    <span style={styles.eyebrow}>動画出力</span>
+                    <h3 style={styles.subTitle}>完成動画のサイズ</h3>
+                  </div>
+                  <div style={styles.lineRow}>
+                    <label style={styles.compactField}>
+                      <span style={styles.labelInline}>横幅</span>
+                      <input
+                        data-testid="settings-width-input"
+                        style={styles.inputSmall}
+                        type="number"
+                        value={settings.outputPreset.width}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            outputPreset: {
+                              ...settings.outputPreset,
+                              width: Number(event.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <label style={styles.compactField}>
+                      <span style={styles.labelInline}>高さ</span>
+                      <input
+                        data-testid="settings-height-input"
+                        style={styles.inputSmall}
+                        type="number"
+                        value={settings.outputPreset.height}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            outputPreset: {
+                              ...settings.outputPreset,
+                              height: Number(event.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                    <label style={styles.compactField}>
+                      <span style={styles.labelInline}>FPS</span>
+                      <input
+                        data-testid="settings-fps-input"
+                        style={styles.inputSmall}
+                        type="number"
+                        value={settings.outputPreset.fps}
+                        onChange={(event) =>
+                          setSettings({
+                            ...settings,
+                            outputPreset: {
+                              ...settings.outputPreset,
+                              fps: Number(event.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <button
+                    style={styles.primaryButton}
+                    data-testid="settings-save-button"
+                    onClick={() => void runUiAction(saveSettings)}
+                  >
+                    モデルと動画設定を保存
+                  </button>
+                </section>
               </section>
             ) : null}
           </fieldset>

@@ -2,6 +2,8 @@ import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import {
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_SCRIPT_MODEL,
   ScriptSchema,
   TimelineDataSchema,
   type Script,
@@ -161,7 +163,10 @@ export const readSettings = async (
   }
   const loaded = (await readJson(settingsPath)) as Partial<AppSettings>;
   return {
-    apiKeys: {},
+    models: {
+      script: loaded.models?.script ?? DEFAULT_SCRIPT_MODEL,
+      image: loaded.models?.image ?? DEFAULT_IMAGE_MODEL,
+    },
     outputPreset: {
       width: loaded.outputPreset?.width ?? 1920,
       height: loaded.outputPreset?.height ?? 1080,
@@ -344,7 +349,10 @@ const createTimelineFromScript = (script: Script): TimelineData => {
 };
 
 const defaultSettings = (): AppSettings => ({
-  apiKeys: {},
+  models: {
+    script: DEFAULT_SCRIPT_MODEL,
+    image: DEFAULT_IMAGE_MODEL,
+  },
   outputPreset: { width: 1920, height: 1080, fps: 30 },
 });
 

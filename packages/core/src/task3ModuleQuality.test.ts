@@ -129,49 +129,61 @@ describe("task3 module quality", () => {
       prisma,
       outputRoot,
     } as WorkflowContext;
-    vi.stubEnv("GOOGLE_API_KEY", "test-google-key");
-    vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
     try {
+      const fetchFn = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      title: "AI料金テスト",
+                      theme: "AI料金テスト",
+                      lines: [
+                        { speaker: "reimu", text: "使用量を確認します。" },
+                      ],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 1_000,
+            candidatesTokenCount: 200,
+            thoughtsTokenCount: 50,
+          },
+        }),
+      });
       const implementations = createDefaultWorkflowImplementations({
         outputRoot,
-        fetchFn: vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            candidates: [
-              {
-                content: {
-                  parts: [
-                    {
-                      text: JSON.stringify({
-                        title: "AI料金テスト",
-                        theme: "AI料金テスト",
-                        lines: [
-                          { speaker: "reimu", text: "使用量を確認します。" },
-                        ],
-                      }),
-                    },
-                  ],
-                },
-              },
-            ],
-            usageMetadata: {
-              promptTokenCount: 1_000,
-              candidatesTokenCount: 200,
-              thoughtsTokenCount: 50,
-            },
-          }),
-        }) as any,
+        googleApiKey: "test-google-key",
+        scriptModel: "gemini-3.1-flash-lite",
+        fetchFn: fetchFn as any,
       });
 
       const output = await implementations.script_generation?.(ctx);
 
       expect(output?.aiUsage).toMatchObject({
         kind: "llm",
-        model: "gemini-2.5-flash",
+        model: "gemini-3.1-flash-lite",
         inputTokens: 1_000,
         outputTokens: 250,
         pricingKnown: true,
       });
+      expect(fetchFn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "/models/gemini-3.1-flash-lite:generateContent",
+        ),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "x-goog-api-key": "test-google-key",
+          }),
+        }),
+      );
+      expect(fetchFn.mock.calls[0]?.[0]).not.toContain("test-google-key");
     } finally {
       vi.unstubAllEnvs();
     }

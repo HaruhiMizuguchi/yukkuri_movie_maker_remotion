@@ -1,5 +1,6 @@
 import type { AutomationMode, WorkflowStepName } from "./automationProfiles";
 import type { TimelineData, TimelineMarker } from "./timelineEditor";
+import type { ImageGenerationModel, ScriptGenerationModel } from "@ymm/shared";
 
 export type DashboardStats = {
   projectCount: number;
@@ -39,8 +40,18 @@ export type ProjectAsset = {
 };
 
 export type AppSettings = {
-  apiKeys: { google?: string; openai?: string; stability?: string };
+  models: {
+    script: ScriptGenerationModel;
+    image: ImageGenerationModel;
+  };
   outputPreset: { width: number; height: number; fps: number };
+};
+
+export type SecretSettingsStatus = {
+  googleApiKey: {
+    configured: boolean;
+    source: "stored" | "environment" | null;
+  };
 };
 
 export type AiUsageSummary = {
@@ -126,7 +137,13 @@ export type PreviewResponse = {
 };
 
 export type SettingsDiagnostics = {
-  googleApiKey: { configured: boolean };
+  googleApiKey: {
+    configured: boolean;
+    reachable: boolean;
+    source: "stored" | "environment" | null;
+    status?: number;
+    error?: string;
+  };
   aivisSpeech: {
     configured: boolean;
     reachable: boolean;

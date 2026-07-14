@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export * from "./aiUsage";
+export * from "./aiModels";
 
 export const WORKFLOW_STEPS = [
   "theme_selection",
