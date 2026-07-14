@@ -88,6 +88,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   outline: 3px solid rgba(103, 232, 249, .9);
   outline-offset: 3px;
 }
+@keyframes generationPulse {
+  0%, 100% { transform: scale(.9); opacity: .68; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.generation-pulse {
+  animation: generationPulse 1.25s ease-in-out infinite;
+}
 summary {
   cursor: pointer;
 }
@@ -133,6 +140,14 @@ summary {
   }
   .stage-copy strong {
     font-size: 10px;
+  }
+  .generation-monitor {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    top: 6px !important;
+  }
+  .generation-monitor > button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 `;
@@ -555,6 +570,56 @@ export const styles: Record<string, React.CSSProperties> = {
     height: "100%",
     borderRadius: 999,
     background: "linear-gradient(90deg, #22d3ee, #38bdf8)",
+  },
+  generationMonitor: {
+    position: "sticky",
+    top: 10,
+    zIndex: 8,
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 12,
+    padding: "14px 16px",
+    border: "1px solid",
+    borderRadius: 18,
+    boxShadow: "0 18px 50px rgba(2, 8, 23, .35)",
+    backdropFilter: "blur(14px)",
+  },
+  generationMonitorIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    display: "grid",
+    placeItems: "center",
+    background: "rgba(255,255,255,.12)",
+    color: "#cffafe",
+    fontWeight: 900,
+  },
+  generationMonitorBody: {
+    minWidth: 0,
+    display: "grid",
+    gap: 7,
+  },
+  generationMonitorHeading: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  generationMonitorDescription: {
+    color: "rgba(226, 232, 240, .76)",
+    fontSize: 12,
+  },
+  generationMonitorAction: {
+    border: "1px solid rgba(207, 250, 254, .36)",
+    borderRadius: 12,
+    padding: "9px 12px",
+    background: "rgba(8, 20, 43, .68)",
+    color: "#ecfeff",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
   runningIndicator: {
     display: "flex",

@@ -25,6 +25,7 @@ import {
   getWorkflowPosition,
   primaryWorkflowNavigation,
 } from "./guidedWorkflow";
+import { getGenerationProgress } from "./generationProgress";
 import type { ScreenId } from "./screenConfig";
 import { styleText, styles } from "./styles";
 import {
@@ -209,6 +210,9 @@ export function App() {
       ["PENDING", "RUNNING"].includes(job.status),
     ),
   );
+  const generationMonitor = projectDetail?.jobs[0]
+    ? getGenerationProgress(projectDetail.jobs[0])
+    : null;
   const recommendedAction = getRecommendedAction({
     hasProject: Boolean(selectedProjectId),
     hasScript: Boolean(
@@ -948,6 +952,75 @@ export function App() {
               {primaryWorkflowNavigation[workflowPosition - 1]?.description}
             </span>
           </div>
+        ) : null}
+
+        {generationMonitor && selectedProject ? (
+          <aside
+            style={{
+              ...styles.generationMonitor,
+              ...generationMonitorToneStyles[generationMonitor.tone],
+            }}
+            className="generation-monitor"
+            data-testid="generation-monitor"
+            data-generation-status={generationMonitor.tone}
+            aria-live={generationMonitor.isActive ? "polite" : "off"}
+          >
+            <span
+              style={styles.generationMonitorIcon}
+              className={
+                generationMonitor.tone === "running"
+                  ? "generation-pulse"
+                  : undefined
+              }
+              aria-hidden="true"
+            >
+              {generationMonitor.tone === "completed"
+                ? "✓"
+                : generationMonitor.tone === "failed"
+                  ? "!"
+                  : "●"}
+            </span>
+            <div style={styles.generationMonitorBody}>
+              <div style={styles.generationMonitorHeading}>
+                <strong>{generationMonitor.heading}</strong>
+                <span data-testid="generation-current-step">
+                  現在: {generationMonitor.currentStepLabel}
+                </span>
+              </div>
+              <span style={styles.generationMonitorDescription}>
+                {generationMonitor.description}
+              </span>
+              <div
+                style={styles.progressTrack}
+                role="progressbar"
+                aria-label="動画生成の進捗"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={generationMonitor.percentage}
+              >
+                <span
+                  style={{
+                    ...styles.progressFill,
+                    width: `${generationMonitor.percentage}%`,
+                  }}
+                />
+              </div>
+              <small data-testid="generation-progress-count">
+                {generationMonitor.settledStepCount} /{" "}
+                {generationMonitor.totalStepCount} 工程 ·{" "}
+                {generationMonitor.percentage}%
+                {generationMonitor.isActive ? " · 自動更新中" : ""}
+              </small>
+            </div>
+            <button
+              style={styles.generationMonitorAction}
+              onClick={() => navigateToScreen(generationMonitor.action)}
+            >
+              {generationMonitor.action === "preview"
+                ? "完成動画を見る"
+                : "生成状況を見る"}
+            </button>
+          </aside>
         ) : null}
 
         {message ? (
@@ -2704,6 +2777,36 @@ export function App() {
     </div>
   );
 }
+
+const generationMonitorToneStyles: Record<
+  ReturnType<typeof getGenerationProgress>["tone"],
+  React.CSSProperties
+> = {
+  pending: {
+    borderColor: "rgba(250, 204, 21, .55)",
+    background:
+      "linear-gradient(120deg, rgba(66, 48, 8, .94), rgba(22, 32, 58, .96))",
+  },
+  running: {
+    borderColor: "rgba(34, 211, 238, .72)",
+    background:
+      "linear-gradient(120deg, rgba(8, 47, 73, .96), rgba(16, 35, 67, .96))",
+  },
+  completed: {
+    borderColor: "rgba(74, 222, 128, .62)",
+    background:
+      "linear-gradient(120deg, rgba(7, 65, 45, .9), rgba(15, 38, 59, .96))",
+  },
+  failed: {
+    borderColor: "rgba(248, 113, 113, .72)",
+    background:
+      "linear-gradient(120deg, rgba(69, 20, 30, .94), rgba(31, 30, 55, .96))",
+  },
+  cancelled: {
+    borderColor: "rgba(148, 163, 184, .45)",
+    background: "rgba(30, 41, 59, .94)",
+  },
+};
 
 const ScreenIntro: React.FC<{
   step: string;

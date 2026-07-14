@@ -171,6 +171,15 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("app-message")).toContainText(
     "完成動画の生成を開始しました",
   );
+  await expect(page.getByTestId("generation-monitor")).toContainText(
+    "生成を受け付けました",
+  );
+  await expect(page.getByTestId("generation-current-step")).toContainText(
+    "開始を待っています",
+  );
+  await expect(page.getByTestId("generation-progress-count")).toContainText(
+    "自動更新中",
+  );
   await expect(page.getByTestId("preview-summary")).toContainText(
     "durationInFrames",
   );

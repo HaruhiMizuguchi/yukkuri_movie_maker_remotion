@@ -56,6 +56,9 @@ export type ProjectDetail = {
     status: string;
     mode: string;
     createdAt: string;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    error?: string | null;
     steps: Array<{ stepName: string; status: string; completedAt?: string }>;
     files: Array<{
       id: string;
