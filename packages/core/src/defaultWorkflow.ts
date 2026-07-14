@@ -3,8 +3,12 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { Script } from "@ymm/shared";
-import { ScriptSchema, TimelineDataSchema } from "@ymm/shared";
+import type { AiUsageRecord, Script } from "@ymm/shared";
+import {
+  createLlmUsageRecord,
+  ScriptSchema,
+  TimelineDataSchema,
+} from "@ymm/shared";
 import { createCharacterPerformancePlan } from "./characterPerformance";
 import { createAudioMixPlan } from "./audioMixPlan";
 import { createChapterPlan } from "./chapterPlan";
@@ -108,9 +112,14 @@ export function createDefaultWorkflowImplementations(
         "manual-script.json",
       );
       const selectedTheme = await readSelectedTheme(projectRoot, details.theme);
-      const script = (await fileExists(manualScriptPath))
-        ? ScriptSchema.parse(await readJson(manualScriptPath))
+      const generation = (await fileExists(manualScriptPath))
+        ? {
+            script: ScriptSchema.parse(await readJson(manualScriptPath)),
+            source: "manual" as const,
+            aiUsage: undefined,
+          }
         : await generateScript(selectedTheme, options.fetchFn);
+      const script = generation.script;
       const scriptPath = path.join(stepDir.runDir, "script.json");
       await writeJson(scriptPath, script);
       await syncLatest(stepDir);
@@ -133,11 +142,19 @@ export function createDefaultWorkflowImplementations(
         event: "completed",
         jobId: ctx.jobId,
         lineCount: script.lines.length,
+        generationSource: generation.source,
+        aiUsage: generation.aiUsage,
       });
 
-      logger.info("script_generation completed", { scriptPath });
+      logger.info("script_generation completed", {
+        scriptPath,
+        generationSource: generation.source,
+        aiUsage: generation.aiUsage,
+      });
       return {
         scriptPath: toRelativePath(outputRoot, scriptPath),
+        generationSource: generation.source,
+        ...(generation.aiUsage ? { aiUsage: generation.aiUsage } : {}),
       };
     },
     tts_generation: async (ctx) => {
@@ -951,15 +968,20 @@ const readGeneratedTitle = async (
 const generateScript = async (
   theme: string,
   fetchFn?: typeof fetch,
-): Promise<Script> => {
+): Promise<{
+  script: Script;
+  source: "api" | "fallback";
+  aiUsage?: AiUsageRecord;
+}> => {
   const effectiveFetch = fetchFn ?? fetch;
   const geminiApiKey = process.env.GOOGLE_API_KEY?.trim();
   if (!geminiApiKey) {
-    return buildFallbackScript(theme);
+    return { script: buildFallbackScript(theme), source: "fallback" };
   }
 
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  let aiUsage: AiUsageRecord | undefined;
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
     const prompt =
       "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。" +
@@ -983,7 +1005,22 @@ const generateScript = async (
 
     const body = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        thoughtsTokenCount?: number;
+      };
     };
+    if (body.usageMetadata) {
+      aiUsage = createLlmUsageRecord({
+        model,
+        inputTokens: body.usageMetadata.promptTokenCount ?? 0,
+        // Geminiの出力単価には思考トークンも含まれるため合算する。
+        outputTokens:
+          (body.usageMetadata.candidatesTokenCount ?? 0) +
+          (body.usageMetadata.thoughtsTokenCount ?? 0),
+      });
+    }
     const text = body.candidates?.[0]?.content?.parts
       ?.map((part) => part.text ?? "")
       .join("");
@@ -995,11 +1032,15 @@ const generateScript = async (
       throw new Error("Gemini response schema mismatch");
     }
     if (parsed.data.lines.length === 0) {
-      return buildFallbackScript(theme);
+      return {
+        script: buildFallbackScript(theme),
+        source: "fallback",
+        aiUsage,
+      };
     }
-    return parsed.data;
+    return { script: parsed.data, source: "api", aiUsage };
   } catch {
-    return buildFallbackScript(theme);
+    return { script: buildFallbackScript(theme), source: "fallback", aiUsage };
   }
 };
 

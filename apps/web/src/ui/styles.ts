@@ -571,6 +571,56 @@ export const styles: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     background: "linear-gradient(90deg, #22d3ee, #38bdf8)",
   },
+  aiUsageCard: {
+    border: "1px solid rgba(167,139,250,.3)",
+    borderRadius: 18,
+    padding: 18,
+    display: "grid",
+    gap: 14,
+    background:
+      "linear-gradient(135deg, rgba(46,16,101,.3), rgba(10,30,60,.64))",
+  },
+  aiUsageCost: {
+    color: "#ddd6fe",
+    fontSize: 24,
+  },
+  aiUsageMetrics: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: 8,
+  },
+  aiUsageLatest: {
+    border: "1px solid rgba(196,181,253,.18)",
+    borderRadius: 12,
+    padding: "10px 12px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    background: "rgba(46,16,101,.18)",
+  },
+  aiUsageMetric: {
+    borderRadius: 12,
+    padding: "10px 12px",
+    display: "grid",
+    gap: 4,
+    background: "rgba(15,23,42,.5)",
+  },
+  aiModelList: {
+    display: "grid",
+    gap: 6,
+  },
+  aiModelRow: {
+    borderTop: "1px solid rgba(196,181,253,.14)",
+    paddingTop: 8,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  inlineLink: {
+    color: "#a5f3fc",
+  },
   generationMonitor: {
     position: "sticky",
     top: 10,

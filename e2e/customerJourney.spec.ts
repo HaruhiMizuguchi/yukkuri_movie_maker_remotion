@@ -112,6 +112,14 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "data-project-id",
     projectId,
   );
+  await expect(page.getByTestId("ai-usage-summary")).toContainText(
+    "AI使用量と料金目安",
+  );
+  await expect(page.getByTestId("ai-usage-summary")).toContainText("約 ￥32");
+  await expect(page.getByTestId("ai-usage-summary")).toContainText(
+    "gemini-2.5-flash",
+  );
+  await expect(page.getByTestId("ai-usage-latest")).toContainText("直近の実行");
 
   await page.getByTestId("nav-script").click();
   await page.getByTestId("script-title-input").fill("AIニュース解説テスト");
@@ -511,6 +519,57 @@ const createProjectDetail = (state: {
   script: state.script,
   timeline: state.timeline,
   assets: state.assets,
+  aiUsageSummary: {
+    project: {
+      requestCount: 2,
+      inputTokens: 100_000,
+      outputTokens: 20_000,
+      imageCount: 3,
+      estimatedCostUsd: 0.197,
+      estimatedCostJpy: 31.52,
+      unpricedRequestCount: 0,
+      usdJpyRate: 160,
+      pricingVersion: "2026-07-15",
+      pricingSource: "https://ai.google.dev/gemini-api/docs/pricing",
+      byModel: [
+        {
+          provider: "google",
+          kind: "llm",
+          model: "gemini-2.5-flash",
+          requestCount: 1,
+          inputTokens: 100_000,
+          outputTokens: 20_000,
+          imageCount: 0,
+          estimatedCostUsd: 0.08,
+          unpricedRequestCount: 0,
+        },
+        {
+          provider: "google",
+          kind: "image",
+          model: "gemini-2.5-flash-image",
+          requestCount: 1,
+          inputTokens: 0,
+          outputTokens: 0,
+          imageCount: 3,
+          estimatedCostUsd: 0.117,
+          unpricedRequestCount: 0,
+        },
+      ],
+    },
+    latestJob: {
+      requestCount: 1,
+      inputTokens: 100_000,
+      outputTokens: 20_000,
+      imageCount: 0,
+      estimatedCostUsd: 0.08,
+      estimatedCostJpy: 12.8,
+      unpricedRequestCount: 0,
+      usdJpyRate: 160,
+      pricingVersion: "2026-07-15",
+      pricingSource: "https://ai.google.dev/gemini-api/docs/pricing",
+      byModel: [],
+    },
+  },
   logs: ["customer journey e2e mock log"],
 });
 

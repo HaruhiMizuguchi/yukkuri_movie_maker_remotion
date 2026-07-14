@@ -104,6 +104,25 @@ const formatUpdatedAt = (value: string): string =>
     minute: "2-digit",
   }).format(new Date(value));
 
+const formatTokenCount = (value: number): string =>
+  new Intl.NumberFormat("ja-JP").format(value);
+
+const formatEstimatedJpy = (value: number): string =>
+  "約 " +
+  new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatEstimatedUsd = (value: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value < 0.01 ? 4 : 2,
+    maximumFractionDigits: value < 0.01 ? 4 : 2,
+  }).format(value);
+
 export function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -1456,6 +1475,157 @@ export function App() {
                         動画を確認
                       </button>
                     </div>
+                    <section
+                      style={styles.aiUsageCard}
+                      data-testid="ai-usage-summary"
+                      aria-labelledby="ai-usage-title"
+                    >
+                      <div style={styles.sectionHeadingRow}>
+                        <div>
+                          <span style={styles.eyebrow}>この動画の累計</span>
+                          <h3 id="ai-usage-title" style={styles.subTitle}>
+                            AI使用量と料金目安
+                          </h3>
+                        </div>
+                        {projectDetail.aiUsageSummary.project.requestCount >
+                        0 ? (
+                          <strong style={styles.aiUsageCost}>
+                            {formatEstimatedJpy(
+                              projectDetail.aiUsageSummary.project
+                                .estimatedCostJpy,
+                            )}
+                          </strong>
+                        ) : null}
+                      </div>
+                      {projectDetail.aiUsageSummary.project.requestCount ===
+                      0 ? (
+                        <div style={styles.emptyStateCompact}>
+                          APIを使った生成記録はまだありません。手動台本や代替生成は料金に含みません。
+                        </div>
+                      ) : (
+                        <>
+                          {projectDetail.aiUsageSummary.latestJob &&
+                          projectDetail.aiUsageSummary.latestJob.requestCount >
+                            0 ? (
+                            <div
+                              style={styles.aiUsageLatest}
+                              data-testid="ai-usage-latest"
+                            >
+                              <span>
+                                <strong>直近の実行</strong>
+                                <small>
+                                  API{" "}
+                                  {
+                                    projectDetail.aiUsageSummary.latestJob
+                                      .requestCount
+                                  }
+                                  回 · 入力{" "}
+                                  {formatTokenCount(
+                                    projectDetail.aiUsageSummary.latestJob
+                                      .inputTokens,
+                                  )}{" "}
+                                  tokens · 画像{" "}
+                                  {
+                                    projectDetail.aiUsageSummary.latestJob
+                                      .imageCount
+                                  }
+                                  枚
+                                </small>
+                              </span>
+                              <strong>
+                                {formatEstimatedJpy(
+                                  projectDetail.aiUsageSummary.latestJob
+                                    .estimatedCostJpy,
+                                )}
+                              </strong>
+                            </div>
+                          ) : null}
+                          <div style={styles.aiUsageMetrics}>
+                            <span style={styles.aiUsageMetric}>
+                              <small>LLM入力</small>
+                              <strong>
+                                {formatTokenCount(
+                                  projectDetail.aiUsageSummary.project
+                                    .inputTokens,
+                                )}{" "}
+                                tokens
+                              </strong>
+                            </span>
+                            <span style={styles.aiUsageMetric}>
+                              <small>LLM出力</small>
+                              <strong>
+                                {formatTokenCount(
+                                  projectDetail.aiUsageSummary.project
+                                    .outputTokens,
+                                )}{" "}
+                                tokens
+                              </strong>
+                            </span>
+                            <span style={styles.aiUsageMetric}>
+                              <small>生成画像</small>
+                              <strong>
+                                {
+                                  projectDetail.aiUsageSummary.project
+                                    .imageCount
+                                }
+                                枚
+                              </strong>
+                            </span>
+                            <span style={styles.aiUsageMetric}>
+                              <small>概算（USD）</small>
+                              <strong>
+                                {formatEstimatedUsd(
+                                  projectDetail.aiUsageSummary.project
+                                    .estimatedCostUsd,
+                                )}
+                              </strong>
+                            </span>
+                          </div>
+                          <div style={styles.aiModelList}>
+                            {projectDetail.aiUsageSummary.project.byModel.map(
+                              (usage) => (
+                                <div
+                                  key={usage.kind + "-" + usage.model}
+                                  style={styles.aiModelRow}
+                                >
+                                  <span>
+                                    <strong>{usage.model}</strong>
+                                    <small>
+                                      {usage.kind === "llm"
+                                        ? "LLM · " + usage.requestCount + "回"
+                                        : "画像 · " + usage.imageCount + "枚"}
+                                    </small>
+                                  </span>
+                                  <span>
+                                    {usage.unpricedRequestCount > 0
+                                      ? "単価未登録"
+                                      : formatEstimatedUsd(
+                                          usage.estimatedCostUsd,
+                                        )}
+                                  </span>
+                                </div>
+                              ),
+                            )}
+                          </div>
+                          <small style={styles.helpText}>
+                            Googleの標準公開単価と 1 USD ={" "}
+                            {projectDetail.aiUsageSummary.project.usdJpyRate}
+                            円での概算です。無料枠・税・契約割引・キャッシュは実請求で変わります。{" "}
+                            <a
+                              style={styles.inlineLink}
+                              href={
+                                projectDetail.aiUsageSummary.project
+                                  .pricingSource
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              単価を確認
+                            </a>
+                          </small>
+                        </>
+                      )}
+                    </section>
                     <details style={styles.advancedDetails}>
                       <summary>再実行・工程・成果物の詳細</summary>
                       <div style={styles.advancedContent}>

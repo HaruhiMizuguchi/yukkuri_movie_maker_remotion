@@ -43,6 +43,30 @@ export type AppSettings = {
   outputPreset: { width: number; height: number; fps: number };
 };
 
+export type AiUsageSummary = {
+  requestCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  imageCount: number;
+  estimatedCostUsd: number;
+  estimatedCostJpy: number;
+  unpricedRequestCount: number;
+  usdJpyRate: number;
+  pricingVersion: string;
+  pricingSource: string;
+  byModel: Array<{
+    provider: string;
+    kind: "llm" | "image";
+    model: string;
+    requestCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    imageCount: number;
+    estimatedCostUsd: number;
+    unpricedRequestCount: number;
+  }>;
+};
+
 export type ProjectDetail = {
   project: {
     id: string;
@@ -70,6 +94,10 @@ export type ProjectDetail = {
   script: ScriptData | null;
   timeline: TimelineData | null;
   assets: ProjectAsset[];
+  aiUsageSummary: {
+    project: AiUsageSummary;
+    latestJob: AiUsageSummary | null;
+  };
   logs: string[];
 };
 

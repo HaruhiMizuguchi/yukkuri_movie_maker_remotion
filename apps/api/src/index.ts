@@ -15,7 +15,9 @@ import {
 } from "@ymm/core";
 import {
   AutomationModeSchema,
+  extractAiUsageRecords,
   ScriptSchema,
+  summarizeAiUsage,
   TimelineDataSchema,
 } from "@ymm/shared";
 import { z } from "zod";
@@ -303,6 +305,10 @@ app.get("/api/projects/:projectId", async (req, reply) => {
     : null;
   const assets = await listProjectAssets(workspaceRoot, projectId);
   const logs = await readWorkflowLogs(projectId);
+  const usageRecordsByJob = jobs.map((job) =>
+    job.steps.flatMap((step) => extractAiUsageRecords(step.outputJson)),
+  );
+  const projectUsageRecords = usageRecordsByJob.flat();
 
   return toJsonSafeValue({
     project: access.project,
@@ -311,6 +317,10 @@ app.get("/api/projects/:projectId", async (req, reply) => {
     script,
     timeline,
     assets,
+    aiUsageSummary: {
+      project: summarizeAiUsage(projectUsageRecords),
+      latestJob: jobs[0] ? summarizeAiUsage(usageRecordsByJob[0] ?? []) : null,
+    },
     logs,
   });
 });

@@ -13,7 +13,10 @@ type PrismaMockResult = {
   registeredFiles: Array<any>;
 };
 
-const createPrismaMock = (projectId: string, theme: string): PrismaMockResult => {
+const createPrismaMock = (
+  projectId: string,
+  theme: string,
+): PrismaMockResult => {
   const registeredFiles: Array<any> = [];
   const prisma: any = {
     workflowStep: {
@@ -39,7 +42,11 @@ const createPrismaMock = (projectId: string, theme: string): PrismaMockResult =>
   return { prisma, registeredFiles };
 };
 
-const createContext = (projectId: string, theme: string, outputRoot: string): WorkflowContext => {
+const createContext = (
+  projectId: string,
+  theme: string,
+  outputRoot: string,
+): WorkflowContext => {
   const { prisma } = createPrismaMock(projectId, theme);
   return {
     jobId: "job-task3-quality",
@@ -50,15 +57,33 @@ const createContext = (projectId: string, theme: string, outputRoot: string): Wo
 
 const writeJson = async (filePath: string, payload: unknown): Promise<void> => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    filePath,
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf-8",
+  );
 };
 
 const createTempRoot = (suffix: string): string =>
-  path.join(process.cwd(), "outputs", "test_evidence", "task3_quality", `${suffix}-${Date.now()}`);
+  path.join(
+    process.cwd(),
+    "outputs",
+    "test_evidence",
+    "task3_quality",
+    `${suffix}-${Date.now()}`,
+  );
 
-const runCommand = async (command: string, args: string[], cwd: string): Promise<string> =>
+const runCommand = async (
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<string> =>
   new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      cwd,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
@@ -89,17 +114,78 @@ const ffprobeDuration = async (filePath: string): Promise<number> => {
       "default=noprint_wrappers=1:nokey=1",
       filePath,
     ],
-    process.cwd()
+    process.cwd(),
   );
   return Number(raw);
 };
 
 describe("task3 module quality", () => {
+  it("script_generation: API応答のトークン使用量と概算料金を返す", async () => {
+    const outputRoot = createTempRoot("script-usage");
+    const projectId = `project-${Date.now()}`;
+    const { prisma } = createPrismaMock(projectId, "AI料金テスト");
+    const ctx = {
+      jobId: "job-task3-quality",
+      prisma,
+      outputRoot,
+    } as WorkflowContext;
+    vi.stubEnv("GOOGLE_API_KEY", "test-google-key");
+    vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
+    try {
+      const implementations = createDefaultWorkflowImplementations({
+        outputRoot,
+        fetchFn: vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        title: "AI料金テスト",
+                        theme: "AI料金テスト",
+                        lines: [
+                          { speaker: "reimu", text: "使用量を確認します。" },
+                        ],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 1_000,
+              candidatesTokenCount: 200,
+              thoughtsTokenCount: 50,
+            },
+          }),
+        }) as any,
+      });
+
+      const output = await implementations.script_generation?.(ctx);
+
+      expect(output?.aiUsage).toMatchObject({
+        kind: "llm",
+        model: "gemini-2.5-flash",
+        inputTokens: 1_000,
+        outputTokens: 250,
+        pricingKnown: true,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("script_generation: JSON構造と最低限の台本品質を満たす", async () => {
     const outputRoot = createTempRoot("script");
     const projectId = `project-${Date.now()}`;
     const { prisma } = createPrismaMock(projectId, "AIで学ぶ宇宙開発");
-    const ctx = { jobId: "job-task3-quality", prisma, outputRoot } as WorkflowContext;
+    const ctx = {
+      jobId: "job-task3-quality",
+      prisma,
+      outputRoot,
+    } as WorkflowContext;
     const implementations = createDefaultWorkflowImplementations({
       outputRoot,
       ttsProvider: "mock",
@@ -115,9 +201,18 @@ describe("task3 module quality", () => {
                       title: "宇宙開発の現在地",
                       theme: "AIで学ぶ宇宙開発",
                       lines: [
-                        { speaker: "reimu", text: "宇宙開発の基本を整理します。" },
-                        { speaker: "marisa", text: "重要なポイントを3つに絞って解説するぜ。" },
-                        { speaker: "reimu", text: "最後に今後の展望を確認しましょう。" },
+                        {
+                          speaker: "reimu",
+                          text: "宇宙開発の基本を整理します。",
+                        },
+                        {
+                          speaker: "marisa",
+                          text: "重要なポイントを3つに絞って解説するぜ。",
+                        },
+                        {
+                          speaker: "reimu",
+                          text: "最後に今後の展望を確認しましょう。",
+                        },
                       ],
                     }),
                   },
@@ -138,7 +233,7 @@ describe("task3 module quality", () => {
       "output",
       "script_generation",
       "latest",
-      "script.json"
+      "script.json",
     );
     const script = JSON.parse(await fs.readFile(scriptPath, "utf-8")) as {
       lines: Array<{ text: string }>;
@@ -159,7 +254,7 @@ describe("task3 module quality", () => {
         "output",
         "script_generation",
         "latest",
-        "script.json"
+        "script.json",
       ),
       {
         title: "テスト",
@@ -168,10 +263,13 @@ describe("task3 module quality", () => {
           { speaker: "reimu", text: "最初のセリフです。" },
           { speaker: "marisa", text: "二つ目のセリフです。" },
         ],
-      }
+      },
     );
 
-    const implementations = createDefaultWorkflowImplementations({ outputRoot, ttsProvider: "mock" });
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+    });
     await implementations.tts_generation?.(ctx);
 
     const audioPath = path.join(
@@ -181,7 +279,7 @@ describe("task3 module quality", () => {
       "output",
       "tts_generation",
       "latest",
-      "audio.wav"
+      "audio.wav",
     );
     const timestampsPath = path.join(
       outputRoot,
@@ -190,11 +288,13 @@ describe("task3 module quality", () => {
       "output",
       "tts_generation",
       "latest",
-      "timestamps.json"
+      "timestamps.json",
     );
 
     const duration = await ffprobeDuration(audioPath);
-    const timestamps = JSON.parse(await fs.readFile(timestampsPath, "utf-8")) as Array<any>;
+    const timestamps = JSON.parse(
+      await fs.readFile(timestampsPath, "utf-8"),
+    ) as Array<any>;
     expect(duration).toBeGreaterThan(1.5);
     expect(timestamps).toHaveLength(2);
     expect(timestamps[0].endMs).toBeLessThanOrEqual(timestamps[1].startMs);
@@ -206,27 +306,60 @@ describe("task3 module quality", () => {
     const ctx = createContext(projectId, "字幕テスト", outputRoot);
     const projectRoot = path.join(outputRoot, "projects", projectId, "output");
 
-    await writeJson(path.join(projectRoot, "script_generation", "latest", "script.json"), {
-      title: "字幕",
-      theme: "字幕テスト",
-      lines: [
-        { speaker: "reimu", text: "字幕の1行目です。" },
-        { speaker: "marisa", text: "字幕の2行目です。" },
+    await writeJson(
+      path.join(projectRoot, "script_generation", "latest", "script.json"),
+      {
+        title: "字幕",
+        theme: "字幕テスト",
+        lines: [
+          { speaker: "reimu", text: "字幕の1行目です。" },
+          { speaker: "marisa", text: "字幕の2行目です。" },
+        ],
+      },
+    );
+    await writeJson(
+      path.join(projectRoot, "tts_generation", "latest", "timestamps.json"),
+      [
+        {
+          index: 0,
+          speaker: "reimu",
+          text: "字幕の1行目です。",
+          startMs: 0,
+          endMs: 1800,
+        },
+        {
+          index: 1,
+          speaker: "marisa",
+          text: "字幕の2行目です。",
+          startMs: 1800,
+          endMs: 3600,
+        },
       ],
-    });
-    await writeJson(path.join(projectRoot, "tts_generation", "latest", "timestamps.json"), [
-      { index: 0, speaker: "reimu", text: "字幕の1行目です。", startMs: 0, endMs: 1800 },
-      { index: 1, speaker: "marisa", text: "字幕の2行目です。", startMs: 1800, endMs: 3600 },
-    ]);
+    );
 
-    const implementations = createDefaultWorkflowImplementations({ outputRoot, ttsProvider: "mock" });
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+    });
     await implementations.subtitle_generation?.(ctx);
 
-    const assPath = path.join(projectRoot, "subtitle_generation", "latest", "subtitles.ass");
-    const jsonPath = path.join(projectRoot, "subtitle_generation", "latest", "subtitles.json");
+    const assPath = path.join(
+      projectRoot,
+      "subtitle_generation",
+      "latest",
+      "subtitles.ass",
+    );
+    const jsonPath = path.join(
+      projectRoot,
+      "subtitle_generation",
+      "latest",
+      "subtitles.json",
+    );
     const assText = await fs.readFile(assPath, "utf-8");
     const json = JSON.parse(await fs.readFile(jsonPath, "utf-8")) as Array<any>;
-    const dialogueCount = assText.split("\n").filter((line) => line.startsWith("Dialogue:")).length;
+    const dialogueCount = assText
+      .split("\n")
+      .filter((line) => line.startsWith("Dialogue:")).length;
 
     expect(json).toHaveLength(2);
     expect(dialogueCount).toBe(2);
@@ -238,8 +371,16 @@ describe("task3 module quality", () => {
     const ctx = createContext(projectId, "動画合成テスト", outputRoot);
     const projectRoot = path.join(outputRoot, "projects", projectId);
 
-    await fs.mkdir(path.join(projectRoot, "input", "assets", "characters"), { recursive: true });
-    const customCharacterPath = path.join(projectRoot, "input", "assets", "characters", "main.png");
+    await fs.mkdir(path.join(projectRoot, "input", "assets", "characters"), {
+      recursive: true,
+    });
+    const customCharacterPath = path.join(
+      projectRoot,
+      "input",
+      "assets",
+      "characters",
+      "main.png",
+    );
     await runCommand(
       "ffmpeg",
       [
@@ -252,24 +393,60 @@ describe("task3 module quality", () => {
         "1",
         customCharacterPath,
       ],
-      process.cwd()
+      process.cwd(),
     );
 
-    await writeJson(path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.json"), [
-      { index: 0, speaker: "reimu", text: "動画の字幕", startMs: 0, endMs: 2000 },
-    ]);
-    await writeJson(path.join(projectRoot, "output", "script_generation", "latest", "script.json"), {
-      title: "動画",
-      theme: "動画合成テスト",
-      lines: [{ speaker: "reimu", text: "動画の字幕" }],
-    });
-    await fs.mkdir(path.join(projectRoot, "output", "subtitle_generation", "latest"), { recursive: true });
-    await fs.writeFile(
-      path.join(projectRoot, "output", "subtitle_generation", "latest", "subtitles.ass"),
-      "[Script Info]\n[V4+ Styles]\n[Events]\nDialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,reimu: 動画の字幕\n",
-      "utf-8"
+    await writeJson(
+      path.join(
+        projectRoot,
+        "output",
+        "subtitle_generation",
+        "latest",
+        "subtitles.json",
+      ),
+      [
+        {
+          index: 0,
+          speaker: "reimu",
+          text: "動画の字幕",
+          startMs: 0,
+          endMs: 2000,
+        },
+      ],
     );
-    await fs.mkdir(path.join(projectRoot, "output", "tts_generation", "latest"), { recursive: true });
+    await writeJson(
+      path.join(
+        projectRoot,
+        "output",
+        "script_generation",
+        "latest",
+        "script.json",
+      ),
+      {
+        title: "動画",
+        theme: "動画合成テスト",
+        lines: [{ speaker: "reimu", text: "動画の字幕" }],
+      },
+    );
+    await fs.mkdir(
+      path.join(projectRoot, "output", "subtitle_generation", "latest"),
+      { recursive: true },
+    );
+    await fs.writeFile(
+      path.join(
+        projectRoot,
+        "output",
+        "subtitle_generation",
+        "latest",
+        "subtitles.ass",
+      ),
+      "[Script Info]\n[V4+ Styles]\n[Events]\nDialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,reimu: 動画の字幕\n",
+      "utf-8",
+    );
+    await fs.mkdir(
+      path.join(projectRoot, "output", "tts_generation", "latest"),
+      { recursive: true },
+    );
     await runCommand(
       "ffmpeg",
       [
@@ -278,9 +455,15 @@ describe("task3 module quality", () => {
         "lavfi",
         "-i",
         "sine=frequency=440:duration=2",
-        path.join(projectRoot, "output", "tts_generation", "latest", "audio.wav"),
+        path.join(
+          projectRoot,
+          "output",
+          "tts_generation",
+          "latest",
+          "audio.wav",
+        ),
       ],
-      process.cwd()
+      process.cwd(),
     );
 
     const implementations = createDefaultWorkflowImplementations({
@@ -295,9 +478,11 @@ describe("task3 module quality", () => {
       "output",
       "video_composition",
       "latest",
-      "composition.json"
+      "composition.json",
     );
-    const composition = JSON.parse(await fs.readFile(compositionPath, "utf-8")) as {
+    const composition = JSON.parse(
+      await fs.readFile(compositionPath, "utf-8"),
+    ) as {
       characterImagePath: string;
     };
     expect(composition.characterImagePath).toContain("characters/main.png");
@@ -314,7 +499,7 @@ describe("task3 module quality", () => {
       "output",
       "video_composition",
       "latest",
-      "preview.mp4"
+      "preview.mp4",
     );
 
     await fs.mkdir(path.dirname(previewPath), { recursive: true });
@@ -339,10 +524,13 @@ describe("task3 module quality", () => {
         "aac",
         previewPath,
       ],
-      process.cwd()
+      process.cwd(),
     );
 
-    const implementations = createDefaultWorkflowImplementations({ outputRoot, ttsProvider: "mock" });
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+    });
     await implementations.final_encoding?.(ctx);
 
     const finalPath = path.join(
@@ -352,7 +540,7 @@ describe("task3 module quality", () => {
       "output",
       "final_encoding",
       "latest",
-      "final.mp4"
+      "final.mp4",
     );
     const codecName = await runCommand(
       "ffprobe",
@@ -367,7 +555,7 @@ describe("task3 module quality", () => {
         "default=noprint_wrappers=1:nokey=1",
         finalPath,
       ],
-      process.cwd()
+      process.cwd(),
     );
 
     expect(codecName).toBe("h264");
