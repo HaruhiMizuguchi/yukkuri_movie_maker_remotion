@@ -621,6 +621,17 @@ export const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     whiteSpace: "nowrap",
   },
+  contextNotice: {
+    display: "grid",
+    gap: 4,
+    marginBottom: 14,
+    padding: "12px 14px",
+    border: "1px solid rgba(103, 232, 249, .28)",
+    borderRadius: 14,
+    background: "rgba(8, 47, 73, .42)",
+    color: "rgba(226, 232, 240, .82)",
+    fontSize: 12,
+  },
   runningIndicator: {
     display: "flex",
     alignItems: "center",

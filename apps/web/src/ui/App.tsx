@@ -223,7 +223,50 @@ export function App() {
   });
   const workflowPosition = getWorkflowPosition(activeScreen);
 
+  const beginNewProject = () => {
+    setSelectedProjectId(null);
+    setProjectDetail(null);
+    setScriptDraft({
+      ...initialScript,
+      lines: initialScript.lines.map((line) => ({ ...line })),
+    });
+    setTimelineDraft(null);
+    setTimelinePast([]);
+    setTimelineFuture([]);
+    setTimelineDirty(false);
+    setAssets([]);
+    setAssetForm({
+      type: "image",
+      usage: "background",
+      name: "",
+      relativePath: "",
+    });
+    setAssetUploadFile(null);
+    setPreview(null);
+    setSelectedTimelineClip(null);
+    setTimelinePlayheadMs(0);
+    setTimelineZoomWindowMs(6000);
+    setManualSubtitleText("");
+    setManualMarkerLabel("調整ポイント");
+    setManualMarkerTimeMs("0");
+    setWizardTheme("");
+    setWizardMode("full");
+    setCustomSkipSteps([]);
+    setWizardTemplateId("");
+    setLastCreatedJobId(null);
+    setErrorMessage("");
+    retryActionRef.current = null;
+    setMessage(
+      "新しい動画の作成に切り替えました。以前の動画は保存されたままです。",
+    );
+    setActiveScreen("wizard");
+  };
+
   const navigateToScreen = (screen: ScreenId) => {
+    if (screen === "wizard") {
+      beginNewProject();
+      return;
+    }
     if (projectRequiredScreens.has(screen) && !selectedProjectId) {
       setMessage(
         "先にホームでプロジェクトを選ぶか、新しい動画を作成してください。",
@@ -877,6 +920,12 @@ export function App() {
                 · 詳細を見る →
               </small>
             </button>
+          ) : activeScreen === "wizard" ? (
+            <div style={styles.statusCard} data-testid="selected-project-id">
+              <span style={styles.statusCardLabel}>作成モード</span>
+              <strong>新しい動画を作成中</strong>
+              <small>以前の動画は選択されていません</small>
+            </div>
           ) : (
             <div style={styles.statusCard} data-testid="selected-project-id">
               <span style={styles.statusCardLabel}>編集中の動画</span>
@@ -1197,6 +1246,12 @@ export function App() {
                   title="どんな動画を作りますか？"
                   description="テーマと作り方を選びます。細かな設定や素材は、あとからいつでも変更できます。"
                 />
+                <div style={styles.contextNotice} data-testid="wizard-context">
+                  <strong>新しい動画として作成します</strong>
+                  <span>
+                    以前の動画は保存済みです。この画面の内容が混ざることはありません。
+                  </span>
+                </div>
                 <div style={styles.formSection}>
                   <label style={styles.fieldLabel} htmlFor="wizard-theme">
                     <strong>解説したいテーマ</strong>

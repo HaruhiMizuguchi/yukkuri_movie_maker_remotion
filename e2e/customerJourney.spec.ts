@@ -93,6 +93,26 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "ジョブ数とステータスが確認できる",
   ]);
 
+  await page.getByTestId("nav-wizard").click();
+  await expect(page.getByTestId("screen-wizard")).toBeVisible();
+  await expect(page.getByTestId("selected-project-id")).toContainText(
+    "新しい動画を作成中",
+  );
+  await expect(page.getByTestId("selected-project-id")).not.toHaveAttribute(
+    "data-project-id",
+  );
+  await expect(page.getByTestId("wizard-theme-input")).toHaveValue("");
+  await expect(page.getByTestId("nav-script")).toBeDisabled();
+  await expect(page.getByTestId("generation-monitor")).toHaveCount(0);
+
+  await page.getByTestId("nav-dashboard").click();
+  await page.getByRole("button", { name: "AIニュース解説を開く" }).click();
+  await expect(page.getByTestId("screen-project")).toBeVisible();
+  await expect(page.getByTestId("selected-project-id")).toHaveAttribute(
+    "data-project-id",
+    projectId,
+  );
+
   await page.getByTestId("nav-script").click();
   await page.getByTestId("script-title-input").fill("AIニュース解説テスト");
   await page.getByTestId("script-theme-input").fill("AIニュース解説");
