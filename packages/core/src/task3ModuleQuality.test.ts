@@ -189,6 +189,118 @@ describe("task3 module quality", () => {
     }
   });
 
+  it("script_generation: OpenAI Responses APIで台本と使用量を生成する", async () => {
+    const outputRoot = createTempRoot("script-openai");
+    const projectId = `project-${Date.now()}`;
+    const { prisma } = createPrismaMock(projectId, "OpenAI台本テスト");
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  title: "OpenAI台本",
+                  theme: "OpenAI台本テスト",
+                  lines: [{ speaker: "reimu", text: "OpenAIで生成しました。" }],
+                }),
+              },
+            ],
+          },
+        ],
+        usage: { input_tokens: 800, output_tokens: 160 },
+      }),
+    });
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      openaiApiKey: "test-openai-key",
+      scriptModel: "gpt-5.6-terra",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const output = await implementations.script_generation?.({
+      jobId: "job-task3-quality",
+      prisma,
+      outputRoot,
+    } as WorkflowContext);
+
+    expect(output).toMatchObject({
+      generationSource: "api",
+      aiUsage: {
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        inputTokens: 800,
+        outputTokens: 160,
+      },
+    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-openai-key",
+        }),
+      }),
+    );
+  });
+
+  it("script_generation: Claude Messages APIで台本と使用量を生成する", async () => {
+    const outputRoot = createTempRoot("script-claude");
+    const projectId = `project-${Date.now()}`;
+    const { prisma } = createPrismaMock(projectId, "Claude台本テスト");
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              title: "Claude台本",
+              theme: "Claude台本テスト",
+              lines: [{ speaker: "marisa", text: "Claudeで生成したぜ。" }],
+            }),
+          },
+        ],
+        usage: { input_tokens: 700, output_tokens: 140 },
+      }),
+    });
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      anthropicApiKey: "test-anthropic-key",
+      scriptModel: "claude-sonnet-5",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const output = await implementations.script_generation?.({
+      jobId: "job-task3-quality",
+      prisma,
+      outputRoot,
+    } as WorkflowContext);
+
+    expect(output).toMatchObject({
+      generationSource: "api",
+      aiUsage: {
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        inputTokens: 700,
+        outputTokens: 140,
+      },
+    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-api-key": "test-anthropic-key",
+          "anthropic-version": "2023-06-01",
+        }),
+      }),
+    );
+  });
+
   it("script_generation: JSON構造と最低限の台本品質を満たす", async () => {
     const outputRoot = createTempRoot("script");
     const projectId = `project-${Date.now()}`;

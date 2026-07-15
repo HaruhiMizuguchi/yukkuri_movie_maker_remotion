@@ -1,14 +1,24 @@
 import { z } from "zod";
+import {
+  AiProviderSchema,
+  inferAiProviderFromModel,
+  type AiProvider,
+} from "./aiModels";
 
 export const AI_PRICING_VERSION = "2026-07-15";
 export const AI_PRICING_SOURCE =
   "https://ai.google.dev/gemini-api/docs/pricing";
+export const AI_PRICING_SOURCES: Readonly<Record<AiProvider, string>> = {
+  google: AI_PRICING_SOURCE,
+  openai: "https://developers.openai.com/api/docs/pricing",
+  anthropic: "https://platform.claude.com/docs/en/about-claude/pricing",
+};
 export const DEFAULT_USD_JPY_RATE = 160;
 
 const AiUsageKindSchema = z.enum(["llm", "image"]);
 
 export const AiUsageRecordSchema = z.object({
-  provider: z.literal("google"),
+  provider: AiProviderSchema,
   kind: AiUsageKindSchema,
   model: z.string().min(1),
   inputTokens: z.number().int().nonnegative(),
@@ -33,6 +43,7 @@ export type AiUsageSummary = {
   usdJpyRate: number;
   pricingVersion: string;
   pricingSource: string;
+  pricingSources: string[];
   byModel: Array<{
     provider: AiUsageRecord["provider"];
     kind: AiUsageRecord["kind"];
@@ -53,7 +64,7 @@ type ModelPricing = {
 };
 
 // 料金はGoogleの標準（非バッチ）単価。実際の請求は無料枠や契約条件で変わる。
-const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
+const MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   "gemini-3.5-flash": {
     inputUsdPerMillion: 1.5,
     outputUsdPerMillion: 9,
@@ -95,6 +106,40 @@ const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   "imagen-4.0-fast-generate-001": { imageUsdEach: 0.02 },
   "imagen-4.0-generate-001": { imageUsdEach: 0.04 },
   "imagen-4.0-ultra-generate-001": { imageUsdEach: 0.06 },
+  "gpt-5.6-sol": {
+    inputUsdPerMillion: 5,
+    outputUsdPerMillion: 30,
+  },
+  "gpt-5.6-terra": {
+    inputUsdPerMillion: 2.5,
+    outputUsdPerMillion: 15,
+  },
+  "gpt-5.6-luna": {
+    inputUsdPerMillion: 1,
+    outputUsdPerMillion: 6,
+  },
+  // 1536x1024・mediumの画像出力概算に、取得できた場合のテキスト入力料金を加算する。
+  "gpt-image-2": {
+    inputUsdPerMillion: 5,
+    imageUsdEach: 0.041,
+  },
+  "claude-fable-5": {
+    inputUsdPerMillion: 10,
+    outputUsdPerMillion: 50,
+  },
+  "claude-opus-4-8": {
+    inputUsdPerMillion: 5,
+    outputUsdPerMillion: 25,
+  },
+  // 2026-08-31までの導入単価。pricingVersion更新時に標準単価へ見直す。
+  "claude-sonnet-5": {
+    inputUsdPerMillion: 2,
+    outputUsdPerMillion: 10,
+  },
+  "claude-haiku-4-5": {
+    inputUsdPerMillion: 1,
+    outputUsdPerMillion: 5,
+  },
 };
 
 const roundMoney = (value: number): number => Number(value.toFixed(8));
@@ -109,7 +154,8 @@ const createUsageRecord = (input: {
   const inputTokens = Math.max(0, Math.trunc(input.inputTokens ?? 0));
   const outputTokens = Math.max(0, Math.trunc(input.outputTokens ?? 0));
   const imageCount = Math.max(0, Math.trunc(input.imageCount ?? 0));
-  const pricing = GOOGLE_MODEL_PRICING[input.model];
+  const provider = inferAiProviderFromModel(input.model);
+  const pricing = MODEL_PRICING[input.model];
   const pricingKnown = pricing !== undefined;
   const estimatedCostUsd = pricing
     ? roundMoney(
@@ -120,7 +166,7 @@ const createUsageRecord = (input: {
     : null;
 
   return {
-    provider: "google",
+    provider,
     kind: input.kind,
     model: input.model,
     inputTokens,
@@ -129,7 +175,7 @@ const createUsageRecord = (input: {
     estimatedCostUsd,
     pricingKnown,
     pricingVersion: AI_PRICING_VERSION,
-    pricingSource: AI_PRICING_SOURCE,
+    pricingSource: AI_PRICING_SOURCES[provider],
   };
 };
 
@@ -200,6 +246,9 @@ export const summarizeAiUsage = (
   }
 
   const roundedUsd = roundMoney(estimatedCostUsd);
+  const pricingSources = [
+    ...new Set(records.map((record) => record.pricingSource)),
+  ];
   return {
     requestCount: records.length,
     inputTokens,
@@ -210,7 +259,9 @@ export const summarizeAiUsage = (
     unpricedRequestCount,
     usdJpyRate,
     pricingVersion: AI_PRICING_VERSION,
-    pricingSource: AI_PRICING_SOURCE,
+    pricingSource: pricingSources[0] ?? AI_PRICING_SOURCE,
+    pricingSources:
+      pricingSources.length > 0 ? pricingSources : [AI_PRICING_SOURCE],
     byModel: [...byModel.values()],
   };
 };

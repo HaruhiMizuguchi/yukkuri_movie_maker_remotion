@@ -118,6 +118,67 @@ describe("production workflow implementations", () => {
     expect(generated).toEqual(imageBytes);
   });
 
+  it("OpenAI Image APIで16:9背景を生成し、使用量を返す", async () => {
+    const outputRoot = path.join(
+      process.cwd(),
+      "outputs",
+      "test_evidence",
+      "image-model",
+      `openai-${Date.now()}`,
+    );
+    const projectId = `project-${Date.now()}`;
+    const { prisma } = createPrismaMock(projectId, "OpenAI画像");
+    const imageBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ b64_json: imageBytes.toString("base64") }],
+        usage: { input_tokens: 300 },
+      }),
+    });
+    const implementations = createProductionWorkflowImplementations({
+      outputRoot,
+      openaiApiKey: "test-openai-key",
+      imageModel: "gpt-image-2",
+      fetchFn: fetchFn as unknown as typeof fetch,
+      cacheEnabled: false,
+    });
+
+    const result = await implementations.background_generation?.({
+      jobId: "job-advanced",
+      prisma,
+      outputRoot,
+    } as WorkflowContext);
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/images/generations",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-openai-key",
+        }),
+      }),
+    );
+    const request = JSON.parse(fetchFn.mock.calls[0]?.[1]?.body as string);
+    expect(request).toMatchObject({
+      model: "gpt-image-2",
+      size: "1536x1024",
+      quality: "medium",
+    });
+    expect(result).toMatchObject({
+      generationSource: "openai-api",
+      aiUsage: {
+        provider: "openai",
+        model: "gpt-image-2",
+        inputTokens: 300,
+        imageCount: 1,
+      },
+    });
+  });
+
   it("AI拡張ステップと運用機能を含む成果物を生成できる", async () => {
     const runId = `run-${Date.now()}`;
     const projectId = `project-${Date.now()}`;

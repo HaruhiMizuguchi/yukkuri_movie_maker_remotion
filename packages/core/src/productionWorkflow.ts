@@ -11,6 +11,7 @@ import type {
 import {
   createImageUsageRecord,
   DEFAULT_IMAGE_MODEL,
+  getAiProviderForImageModel,
   ScriptSchema,
 } from "@ymm/shared";
 import {
@@ -318,17 +319,32 @@ const createBackgroundGenerationImplementation =
     const backgroundPath = path.join(stepDir.runDir, "background.png");
     const prompt = `「${details.theme}」を解説する動画で使う純粋な背景素材。タイトルカードやインフォグラフィックではない。16:9、映画的、主な被写体は左側、右側は字幕用の暗く静かな余白。絶対に文字、数字、記号、ロゴ、看板を描かない。NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO LOGO.`;
     let aiUsage: AiUsageRecord | undefined;
-    let generationSource: "google-api" | "placeholder" = "placeholder";
-    if (options.googleApiKey?.trim()) {
-      const generated = await generateGoogleImage({
-        prompt,
-        apiKey: options.googleApiKey.trim(),
-        model: options.imageModel ?? DEFAULT_IMAGE_MODEL,
-        fetchFn: options.fetchFn,
-      });
+    let generationSource: "google-api" | "openai-api" | "placeholder" =
+      "placeholder";
+    const imageModel = options.imageModel ?? DEFAULT_IMAGE_MODEL;
+    const imageProvider = getAiProviderForImageModel(imageModel);
+    const imageApiKey =
+      imageProvider === "google"
+        ? options.googleApiKey?.trim()
+        : options.openaiApiKey?.trim();
+    if (imageApiKey) {
+      const generated =
+        imageProvider === "google"
+          ? await generateGoogleImage({
+              prompt,
+              apiKey: imageApiKey,
+              model: imageModel,
+              fetchFn: options.fetchFn,
+            })
+          : await generateOpenAiImage({
+              prompt,
+              apiKey: imageApiKey,
+              model: imageModel,
+              fetchFn: options.fetchFn,
+            });
       await writeGeneratedImageAsPng(backgroundPath, generated);
       aiUsage = generated.aiUsage;
-      generationSource = "google-api";
+      generationSource = `${imageProvider}-api`;
     } else {
       await runCommand(
         "ffmpeg",
@@ -492,17 +508,32 @@ const createIllustrationInsertionImplementation =
     const illustrationPath = path.join(stepDir.runDir, "illustration.png");
     const prompt = `「${details.theme}」の要点を視覚だけで伝える挿絵。タイトルカードやインフォグラフィックではない。16:9、わかりやすい構図、高品質。絶対に文字、数字、記号、ロゴを描かない。NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO LOGO.`;
     let aiUsage: AiUsageRecord | undefined;
-    let generationSource: "google-api" | "placeholder" = "placeholder";
-    if (options.googleApiKey?.trim()) {
-      const generated = await generateGoogleImage({
-        prompt,
-        apiKey: options.googleApiKey.trim(),
-        model: options.imageModel ?? DEFAULT_IMAGE_MODEL,
-        fetchFn: options.fetchFn,
-      });
+    let generationSource: "google-api" | "openai-api" | "placeholder" =
+      "placeholder";
+    const imageModel = options.imageModel ?? DEFAULT_IMAGE_MODEL;
+    const imageProvider = getAiProviderForImageModel(imageModel);
+    const imageApiKey =
+      imageProvider === "google"
+        ? options.googleApiKey?.trim()
+        : options.openaiApiKey?.trim();
+    if (imageApiKey) {
+      const generated =
+        imageProvider === "google"
+          ? await generateGoogleImage({
+              prompt,
+              apiKey: imageApiKey,
+              model: imageModel,
+              fetchFn: options.fetchFn,
+            })
+          : await generateOpenAiImage({
+              prompt,
+              apiKey: imageApiKey,
+              model: imageModel,
+              fetchFn: options.fetchFn,
+            });
       await writeGeneratedImageAsPng(illustrationPath, generated);
       aiUsage = generated.aiUsage;
-      generationSource = "google-api";
+      generationSource = `${imageProvider}-api`;
     } else {
       await runCommand(
         "ffmpeg",
@@ -935,6 +966,72 @@ const generateGoogleImage = async ({
     aiUsage: createImageUsageRecord({
       model,
       inputTokens: body.usageMetadata?.promptTokenCount ?? 0,
+      imageCount: 1,
+    }),
+  };
+};
+
+const generateOpenAiImage = async ({
+  prompt,
+  apiKey,
+  model,
+  fetchFn = fetch,
+}: {
+  prompt: string;
+  apiKey: string;
+  model: ImageGenerationModel;
+  fetchFn?: typeof fetch;
+}): Promise<{
+  bytes: Buffer;
+  mimeType: "image/png";
+  aiUsage: AiUsageRecord;
+}> => {
+  const response = await fetchFn(
+    "https://api.openai.com/v1/images/generations",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        size: "1536x1024",
+        quality: "medium",
+        output_format: "png",
+      }),
+      signal: AbortSignal.timeout(120_000),
+    },
+  );
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errorBody = (await response.json()) as {
+        error?: { message?: string };
+      };
+      detail = errorBody.error?.message?.slice(0, 300) ?? "";
+    } catch {
+      // 応答本文がJSONでない場合もHTTP状態から診断できるようにする。
+    }
+    throw new Error(
+      `OpenAI image API error: ${response.status}${detail ? ` - ${detail}` : ""}`,
+    );
+  }
+  const body = (await response.json()) as {
+    data?: Array<{ b64_json?: string }>;
+    usage?: { input_tokens?: number };
+  };
+  const data = body.data?.[0]?.b64_json;
+  if (!data) {
+    throw new Error("OpenAI image API response did not contain base64 image");
+  }
+  return {
+    bytes: Buffer.from(data, "base64"),
+    mimeType: "image/png",
+    aiUsage: createImageUsageRecord({
+      model,
+      inputTokens: body.usage?.input_tokens ?? 0,
       imageCount: 1,
     }),
   };

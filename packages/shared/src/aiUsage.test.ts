@@ -73,6 +73,43 @@ describe("AI使用量と概算料金", () => {
     expect(summary.unpricedRequestCount).toBe(1);
   });
 
+  it("OpenAIとClaudeの実トークン数を各社の公式単価で計算する", () => {
+    const openai = createLlmUsageRecord({
+      model: "gpt-5.6-terra",
+      inputTokens: 1_000_000,
+      outputTokens: 100_000,
+    });
+    const claude = createLlmUsageRecord({
+      model: "claude-sonnet-5",
+      inputTokens: 1_000_000,
+      outputTokens: 100_000,
+    });
+
+    expect(openai).toMatchObject({ provider: "openai", estimatedCostUsd: 4 });
+    expect(claude).toMatchObject({
+      provider: "anthropic",
+      estimatedCostUsd: 3,
+    });
+    const summary = summarizeAiUsage([openai, claude]);
+    expect(summary.pricingSources).toHaveLength(2);
+    expect(summary.pricingSources).toContain(
+      "https://developers.openai.com/api/docs/pricing",
+    );
+    expect(summary.pricingSources).toContain(
+      "https://platform.claude.com/docs/en/about-claude/pricing",
+    );
+  });
+
+  it("OpenAI画像モデルの16:9中品質の枚数料金を計算する", () => {
+    const usage = createImageUsageRecord({
+      model: "gpt-image-2",
+      imageCount: 2,
+    });
+
+    expect(usage.provider).toBe("openai");
+    expect(usage.estimatedCostUsd).toBe(0.082);
+  });
+
   it("WorkflowStepのoutputJsonから有効な使用量だけを抽出する", () => {
     const usage = createLlmUsageRecord({
       model: "gemini-2.5-flash-lite",

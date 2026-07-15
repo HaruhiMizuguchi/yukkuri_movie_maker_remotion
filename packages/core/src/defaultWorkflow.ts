@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import type {
   AiUsageRecord,
+  AiProvider,
   ImageGenerationModel,
   Script,
   ScriptGenerationModel,
@@ -12,6 +13,7 @@ import type {
 import {
   createLlmUsageRecord,
   DEFAULT_SCRIPT_MODEL,
+  getAiProviderForScriptModel,
   ScriptSchema,
   TimelineDataSchema,
 } from "@ymm/shared";
@@ -48,6 +50,8 @@ export type DefaultWorkflowOptions = {
   disableRemotion?: boolean;
   fetchFn?: typeof fetch;
   googleApiKey?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
   scriptModel?: ScriptGenerationModel;
   imageModel?: ImageGenerationModel;
   logger?: Logger;
@@ -130,6 +134,8 @@ export function createDefaultWorkflowImplementations(
         : await generateScript(selectedTheme, {
             fetchFn: options.fetchFn,
             googleApiKey: options.googleApiKey,
+            openaiApiKey: options.openaiApiKey,
+            anthropicApiKey: options.anthropicApiKey,
             model: options.scriptModel,
           });
       const script = generation.script;
@@ -156,17 +162,31 @@ export function createDefaultWorkflowImplementations(
         jobId: ctx.jobId,
         lineCount: script.lines.length,
         generationSource: generation.source,
+        generationProvider:
+          "provider" in generation ? generation.provider : "manual",
+        generationModel: "model" in generation ? generation.model : undefined,
+        generationError: "error" in generation ? generation.error : undefined,
         aiUsage: generation.aiUsage,
       });
 
       logger.info("script_generation completed", {
         scriptPath,
         generationSource: generation.source,
+        generationProvider:
+          "provider" in generation ? generation.provider : "manual",
+        generationModel: "model" in generation ? generation.model : undefined,
         aiUsage: generation.aiUsage,
       });
       return {
         scriptPath: toRelativePath(outputRoot, scriptPath),
         generationSource: generation.source,
+        ...("provider" in generation
+          ? { generationProvider: generation.provider }
+          : {}),
+        ...("model" in generation ? { generationModel: generation.model } : {}),
+        ...("error" in generation && generation.error
+          ? { generationError: generation.error }
+          : {}),
         ...(generation.aiUsage ? { aiUsage: generation.aiUsage } : {}),
       };
     },
@@ -983,51 +1003,162 @@ const generateScript = async (
   options: {
     fetchFn?: typeof fetch;
     googleApiKey?: string;
+    openaiApiKey?: string;
+    anthropicApiKey?: string;
     model?: ScriptGenerationModel;
   } = {},
 ): Promise<{
   script: Script;
   source: "api" | "fallback";
+  provider: AiProvider;
+  model: ScriptGenerationModel;
   aiUsage?: AiUsageRecord;
+  error?: string;
 }> => {
   const effectiveFetch = options.fetchFn ?? fetch;
-  const geminiApiKey =
-    options.googleApiKey?.trim() || process.env.GOOGLE_API_KEY?.trim();
-  if (!geminiApiKey) {
-    return { script: buildFallbackScript(theme), source: "fallback" };
-  }
-
   const model =
     options.model ??
     (process.env.GEMINI_MODEL as ScriptGenerationModel | undefined) ??
     DEFAULT_SCRIPT_MODEL;
+  const provider = getAiProviderForScriptModel(model);
+  const apiKey =
+    provider === "google"
+      ? options.googleApiKey?.trim() || process.env.GOOGLE_API_KEY?.trim()
+      : provider === "openai"
+        ? options.openaiApiKey?.trim() || process.env.OPENAI_API_KEY?.trim()
+        : options.anthropicApiKey?.trim() ||
+          process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
+    return {
+      script: buildFallbackScript(theme),
+      source: "fallback",
+      provider,
+      model,
+      error: `${provider}_api_key_missing`,
+    };
+  }
+
   let aiUsage: AiUsageRecord | undefined;
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const prompt =
       "あなたはゆっくり解説の脚本家です。JSONのみで返答してください。" +
       "schema={title:string,theme:string,lines:[{speaker:string,text:string,emotion?:string}]}" +
       `テーマ: ${theme}`;
-    const response = await effectiveFetch(url, {
+    const response = await requestScriptGeneration({
+      provider,
+      model,
+      apiKey,
+      prompt,
+      fetchFn: effectiveFetch,
+    });
+    if (!response.ok) {
+      throw new Error(`${provider}_api_http_${response.status}`);
+    }
+    const parsedResponse = parseScriptProviderResponse(
+      provider,
+      model,
+      await response.json(),
+    );
+    aiUsage = parsedResponse.aiUsage;
+    const text = parsedResponse.text;
+    if (!text) {
+      throw new Error(`${provider}_response_empty`);
+    }
+    const parsed = ScriptSchema.safeParse(JSON.parse(extractJson(text)));
+    if (!parsed.success) {
+      throw new Error(`${provider}_response_schema_mismatch`);
+    }
+    if (parsed.data.lines.length === 0) {
+      return {
+        script: buildFallbackScript(theme),
+        source: "fallback",
+        provider,
+        model,
+        aiUsage,
+        error: `${provider}_response_lines_empty`,
+      };
+    }
+    return { script: parsed.data, source: "api", provider, model, aiUsage };
+  } catch (error) {
+    return {
+      script: buildFallbackScript(theme),
+      source: "fallback",
+      provider,
+      model,
+      aiUsage,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
+const requestScriptGeneration = async ({
+  provider,
+  model,
+  apiKey,
+  prompt,
+  fetchFn,
+}: {
+  provider: AiProvider;
+  model: ScriptGenerationModel;
+  apiKey: string;
+  prompt: string;
+  fetchFn: typeof fetch;
+}): Promise<Response> => {
+  if (provider === "google") {
+    return fetchFn(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.5,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: AbortSignal.timeout(60_000),
+      },
+    );
+  }
+  if (provider === "openai") {
+    return fetchFn("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": geminiApiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.5,
-          responseMimeType: "application/json",
-        },
-      }),
-      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ model, input: prompt }),
+      signal: AbortSignal.timeout(60_000),
     });
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
+  }
+  return fetchFn("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: "ゆっくり解説の脚本家として、有効なJSONだけを返してください。",
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+};
 
-    const body = (await response.json()) as {
+const parseScriptProviderResponse = (
+  provider: AiProvider,
+  model: ScriptGenerationModel,
+  payload: unknown,
+): { text: string; aiUsage?: AiUsageRecord } => {
+  if (provider === "google") {
+    const body = payload as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       usageMetadata?: {
         promptTokenCount?: number;
@@ -1035,37 +1166,72 @@ const generateScript = async (
         thoughtsTokenCount?: number;
       };
     };
-    if (body.usageMetadata) {
-      aiUsage = createLlmUsageRecord({
-        model,
-        inputTokens: body.usageMetadata.promptTokenCount ?? 0,
-        // Geminiの出力単価には思考トークンも含まれるため合算する。
-        outputTokens:
-          (body.usageMetadata.candidatesTokenCount ?? 0) +
-          (body.usageMetadata.thoughtsTokenCount ?? 0),
-      });
-    }
-    const text = body.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text ?? "")
-      .join("");
-    if (!text) {
-      throw new Error("Gemini response was empty");
-    }
-    const parsed = ScriptSchema.safeParse(JSON.parse(extractJson(text)));
-    if (!parsed.success) {
-      throw new Error("Gemini response schema mismatch");
-    }
-    if (parsed.data.lines.length === 0) {
-      return {
-        script: buildFallbackScript(theme),
-        source: "fallback",
-        aiUsage,
-      };
-    }
-    return { script: parsed.data, source: "api", aiUsage };
-  } catch {
-    return { script: buildFallbackScript(theme), source: "fallback", aiUsage };
+    return {
+      text:
+        body.candidates?.[0]?.content?.parts
+          ?.map((part) => part.text ?? "")
+          .join("") ?? "",
+      ...(body.usageMetadata
+        ? {
+            aiUsage: createLlmUsageRecord({
+              model,
+              inputTokens: body.usageMetadata.promptTokenCount ?? 0,
+              // Geminiの出力単価には思考トークンも含まれるため合算する。
+              outputTokens:
+                (body.usageMetadata.candidatesTokenCount ?? 0) +
+                (body.usageMetadata.thoughtsTokenCount ?? 0),
+            }),
+          }
+        : {}),
+    };
   }
+  if (provider === "openai") {
+    const body = payload as {
+      output_text?: string;
+      output?: Array<{
+        content?: Array<{ type?: string; text?: string }>;
+      }>;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    };
+    const text =
+      body.output_text ??
+      (body.output ?? [])
+        .flatMap((item) => item.content ?? [])
+        .filter((item) => item.type === "output_text" || item.text)
+        .map((item) => item.text ?? "")
+        .join("");
+    return {
+      text,
+      ...(body.usage
+        ? {
+            aiUsage: createLlmUsageRecord({
+              model,
+              inputTokens: body.usage.input_tokens ?? 0,
+              outputTokens: body.usage.output_tokens ?? 0,
+            }),
+          }
+        : {}),
+    };
+  }
+  const body = payload as {
+    content?: Array<{ type?: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
+  return {
+    text: (body.content ?? [])
+      .filter((item) => item.type === "text" || item.text)
+      .map((item) => item.text ?? "")
+      .join(""),
+    ...(body.usage
+      ? {
+          aiUsage: createLlmUsageRecord({
+            model,
+            inputTokens: body.usage.input_tokens ?? 0,
+            outputTokens: body.usage.output_tokens ?? 0,
+          }),
+        }
+      : {}),
+  };
 };
 
 const extractJson = (text: string): string => {
