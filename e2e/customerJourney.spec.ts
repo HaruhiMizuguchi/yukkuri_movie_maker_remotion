@@ -82,11 +82,28 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "テンプレート未指定でも作成できる",
   ]);
 
+  const automaticJobRequestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === `/api/projects/${projectId}/jobs`,
+    { timeout: 3_000 },
+  );
   await page.getByTestId("wizard-create-button").click();
+  const automaticJobRequest = await automaticJobRequestPromise;
+  expect(automaticJobRequest.postDataJSON()).toMatchObject({
+    mode: "full",
+    runMode: "resume",
+  });
   await expect(page.getByTestId("screen-project")).toBeVisible();
   await expect(page.getByTestId("selected-project-id")).toHaveAttribute(
     "data-project-id",
     projectId,
+  );
+  await expect(page.getByTestId("app-message")).toContainText(
+    "全自動で完成動画の生成を開始しました",
+  );
+  await expect(page.getByTestId("generation-monitor")).toContainText(
+    "生成を受け付けました",
   );
   await visual.capture(page, "03-project-created", "プロジェクト詳細", [
     "作成直後のプロジェクトが選択状態になる",
@@ -364,7 +381,12 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     }
 
     if (url.pathname === `/api/projects/${projectId}` && method === "GET") {
-      return fulfillJson(createProjectDetail(state));
+      const detail = createProjectDetail(state);
+      // 初回表示では受付状態を確認し、次回ポーリングから完了へ進む実運用を模擬する。
+      if (state.jobs[0]?.status === "PENDING") {
+        state.jobs[0].status = "COMPLETED";
+      }
+      return fulfillJson(detail);
     }
 
     if (

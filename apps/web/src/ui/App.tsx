@@ -530,8 +530,22 @@ export function App() {
     );
   };
 
+  const enqueueProjectJob = (
+    projectId: string,
+    mode: AutomationMode,
+    skipSteps: string[],
+  ) =>
+    fetchJson<{ jobId: string }>(`/api/projects/${projectId}/jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildJobRequest(mode, skipSteps)),
+    });
+
   const createProject = async () => {
-    const created = await fetchJson<{ projectId: string }>("/api/projects", {
+    const created = await fetchJson<{
+      projectId: string;
+      mode: AutomationMode;
+    }>("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -540,23 +554,44 @@ export function App() {
         templateId: wizardTemplateId || undefined,
       }),
     });
+    const effectiveMode = created.mode ?? wizardMode;
+    setSelectedProjectId(created.projectId);
+    setActiveScreen("project");
+
+    try {
+      // ウィザードの「制作を始める」は、プロジェクト保存だけでなく選択範囲の生成開始までを保証する。
+      const job = await enqueueProjectJob(
+        created.projectId,
+        effectiveMode,
+        customSkipSteps,
+      );
+      setLastCreatedJobId(job.jobId);
+    } catch (error) {
+      await Promise.allSettled([
+        refreshDashboard(),
+        loadProjectDetail(created.projectId),
+      ]);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `プロジェクトは作成されましたが、自動生成を開始できませんでした。${detail}`,
+      );
+    }
+
     setMessage(
-      "動画の制作を開始しました。内容を確認しながら順番に進められます。",
+      effectiveMode === "full"
+        ? "全自動で完成動画の生成を開始しました。進捗は自動で更新されます。"
+        : `${automationModeLabels[effectiveMode]}で生成を開始しました。進捗は自動で更新されます。`,
     );
     await refreshDashboard();
     await loadProjectDetail(created.projectId);
-    setActiveScreen("project");
   };
 
   const createRenderJob = async () => {
     if (!selectedProjectId) return;
-    const created = await fetchJson<{ jobId: string }>(
-      `/api/projects/${selectedProjectId}/jobs`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildJobRequest(wizardMode, customSkipSteps)),
-      },
+    const created = await enqueueProjectJob(
+      selectedProjectId,
+      wizardMode,
+      customSkipSteps,
     );
     setLastCreatedJobId(created.jobId);
     setMessage("完成動画の生成を開始しました。進捗は自動で更新されます。");
@@ -1502,7 +1537,9 @@ export function App() {
                   onClick={() => void runUiAction(createProject)}
                   disabled={!wizardTheme.trim()}
                 >
-                  この内容で制作を始める →
+                  {wizardMode === "full"
+                    ? "この内容で全自動制作を開始 →"
+                    : `この内容で${automationModeLabels[wizardMode]}生成を開始 →`}
                 </button>
               </section>
             ) : null}
