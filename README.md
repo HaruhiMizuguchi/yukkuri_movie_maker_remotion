@@ -68,6 +68,8 @@ pnpm dev
 
 Windowsでは `start_yukkuri_movie_maker.bat` をダブルクリックすると、DB起動、migration適用、AivisSpeech待機、Web/API/Worker起動、ブラウザ表示までをまとめて実行できます。デスクトップから使う場合は、このBATファイルのショートカットを作成してください。PowerShellから細かな起動オプションを指定する場合は `./start_yukkuri_movie_maker.ps1` も利用できます。
 
+テーマ入力から完成動画の確認までの画面操作は、[スクリーンショット付き全自動操作手順](docs/user_guide/full_auto_operation_guide.html)を参照してください。
+
 ## 環境変数と設定テンプレート
 
 ### 必須の環境変数

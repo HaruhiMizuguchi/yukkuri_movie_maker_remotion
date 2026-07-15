@@ -6,6 +6,7 @@
 
 ## 更新メモ
 
+- 2026-07-16: 作成ウィザードがプロジェクト作成だけで生成ジョブを投入していなかった不具合を修正。選択モードで即座にジョブを開始し、失敗時は作成済みプロジェクトを保持して理由を表示する。実ブラウザからGoogle AI・AivisSpeech・Remotionの全自動13工程を完走し、5枚の実画面スクリーンショットを使ったHTML操作手順書を追加
 - 2026-07-16: デスクトップショートカットから起動できる `start_yukkuri_movie_maker.bat` を追加。任意の作業フォルダーから既存PowerShellランチャーを呼び出し、引数転送に対応。AivisSpeech・DB・migration・サーバー・ブラウザの5段階を表示し、起動後はサーバー終了まで、早期終了時はキー入力までウィンドウを保持。全起動出力を `logs/launcher/` に保存し、Web/API起動済みの場合の二重起動と即時終了を防止。BATのASCII限定、Windows PowerShell 5向けUTF-8 BOM、ViteのIPv6 localhost待受に対応
 - 2026-07-15: タスク17-5の最終品質ゲートを完了。lint・型検査・単体テスト107件・Webビルド・デスクトップ/モバイルE2Eを通し、101.461秒の実動画 `outputs/test_evidence/task3_quality/full-run-1784054236671/projects/project-1784054236671/output/final_encoding/latest/final.mp4` を生成。字幕/音声11区間の最終終了時刻は双方101.386秒（差0ms）、末尾余白0.075秒、H.264/AACを確認。実AI成果物・使用量証跡と設定/接続診断UIも別途実ブラウザで確認
 - 2026-07-15: タスク17-4として台本/画像モデル選択、通常設定と分離したGoogle APIキー秘密ストア、値を返さない登録/削除/実接続診断UI、Job snapshot/Worker反映を実装。実APIで台本JSON・背景PNG・使用量証跡を `outputs/test_evidence/task17_ai_real/run-1784053894377/` に生成
@@ -358,3 +359,24 @@
 - Anthropic実API: `ANTHROPIC_API_KEY` 未設定のため理由付きskip。モックのClaude Messages API分岐は単体テストで確認
 - 完成動画: `outputs/test_evidence/task3_quality/full-run-1784088565002/.../final.mp4`（14,214,844 bytes、150.549秒、1920x1080 H.264 + AAC）
 - 字幕・音声同期: TTSタイムスタンプ終端150.472秒、動画終端との差77ms
+
+---
+
+## 19. 全自動開始導線の修正・HTML操作手順書（2026-07-16）
+
+- [x] ウィザードの制作開始操作で、選択した自動化モードの生成ジョブが即座に投入される回帰E2Eを追加する
+- [x] プロジェクト作成後に生成ジョブを開始し、生成状況とエラーを画面上で明確に確認できるようにする
+- [x] 実ブラウザで主要操作を再現し、実画面スクリーンショットを取得する
+- [x] スクリーンショット付きHTML操作手順書を作成し、ブラウザで表示品質とリンク切れを確認する
+- [x] lint・型検査・全単体テスト・Webビルド・主要E2Eを通す
+- [x] 実動画生成経路で再生可能な `final.mp4` を1本生成し、FFprobeで検証する
+
+### 19-1. 最終検証結果
+
+- 回帰E2E: 修正前はdesktop/mobileともジョブPOST待機がタイムアウトし、修正後は選択モード `full` / `runMode: resume` の投入、生成モニター表示まで成功
+- 実ブラウザ: 「生成AIを安全に使う3つのポイント」を全自動で作成し、待機→台本生成→13/13工程完了→動画プレイヤー表示→ダウンロード導線まで確認
+- 実接続: Google AIで台本1件・画像2件、AivisSpeechで音声4区間を生成し、Remotionで合成・最終エンコード
+- 完成動画: `projects/93309c31-ecf7-4139-89fd-0609e3c743c5/output/final_encoding/latest/final.mp4`（9,622,486 bytes、14.229秒、1920x1080 H.264 + AAC）
+- 字幕・音声同期: TTSタイムスタンプ終端14.162秒、動画終端との差67ms
+- HTML手順書: `docs/user_guide/full_auto_operation_guide.html`。実画面JPEG 5枚を参照し、ブラウザ表示と画像形式を検証
+- 品質ゲート: Vitest 39ファイル・122件、型検査、lint、Web本番ビルド、Chromium desktop/mobile E2E 2件すべて成功

@@ -48,3 +48,5 @@
 - 日本語を含む `.ps1` をWindows PowerShell 5の `powershell.exe -File` で起動する場合、BOMなしUTF-8はANSIとして誤読され構文エラーになることがある。デスクトップランチャーから呼ぶPowerShellスクリプトはUTF-8 BOM付きで保存し、実際の `powershell.exe` 経路でも検証する。
 - ViteがWindows上で `localhost` のIPv6アドレス（`::1`）だけにlistenする場合、`127.0.0.1:3000` の起動確認は失敗する。Webの起動確認・ブラウザURLは `localhost` を使い、APIが明示的にIPv4 listenする場合だけ `127.0.0.1` を使う。
 - `.bat` にBOMなしUTF-8の日本語を直接書くと、Windowsの `cmd.exe` が既定コードページで誤読し、後続コマンドや引用符まで分断することがある。デスクトップ起動用BATはASCIIだけで構成し、日本語表示はUTF-8 BOM付きPowerShell側で行う。
+- 作成ウィザードでProjectレコードを保存しただけではWorker処理は始まらない。ユーザーへ「制作を開始」と案内する操作では、`POST /api/projects/:projectId/jobs` の成功と生成モニター表示までを同じ導線で保証する。
+- in-app Browserのスクリーンショットは既定でJPEGバイトを返すことがある。拡張子を決め打ちせずマジックナンバーを検証し、配布手順書では実データと拡張子を一致させる。
