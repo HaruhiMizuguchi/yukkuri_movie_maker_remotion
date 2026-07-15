@@ -6,6 +6,7 @@
 
 ## 更新メモ
 
+- 2026-07-16: デスクトップショートカットから起動できる `start_yukkuri_movie_maker.bat` を追加。任意の作業フォルダーから既存PowerShellランチャーを呼び出し、引数転送に対応。AivisSpeech・DB・migration・サーバー・ブラウザの5段階を表示し、起動後はサーバー終了まで、早期終了時はキー入力までウィンドウを保持。全起動出力を `logs/launcher/` に保存し、Web/API起動済みの場合の二重起動と即時終了を防止。BATのASCII限定、Windows PowerShell 5向けUTF-8 BOM、ViteのIPv6 localhost待受に対応
 - 2026-07-15: タスク17-5の最終品質ゲートを完了。lint・型検査・単体テスト107件・Webビルド・デスクトップ/モバイルE2Eを通し、101.461秒の実動画 `outputs/test_evidence/task3_quality/full-run-1784054236671/projects/project-1784054236671/output/final_encoding/latest/final.mp4` を生成。字幕/音声11区間の最終終了時刻は双方101.386秒（差0ms）、末尾余白0.075秒、H.264/AACを確認。実AI成果物・使用量証跡と設定/接続診断UIも別途実ブラウザで確認
 - 2026-07-15: タスク17-4として台本/画像モデル選択、通常設定と分離したGoogle APIキー秘密ストア、値を返さない登録/削除/実接続診断UI、Job snapshot/Worker反映を実装。実APIで台本JSON・背景PNG・使用量証跡を `outputs/test_evidence/task17_ai_real/run-1784053894377/` に生成
 - 2026-07-15: タスク17-3としてGeminiの実レスポンスからLLM入出力トークンを記録し、画像枚数を含むモデル別料金計算、直近実行/プロジェクト累計の概算USD・JPY表示を追加
@@ -70,6 +71,7 @@
 - [x] ローカル開発起動フローの整理（`pnpm dev` の役割確認）
 - [x] Windowsでの `corepack pnpm dev` 起動互換性を確保（子プロセス側も `corepack pnpm` を使用）
 - [x] `pnpm dev` の標準出力/標準エラーを `logs/dev/*.log` に記録し、PowerShell実行時のトラブル調査を容易化
+- [x] デスクトップショートカットから利用できるWindows BATランチャーを追加
 
 ## 1. データモデル / 共有型
 

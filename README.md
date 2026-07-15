@@ -66,7 +66,7 @@ corepack pnpm exec prisma migrate resolve --applied 20260711093000_init
 pnpm dev
 ```
 
-Windowsでは `./start_yukkuri_movie_maker.ps1` を使うと、DB起動、migration適用、AivisSpeech待機、Web/API/Worker起動、ブラウザ表示までをまとめて実行できます。
+Windowsでは `start_yukkuri_movie_maker.bat` をダブルクリックすると、DB起動、migration適用、AivisSpeech待機、Web/API/Worker起動、ブラウザ表示までをまとめて実行できます。デスクトップから使う場合は、このBATファイルのショートカットを作成してください。PowerShellから細かな起動オプションを指定する場合は `./start_yukkuri_movie_maker.ps1` も利用できます。
 
 ## 環境変数と設定テンプレート
 

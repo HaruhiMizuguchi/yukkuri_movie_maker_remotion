@@ -45,3 +45,6 @@
 - Gemini 3.1画像モデルのraw RESTは、`v1` の `generationConfig.responseFormat` が環境によって未知フィールドのHTTP 400になる。`v1beta/models/{model}:generateContent` に `responseModalities` と `imageConfig` を渡す経路で実生成できた。また `inlineData.mimeType` が `image/jpeg` になる場合があるため、拡張子をPNGに固定する成果物はFFmpegで実変換してから保存する。
 - OpenAI APIキーは環境変数に値が存在しても、失効・誤設定時は `/v1/responses` と `/v1/models` がHTTP 401になる。「設定済み」と「接続OK」を分離し、実接続診断で認証状態を確認する。
 - OpenAIの単発画像生成は `POST /v1/images/generations` へ `gpt-image-2`、`size: 1536x1024`、`quality: medium` を指定し、`data[0].b64_json` をPNGとして保存する。Claude Messages APIは画像入力に対応しても画像出力モデルではないため、このプロジェクトでは台本生成だけに提供する。
+- 日本語を含む `.ps1` をWindows PowerShell 5の `powershell.exe -File` で起動する場合、BOMなしUTF-8はANSIとして誤読され構文エラーになることがある。デスクトップランチャーから呼ぶPowerShellスクリプトはUTF-8 BOM付きで保存し、実際の `powershell.exe` 経路でも検証する。
+- ViteがWindows上で `localhost` のIPv6アドレス（`::1`）だけにlistenする場合、`127.0.0.1:3000` の起動確認は失敗する。Webの起動確認・ブラウザURLは `localhost` を使い、APIが明示的にIPv4 listenする場合だけ `127.0.0.1` を使う。
+- `.bat` にBOMなしUTF-8の日本語を直接書くと、Windowsの `cmd.exe` が既定コードページで誤読し、後続コマンドや引用符まで分断することがある。デスクトップ起動用BATはASCIIだけで構成し、日本語表示はUTF-8 BOM付きPowerShell側で行う。
