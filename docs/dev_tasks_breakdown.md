@@ -59,6 +59,7 @@
 - 2026-07-15: 全自動生成の進捗、プロジェクト選択状態、AI使用量・概算料金、モデル/APIキー設定のUX改善をセクション17へ分割して着手
 - 2026-07-15: タスク17-1を実装。全画面共通の生成モニターで待機/実行/完了/失敗、現在工程、工程数、進捗率、自動更新状態、次アクションを表示
 - 2026-07-15: タスク17-2を実装。新規作成への切替時に以前のプロジェクト選択と編集ドラフトを解除し、ヘッダーと作成画面でコンテキストを明示
+- 2026-07-15: OpenAI・Anthropic Claudeを既存のGemini生成基盤へ追加するタスク18に着手。プロバイダー別APIキー、モデル選択、実生成、使用量・料金、接続診断を同じUXで扱う
 
 ---
 
@@ -332,3 +333,26 @@
 
 - [x] lint・型検査・単体テスト・Webビルド・主要E2Eを通す
 - [x] 実動画と実AI成果物をそれぞれ生成し、`final.mp4` の媒体情報・抽出フレーム・字幕音声同期、AI使用量・料金記録、設定/接続診断UIを確認する
+
+---
+
+## 18. OpenAI・Claudeプロバイダー対応（2026-07-15）
+
+- [x] 台本モデルからプロバイダーを判定し、Gemini・OpenAI Responses API・Claude Messages APIを同じWorkflow境界で実行する
+- [x] Gemini/OpenAIの画像生成モデルを選択でき、画像出力非対応のClaudeはUIと検証で誤選択を防ぐ
+- [x] OpenAI/Anthropic APIキーを既存秘密ストアへ追加し、値を返さない登録・削除・実接続診断を提供する
+- [x] OpenAI/Claudeの実トークン使用量と公式単価に基づく概算料金を既存集計へ反映する
+- [x] プロバイダー分岐・秘密情報・API DTO・UI導線をTDDで検証する
+- [x] 利用可能なGoogle APIキーで台本・画像成果物を実生成し、OpenAIは登録キーのHTTP 401、Anthropicはキー未設定を理由付きで証跡化する
+- [x] lint・型検査・単体テスト・Webビルド・主要E2Eを通し、実動画経路で再生可能な `final.mp4` を最低1本生成・検証する
+
+### 18-1. 最終検証結果
+
+- `corepack pnpm test`: 37ファイル・118件成功
+- `corepack pnpm typecheck` / `corepack pnpm lint` / Web本番ビルド: 成功
+- `corepack pnpm test:e2e:journey`: Chromium desktop/mobileの2件成功
+- Google実API: `gemini-3.1-flash-lite` の台本と `gemini-3.1-flash-lite-image` の画像を生成し、使用量証跡を確認
+- OpenAI実API: `gpt-5.6-luna` へ接続したが登録キーがHTTP 401。`generationError=openai_api_http_401` を構造化ログへ記録
+- Anthropic実API: `ANTHROPIC_API_KEY` 未設定のため理由付きskip。モックのClaude Messages API分岐は単体テストで確認
+- 完成動画: `outputs/test_evidence/task3_quality/full-run-1784088565002/.../final.mp4`（14,214,844 bytes、150.549秒、1920x1080 H.264 + AAC）
+- 字幕・音声同期: TTSタイムスタンプ終端150.472秒、動画終端との差77ms

@@ -50,17 +50,18 @@
 - 手動編集の仕上げ機能（手動テロップ追加、クリップ複製/削除、マーカー追加、音量/フェード調整）
 - 視覚タイムライン編集（プレイヘッド、ズーム、クリップ選択インスペクタ、分割、100msナッジ）
 - プレビュー画面で `preview.mp4` の再生要素、`final.mp4` のダウンロードリンク、手動編集サマリー、出力プリセットを確認可能
-- 設定画面で `.env` のAPI接続診断（Gemini/AivisSpeech）と出力プリセット保存が可能
+- 設定画面でGemini/OpenAI/Claudeのモデル選択、値を再表示しないAPIキー登録・削除・実接続診断、AivisSpeech診断、出力プリセット保存が可能
 - テンプレートに素材セット、出力プリセット、自動化プロファイルを含めて再利用可能
 - エラー表示/再試行、処理中操作抑止、ジョブ自動ポーリング、Undo/Redo、ドラッグ移動と100msスナップ、未保存表示、動画とプレイヘッド同期
-- ジョブ設定snapshot、同一プロジェクト直列化、原子的latest更新、Worker heartbeat、DB/queue/Worker/Aivis/Gemini health、構造化ログ
+- ジョブ設定snapshot、同一プロジェクト直列化、原子的latest更新、Worker heartbeat、DB/queue/Worker/Aivis/Gemini/OpenAI/Claude health、構造化ログ
 - CLIからhealth、ジョブ作成、状態確認、接続診断を実行可能
 
 ## 6. 既知の前提・制約
 
 - AivisSpeech を使う場合はローカルサーバー起動と `AIVIS_SPEECH_BASE_URL` が必要
 - Gemini API を使う場合は `GOOGLE_API_KEY` が必要（クォータ不足時は失敗）
-- GUIのAPIキー入力値はローカル設定ファイルへ保存しない。実API接続は `.env` の環境変数を使う
+- OpenAI API を使う場合は `OPENAI_API_KEY`、Claude APIを使う場合は `ANTHROPIC_API_KEY` が必要
+- GUIのAPIキー入力値は通常設定・成果物から分離したローカル秘密情報ストアへ保存し、読取APIや画面へ値を返さない
 - 認証機構は実装しておらず、APIはローカル単一ユーザー専用。インターネットへ直接公開しない
 - PowerShell環境によって削除系コマンドがポリシーでブロックされる場合がある
 

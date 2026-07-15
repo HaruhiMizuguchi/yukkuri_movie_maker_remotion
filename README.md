@@ -79,9 +79,10 @@ Windowsでは `./start_yukkuri_movie_maker.ps1` を使うと、DB起動、migrat
 - `API_PORT`: APIサーバーのポート（省略時 3001）
 - `ENVIRONMENT`: `development` / `production`
 - `DEBUG`: `true` / `false`
-- `GOOGLE_API_KEY`: Gemini APIキー（LLM利用時）
+- `GOOGLE_API_KEY`: Geminiの台本・画像生成を使う場合
+- `OPENAI_API_KEY`: OpenAIの台本・画像生成を使う場合
+- `ANTHROPIC_API_KEY`: Claudeの台本生成を使う場合
 - `AIVIS_SPEECH_BASE_URL`: AIVIS SpeechサーバーURL
-- `OPENAI_API_KEY`: OpenAI APIキー（任意）
 - `STABILITY_API_KEY`: 画像生成APIキー（任意）
 - `YOUTUBE_ACCESS_TOKEN`: YouTube Data API OAuthアクセストークン（投稿時のみ）
 - `YOUTUBE_PRIVACY_STATUS`: `private` / `unlisted` / `public`（既定 `private`）

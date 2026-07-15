@@ -43,3 +43,5 @@
 - Windowsでは生成物ディレクトリのrenameがDefender等に一時的に `EPERM` / `EBUSY` で拒否されることがある。原子的latest切替は限定回数の短い指数backoffを入れると安定する。
 - Gemini 2.0 Flashは2026-06-01に停止されたため、このプロジェクトの既定モデルは `gemini-3.5-flash` を使う。実接続テストではモデル廃止の404とクォータ不足の429を分けて記録する。
 - Gemini 3.1画像モデルのraw RESTは、`v1` の `generationConfig.responseFormat` が環境によって未知フィールドのHTTP 400になる。`v1beta/models/{model}:generateContent` に `responseModalities` と `imageConfig` を渡す経路で実生成できた。また `inlineData.mimeType` が `image/jpeg` になる場合があるため、拡張子をPNGに固定する成果物はFFmpegで実変換してから保存する。
+- OpenAI APIキーは環境変数に値が存在しても、失効・誤設定時は `/v1/responses` と `/v1/models` がHTTP 401になる。「設定済み」と「接続OK」を分離し、実接続診断で認証状態を確認する。
+- OpenAIの単発画像生成は `POST /v1/images/generations` へ `gpt-image-2`、`size: 1536x1024`、`quality: medium` を指定し、`data[0].b64_json` をPNGとして保存する。Claude Messages APIは画像入力に対応しても画像出力モデルではないため、このプロジェクトでは台本生成だけに提供する。
