@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { readWorkerGoogleApiKey, readWorkerSettings } from "./settings";
+import {
+  readWorkerApiKeys,
+  readWorkerGoogleApiKey,
+  readWorkerSettings,
+} from "./settings";
 
 const createWorkspace = async () => {
   const workspaceRoot = path.join(
@@ -71,5 +75,29 @@ describe("worker settings", () => {
     await expect(readWorkerGoogleApiKey(workspaceRoot, {})).resolves.toBe(
       "worker-stored-key",
     );
+  });
+
+  it("3社の保存キーと環境変数を同じ優先順位で読み込む", async () => {
+    const workspaceRoot = await createWorkspace();
+    await fs.writeFile(
+      path.join(workspaceRoot, "outputs", "system", "secrets.json"),
+      JSON.stringify({
+        googleApiKey: "stored-google-key",
+        openaiApiKey: "stored-openai-key",
+      }),
+      "utf-8",
+    );
+
+    await expect(
+      readWorkerApiKeys(workspaceRoot, {
+        GOOGLE_API_KEY: "env-google-key",
+        OPENAI_API_KEY: "env-openai-key",
+        ANTHROPIC_API_KEY: "env-anthropic-key",
+      }),
+    ).resolves.toEqual({
+      google: "stored-google-key",
+      openai: "stored-openai-key",
+      anthropic: "env-anthropic-key",
+    });
   });
 });

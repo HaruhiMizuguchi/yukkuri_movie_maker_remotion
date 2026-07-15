@@ -15,6 +15,7 @@ import {
 } from "@ymm/core";
 import {
   AutomationModeSchema,
+  AiProviderSchema,
   extractAiUsageRecords,
   ScriptSchema,
   summarizeAiUsage,
@@ -50,10 +51,11 @@ import {
 } from "./storage";
 import { buildSettingsDiagnostics } from "./settingsDiagnostics";
 import {
-  clearGoogleApiKey,
-  getGoogleApiKeyStatus,
-  resolveGoogleApiKey,
-  saveGoogleApiKey,
+  clearApiKey,
+  getApiKeyStatuses,
+  resolveApiKeys,
+  saveApiKey,
+  type ApiKeyStatuses,
 } from "./secretStore";
 import { resolveApiWorkspaceRoot } from "./workspaceRoot";
 
@@ -132,6 +134,8 @@ app.get("/health", async () => {
       worker,
       aivisSpeech: diagnostics.aivisSpeech,
       gemini: diagnostics.googleApiKey,
+      openai: diagnostics.openaiApiKey,
+      anthropic: diagnostics.anthropicApiKey,
     },
   };
 });
@@ -636,26 +640,38 @@ app.put("/api/settings", async (req, reply) => {
   return reply.code(200).send({ ok: true });
 });
 
-app.get("/api/settings/secrets", async () => ({
-  googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
-}));
+const toPublicApiKeyStatuses = (statuses: ApiKeyStatuses) => ({
+  googleApiKey: statuses.google,
+  openaiApiKey: statuses.openai,
+  anthropicApiKey: statuses.anthropic,
+});
 
-app.put("/api/settings/secrets/google", async (req, reply) => {
+app.get("/api/settings/secrets", async () =>
+  toPublicApiKeyStatuses(await getApiKeyStatuses(workspaceRoot)),
+);
+
+app.put("/api/settings/secrets/:provider", async (req, reply) => {
+  const { provider } = z
+    .object({ provider: AiProviderSchema })
+    .parse(req.params);
   const { apiKey } = z
     .object({ apiKey: z.string().trim().min(10).max(512) })
     .parse(req.body ?? {});
-  await saveGoogleApiKey(workspaceRoot, apiKey);
+  await saveApiKey(workspaceRoot, provider, apiKey);
   return reply.code(200).send({
     ok: true,
-    googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
+    ...toPublicApiKeyStatuses(await getApiKeyStatuses(workspaceRoot)),
   });
 });
 
-app.delete("/api/settings/secrets/google", async (_req, reply) => {
-  await clearGoogleApiKey(workspaceRoot);
+app.delete("/api/settings/secrets/:provider", async (req, reply) => {
+  const { provider } = z
+    .object({ provider: AiProviderSchema })
+    .parse(req.params);
+  await clearApiKey(workspaceRoot, provider);
   return reply.code(200).send({
     ok: true,
-    googleApiKey: await getGoogleApiKeyStatus(workspaceRoot),
+    ...toPublicApiKeyStatuses(await getApiKeyStatuses(workspaceRoot)),
   });
 });
 
@@ -684,13 +700,17 @@ app.put("/api/projects/:projectId/settings", async (req, reply) => {
 });
 
 app.get("/api/settings/diagnostics", async () => {
-  const [googleApiKey, googleApiKeyStatus] = await Promise.all([
-    resolveGoogleApiKey(workspaceRoot),
-    getGoogleApiKeyStatus(workspaceRoot),
+  const [apiKeys, apiKeyStatuses] = await Promise.all([
+    resolveApiKeys(workspaceRoot),
+    getApiKeyStatuses(workspaceRoot),
   ]);
   return buildSettingsDiagnostics({
-    googleApiKey,
-    googleApiKeySource: googleApiKeyStatus.source,
+    apiKeys,
+    apiKeySources: {
+      google: apiKeyStatuses.google.source,
+      openai: apiKeyStatuses.openai.source,
+      anthropic: apiKeyStatuses.anthropic.source,
+    },
   });
 });
 

@@ -52,6 +52,14 @@ export type SecretSettingsStatus = {
     configured: boolean;
     source: "stored" | "environment" | null;
   };
+  openaiApiKey: {
+    configured: boolean;
+    source: "stored" | "environment" | null;
+  };
+  anthropicApiKey: {
+    configured: boolean;
+    source: "stored" | "environment" | null;
+  };
 };
 
 export type AiUsageSummary = {
@@ -65,6 +73,7 @@ export type AiUsageSummary = {
   usdJpyRate: number;
   pricingVersion: string;
   pricingSource: string;
+  pricingSources: string[];
   byModel: Array<{
     provider: string;
     kind: "llm" | "image";
@@ -138,6 +147,20 @@ export type PreviewResponse = {
 
 export type SettingsDiagnostics = {
   googleApiKey: {
+    configured: boolean;
+    reachable: boolean;
+    source: "stored" | "environment" | null;
+    status?: number;
+    error?: string;
+  };
+  openaiApiKey: {
+    configured: boolean;
+    reachable: boolean;
+    source: "stored" | "environment" | null;
+    status?: number;
+    error?: string;
+  };
+  anthropicApiKey: {
     configured: boolean;
     reachable: boolean;
     source: "stored" | "environment" | null;

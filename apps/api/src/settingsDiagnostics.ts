@@ -1,11 +1,16 @@
+import type { AiProvider } from "@ymm/shared";
+import type { ApiKeyStatus, ResolvedApiKeys } from "./secretStore";
+
+type ApiConnectionDiagnostic = ApiKeyStatus & {
+  reachable: boolean;
+  status?: number;
+  error?: string;
+};
+
 export type SettingsDiagnostics = {
-  googleApiKey: {
-    configured: boolean;
-    reachable: boolean;
-    source: "stored" | "environment" | null;
-    status?: number;
-    error?: string;
-  };
+  googleApiKey: ApiConnectionDiagnostic;
+  openaiApiKey: ApiConnectionDiagnostic;
+  anthropicApiKey: ApiConnectionDiagnostic;
   aivisSpeech: {
     configured: boolean;
     reachable: boolean;
@@ -18,53 +23,84 @@ type DiagnosticEnvironment =
   | NodeJS.ProcessEnv
   | Record<string, string | undefined>;
 
+const providers: AiProvider[] = ["google", "openai", "anthropic"];
+
 export const buildSettingsDiagnostics = async ({
   env = process.env,
   fetchFn = fetch,
-  googleApiKey = env.GOOGLE_API_KEY,
-  googleApiKeySource = googleApiKey ? "environment" : null,
+  apiKeys = {
+    google: env.GOOGLE_API_KEY,
+    openai: env.OPENAI_API_KEY,
+    anthropic: env.ANTHROPIC_API_KEY,
+  },
+  apiKeySources = {
+    google: apiKeys.google ? "environment" : null,
+    openai: apiKeys.openai ? "environment" : null,
+    anthropic: apiKeys.anthropic ? "environment" : null,
+  },
 }: {
   env?: DiagnosticEnvironment;
   fetchFn?: typeof fetch;
-  googleApiKey?: string;
-  googleApiKeySource?: "stored" | "environment" | null;
+  apiKeys?: ResolvedApiKeys;
+  apiKeySources?: Record<AiProvider, ApiKeyStatus["source"]>;
 } = {}): Promise<SettingsDiagnostics> => {
   const aivisBaseUrl = env.AIVIS_SPEECH_BASE_URL?.trim();
-  const trimmedGoogleApiKey = googleApiKey?.trim();
-
-  const googlePromise = checkGoogleApi({
-    apiKey: trimmedGoogleApiKey,
-    source: googleApiKeySource,
-    fetchFn,
-  });
-  const aivisPromise = checkAivisSpeech({ aivisBaseUrl, fetchFn });
-  const [googleApiDiagnostics, aivisSpeech] = await Promise.all([
-    googlePromise,
-    aivisPromise,
-  ]);
-  return { googleApiKey: googleApiDiagnostics, aivisSpeech };
+  const aiDiagnostics = await Promise.all(
+    providers.map((provider) =>
+      checkAiProvider({
+        provider,
+        apiKey: apiKeys[provider]?.trim(),
+        source: apiKeySources[provider],
+        fetchFn,
+      }),
+    ),
+  );
+  const aivisSpeech = await checkAivisSpeech({ aivisBaseUrl, fetchFn });
+  return {
+    googleApiKey: aiDiagnostics[0],
+    openaiApiKey: aiDiagnostics[1],
+    anthropicApiKey: aiDiagnostics[2],
+    aivisSpeech,
+  };
 };
 
-const checkGoogleApi = async ({
+const checkAiProvider = async ({
+  provider,
   apiKey,
   source,
   fetchFn,
 }: {
+  provider: AiProvider;
   apiKey?: string;
-  source: "stored" | "environment" | null;
+  source: ApiKeyStatus["source"];
   fetchFn: typeof fetch;
-}): Promise<SettingsDiagnostics["googleApiKey"]> => {
+}): Promise<ApiConnectionDiagnostic> => {
   if (!apiKey) {
     return { configured: false, reachable: false, source: null };
   }
+  const request: { url: string; headers: Record<string, string> } =
+    provider === "google"
+      ? {
+          url: "https://generativelanguage.googleapis.com/v1beta/models",
+          headers: { "x-goog-api-key": apiKey },
+        }
+      : provider === "openai"
+        ? {
+            url: "https://api.openai.com/v1/models",
+            headers: { Authorization: `Bearer ${apiKey}` },
+          }
+        : {
+            url: "https://api.anthropic.com/v1/models",
+            headers: {
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+          };
   try {
-    const response = await fetchFn(
-      "https://generativelanguage.googleapis.com/v1beta/models",
-      {
-        headers: { "x-goog-api-key": apiKey },
-        signal: AbortSignal.timeout(5_000),
-      },
-    );
+    const response = await fetchFn(request.url, {
+      headers: request.headers,
+      signal: AbortSignal.timeout(5_000),
+    });
     return {
       configured: true,
       reachable: response.ok,
@@ -94,9 +130,7 @@ const checkAivisSpeech = async ({
   try {
     const response = await fetchFn(
       `${aivisBaseUrl.replace(/\/$/, "")}/speakers`,
-      {
-        signal: AbortSignal.timeout(1_500),
-      },
+      { signal: AbortSignal.timeout(1_500) },
     );
     return {
       configured: true,

@@ -6,6 +6,7 @@ import {
   DEFAULT_SCRIPT_MODEL,
   ImageGenerationModelSchema,
   ScriptGenerationModelSchema,
+  type AiProvider,
 } from "@ymm/shared";
 
 const outputPresetSchema = z.object({
@@ -35,7 +36,11 @@ export type WorkerSettings = z.infer<typeof workerSettingsSchema>;
 
 const workerSecretSchema = z.object({
   googleApiKey: z.string().min(1).optional(),
+  openaiApiKey: z.string().min(1).optional(),
+  anthropicApiKey: z.string().min(1).optional(),
 });
+
+export type WorkerApiKeys = Record<AiProvider, string | undefined>;
 
 export const readWorkerSettings = async (
   workspaceRoot: string,
@@ -64,10 +69,10 @@ export const readWorkerSettings = async (
   }
 };
 
-export const readWorkerGoogleApiKey = async (
+export const readWorkerApiKeys = async (
   workspaceRoot: string,
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
-): Promise<string | undefined> => {
+): Promise<WorkerApiKeys> => {
   const secretsPath = path.join(
     workspaceRoot,
     "outputs",
@@ -78,11 +83,26 @@ export const readWorkerGoogleApiKey = async (
     const loaded = workerSecretSchema.parse(
       JSON.parse(await fs.readFile(secretsPath, "utf-8")),
     );
-    return loaded.googleApiKey?.trim() || env.GOOGLE_API_KEY?.trim();
+    return {
+      google: loaded.googleApiKey?.trim() || env.GOOGLE_API_KEY?.trim(),
+      openai: loaded.openaiApiKey?.trim() || env.OPENAI_API_KEY?.trim(),
+      anthropic:
+        loaded.anthropicApiKey?.trim() || env.ANTHROPIC_API_KEY?.trim(),
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return env.GOOGLE_API_KEY?.trim();
+      return {
+        google: env.GOOGLE_API_KEY?.trim(),
+        openai: env.OPENAI_API_KEY?.trim(),
+        anthropic: env.ANTHROPIC_API_KEY?.trim(),
+      };
     }
     throw error;
   }
 };
+
+export const readWorkerGoogleApiKey = async (
+  workspaceRoot: string,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): Promise<string | undefined> =>
+  (await readWorkerApiKeys(workspaceRoot, env)).google;

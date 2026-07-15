@@ -4,6 +4,7 @@ import {
   DEFAULT_SCRIPT_MODEL,
   IMAGE_MODEL_OPTIONS,
   SCRIPT_MODEL_OPTIONS,
+  type AiProvider,
 } from "@ymm/shared";
 import { fetchJson } from "./apiClient";
 import type {
@@ -130,6 +131,38 @@ const formatEstimatedUsd = (value: number): string =>
     maximumFractionDigits: value < 0.01 ? 4 : 2,
   }).format(value);
 
+type ApiKeyStatusField = "googleApiKey" | "openaiApiKey" | "anthropicApiKey";
+
+const apiProviderSettings: ReadonlyArray<{
+  id: AiProvider;
+  statusField: ApiKeyStatusField;
+  title: string;
+  description: string;
+  placeholder: string;
+}> = [
+  {
+    id: "google",
+    statusField: "googleApiKey",
+    title: "Google Gemini",
+    description: "Geminiの台本生成と画像生成に使います。",
+    placeholder: "Google AI Studioで発行したキー",
+  },
+  {
+    id: "openai",
+    statusField: "openaiApiKey",
+    title: "OpenAI",
+    description: "GPTの台本生成とGPT Imageの画像生成に使います。",
+    placeholder: "OpenAI Platformで発行したキー",
+  },
+  {
+    id: "anthropic",
+    statusField: "anthropicApiKey",
+    title: "Anthropic Claude",
+    description: "Claudeの台本生成に使います。画像生成には対応しません。",
+    placeholder: "Claude Consoleで発行したキー",
+  },
+];
+
 export function App() {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -166,7 +199,11 @@ export function App() {
   });
   const [secretSettingsStatus, setSecretSettingsStatus] =
     useState<SecretSettingsStatus | null>(null);
-  const [googleApiKeyDraft, setGoogleApiKeyDraft] = useState("");
+  const [apiKeyDrafts, setApiKeyDrafts] = useState<Record<AiProvider, string>>({
+    google: "",
+    openai: "",
+    anthropic: "",
+  });
   const [settingsDiagnostics, setSettingsDiagnostics] =
     useState<SettingsDiagnostics | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -254,17 +291,19 @@ export function App() {
     hasRunningJob,
   });
   const workflowPosition = getWorkflowPosition(activeScreen);
-  const googleApiStatusLabel = settingsDiagnostics
-    ? settingsDiagnostics.googleApiKey.reachable
-      ? "接続OK"
-      : settingsDiagnostics.googleApiKey.configured
-        ? `接続失敗${settingsDiagnostics.googleApiKey.status ? ` (HTTP ${settingsDiagnostics.googleApiKey.status})` : ""}`
-        : "未設定"
-    : secretSettingsStatus?.googleApiKey.configured
-      ? secretSettingsStatus.googleApiKey.source === "environment"
-        ? "環境変数で設定済み"
-        : "保存済み"
-      : "未設定";
+  const getApiStatusLabel = (statusField: ApiKeyStatusField): string => {
+    const diagnostics = settingsDiagnostics?.[statusField];
+    if (diagnostics) {
+      if (diagnostics.reachable) return "接続OK";
+      if (diagnostics.configured) {
+        return `接続失敗${diagnostics.status ? ` (HTTP ${diagnostics.status})` : ""}`;
+      }
+      return "未設定";
+    }
+    const status = secretSettingsStatus?.[statusField];
+    if (!status?.configured) return "未設定";
+    return status.source === "environment" ? "環境変数で設定済み" : "保存済み";
+  };
 
   const beginNewProject = () => {
     setSelectedProjectId(null);
@@ -891,30 +930,47 @@ export function App() {
     setSecretSettingsStatus(status);
   };
 
-  const saveGoogleApiKey = async () => {
+  const saveProviderApiKey = async (provider: AiProvider) => {
     const response = await fetchJson<SecretSettingsStatus & { ok: boolean }>(
-      "/api/settings/secrets/google",
+      `/api/settings/secrets/${provider}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: googleApiKeyDraft }),
+        body: JSON.stringify({ apiKey: apiKeyDrafts[provider] }),
       },
     );
-    setSecretSettingsStatus({ googleApiKey: response.googleApiKey });
-    setGoogleApiKeyDraft("");
+    setSecretSettingsStatus({
+      googleApiKey: response.googleApiKey,
+      openaiApiKey: response.openaiApiKey,
+      anthropicApiKey: response.anthropicApiKey,
+    });
+    setApiKeyDrafts((current) => ({ ...current, [provider]: "" }));
     setSettingsDiagnostics(null);
-    setMessage("Google APIキーを安全なローカル領域へ保存しました");
+    const title = apiProviderSettings.find(
+      (item) => item.id === provider,
+    )?.title;
+    setMessage(
+      `${title ?? provider} APIキーを安全なローカル領域へ保存しました`,
+    );
   };
 
-  const clearGoogleApiKey = async () => {
-    if (!window.confirm("保存したGoogle APIキーを削除しますか？")) return;
+  const clearProviderApiKey = async (provider: AiProvider) => {
+    const title = apiProviderSettings.find(
+      (item) => item.id === provider,
+    )?.title;
+    if (!window.confirm(`保存した${title ?? provider} APIキーを削除しますか？`))
+      return;
     const response = await fetchJson<SecretSettingsStatus & { ok: boolean }>(
-      "/api/settings/secrets/google",
+      `/api/settings/secrets/${provider}`,
       { method: "DELETE" },
     );
-    setSecretSettingsStatus({ googleApiKey: response.googleApiKey });
+    setSecretSettingsStatus({
+      googleApiKey: response.googleApiKey,
+      openaiApiKey: response.openaiApiKey,
+      anthropicApiKey: response.anthropicApiKey,
+    });
     setSettingsDiagnostics(null);
-    setMessage("保存したGoogle APIキーを削除しました");
+    setMessage(`保存した${title ?? provider} APIキーを削除しました`);
   };
 
   const saveSettings = async () => {
@@ -1677,20 +1733,28 @@ export function App() {
                             )}
                           </div>
                           <small style={styles.helpText}>
-                            Googleの標準公開単価と 1 USD ={" "}
+                            各AI提供元の標準公開単価と 1 USD ={" "}
                             {projectDetail.aiUsageSummary.project.usdJpyRate}
                             円での概算です。無料枠・税・契約割引・キャッシュは実請求で変わります。{" "}
-                            <a
-                              style={styles.inlineLink}
-                              href={
+                            {(
+                              projectDetail.aiUsageSummary.project
+                                .pricingSources ?? [
                                 projectDetail.aiUsageSummary.project
-                                  .pricingSource
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              単価を確認
-                            </a>
+                                  .pricingSource,
+                              ]
+                            ).map((source, index) => (
+                              <React.Fragment key={source}>
+                                {index > 0 ? " / " : ""}
+                                <a
+                                  style={styles.inlineLink}
+                                  href={source}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  単価{index + 1}
+                                </a>
+                              </React.Fragment>
+                            ))}
                           </small>
                         </>
                       )}
@@ -2971,7 +3035,7 @@ export function App() {
                 <ScreenIntro
                   step="アプリ設定"
                   title="生成と出力の設定"
-                  description="台本・画像に使うAIモデル、Google APIキー、完成動画のサイズを設定します。モデル設定は次に開始する生成から反映されます。"
+                  description="Gemini・OpenAI・Claudeから台本モデルを選び、Gemini・OpenAIから画像モデルを選べます。モデル設定は次に開始する生成から反映されます。"
                 />
                 <div style={styles.settingsGrid}>
                   <section style={styles.settingsCard}>
@@ -3045,80 +3109,102 @@ export function App() {
                     </label>
                   </section>
 
-                  <section style={styles.settingsCard}>
-                    <div style={styles.sectionHeadingRow}>
-                      <div>
-                        <span style={styles.eyebrow}>API接続</span>
-                        <h3 style={styles.subTitle}>Google APIキー</h3>
-                      </div>
-                      <span
-                        style={styles.stepBadge}
-                        data-testid="settings-google-status"
-                      >
-                        {googleApiStatusLabel}
-                      </span>
-                    </div>
-                    <p style={styles.helpText}>
-                      キーはローカルの秘密情報ファイルへ分離して保存し、保存後は画面やAPIで再表示しません。
-                    </p>
-                    <label style={styles.fieldLabel}>
-                      <strong>新しいAPIキー</strong>
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        spellCheck={false}
-                        style={styles.input}
-                        data-testid="settings-google-key-input"
-                        value={googleApiKeyDraft}
-                        placeholder="Google AI Studioで発行したキーを貼り付け"
-                        onChange={(event) =>
-                          setGoogleApiKeyDraft(event.target.value)
-                        }
-                      />
-                    </label>
-                    <div style={styles.lineRow}>
-                      <button
-                        style={styles.primaryButton}
-                        data-testid="settings-google-key-save"
-                        disabled={googleApiKeyDraft.trim().length < 10}
-                        onClick={() => void runUiAction(saveGoogleApiKey)}
-                      >
-                        APIキーを登録
-                      </button>
-                      <button
-                        style={styles.secondaryButton}
-                        data-testid="settings-diagnostics-button"
-                        onClick={() =>
-                          void runUiAction(loadSettingsDiagnostics)
-                        }
-                      >
-                        実際に接続診断
-                      </button>
-                      {secretSettingsStatus?.googleApiKey.source ===
-                      "stored" ? (
-                        <button
-                          style={styles.quietDangerButton}
-                          onClick={() => void runUiAction(clearGoogleApiKey)}
+                  {apiProviderSettings.map((provider) => (
+                    <section key={provider.id} style={styles.settingsCard}>
+                      <div style={styles.sectionHeadingRow}>
+                        <div>
+                          <span style={styles.eyebrow}>API接続</span>
+                          <h3 style={styles.subTitle}>{provider.title}</h3>
+                        </div>
+                        <span
+                          style={styles.stepBadge}
+                          data-testid={`settings-${provider.id}-status`}
                         >
-                          保存キーを削除
+                          {getApiStatusLabel(provider.statusField)}
+                        </span>
+                      </div>
+                      <p style={styles.helpText}>{provider.description}</p>
+                      <p style={styles.helpText}>
+                        キーは秘密情報ファイルへ分離して保存し、保存後は画面やAPIで再表示しません。
+                      </p>
+                      <label style={styles.fieldLabel}>
+                        <strong>新しいAPIキー</strong>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          spellCheck={false}
+                          style={styles.input}
+                          data-testid={`settings-${provider.id}-key-input`}
+                          value={apiKeyDrafts[provider.id]}
+                          placeholder={provider.placeholder}
+                          onChange={(event) =>
+                            setApiKeyDrafts((current) => ({
+                              ...current,
+                              [provider.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div style={styles.lineRow}>
+                        <button
+                          style={styles.primaryButton}
+                          data-testid={`settings-${provider.id}-key-save`}
+                          disabled={
+                            apiKeyDrafts[provider.id].trim().length < 10
+                          }
+                          onClick={() =>
+                            void runUiAction(() =>
+                              saveProviderApiKey(provider.id),
+                            )
+                          }
+                        >
+                          APIキーを登録
                         </button>
-                      ) : null}
-                    </div>
-                    <div style={styles.connectionStatusRow}>
-                      <span
-                        style={styles.stepBadge}
-                        data-testid="settings-aivis-status"
-                      >
-                        Aivis:{" "}
-                        {settingsDiagnostics?.aivisSpeech.reachable
-                          ? "接続OK"
-                          : settingsDiagnostics?.aivisSpeech.configured
-                            ? "未接続"
-                            : "未設定"}
-                      </span>
-                    </div>
-                  </section>
+                        {secretSettingsStatus?.[provider.statusField].source ===
+                        "stored" ? (
+                          <button
+                            style={styles.quietDangerButton}
+                            onClick={() =>
+                              void runUiAction(() =>
+                                clearProviderApiKey(provider.id),
+                              )
+                            }
+                          >
+                            保存キーを削除
+                          </button>
+                        ) : null}
+                      </div>
+                    </section>
+                  ))}
                 </div>
+                <section style={styles.settingsCard}>
+                  <div style={styles.sectionHeadingRow}>
+                    <div>
+                      <span style={styles.eyebrow}>接続確認</span>
+                      <h3 style={styles.subTitle}>登録済みサービスを診断</h3>
+                    </div>
+                    <button
+                      style={styles.secondaryButton}
+                      data-testid="settings-diagnostics-button"
+                      onClick={() => void runUiAction(loadSettingsDiagnostics)}
+                    >
+                      実際に接続診断
+                    </button>
+                  </div>
+                  <div style={styles.connectionStatusRow}>
+                    <span
+                      style={styles.stepBadge}
+                      data-testid="settings-aivis-status"
+                    >
+                      Aivis:{" "}
+                      {settingsDiagnostics?.aivisSpeech.reachable
+                        ? "接続OK"
+                        : settingsDiagnostics?.aivisSpeech.configured
+                          ? "未接続"
+                          : "未設定"}
+                    </span>
+                  </div>
+                </section>
                 <section style={styles.settingsCard}>
                   <div>
                     <span style={styles.eyebrow}>動画出力</span>

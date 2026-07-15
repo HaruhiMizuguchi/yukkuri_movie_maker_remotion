@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { createProductionWorkflowImplementations } from "@ymm/core";
 import { handleRenderJobPayload } from "./renderJobHandler";
-import { readWorkerGoogleApiKey, readWorkerSettings } from "./settings";
+import { readWorkerApiKeys, readWorkerSettings } from "./settings";
 import { parseWorkflowPayload } from "./workflowPayload";
 import {
   resolveWorkerOutputRoot,
@@ -45,15 +45,17 @@ async function main() {
     } catch {
       // 不正ペイロードはhandlerで失敗記録するため、ここでは既定設定の読込を続ける。
     }
-    const [settings, googleApiKey] = await Promise.all([
+    const [settings, apiKeys] = await Promise.all([
       readWorkerSettings(workspaceRoot, jobSettings),
-      readWorkerGoogleApiKey(workspaceRoot),
+      readWorkerApiKeys(workspaceRoot),
     ]);
     const implementations = createProductionWorkflowImplementations({
       workspaceRoot,
       outputRoot,
       outputPreset: settings.outputPreset,
-      googleApiKey,
+      googleApiKey: apiKeys.google,
+      openaiApiKey: apiKeys.openai,
+      anthropicApiKey: apiKeys.anthropic,
       scriptModel: settings.models.script,
       imageModel: settings.models.image,
       ttsProvider: process.env.YMM_TTS_PROVIDER === "mock" ? "mock" : "aivis",

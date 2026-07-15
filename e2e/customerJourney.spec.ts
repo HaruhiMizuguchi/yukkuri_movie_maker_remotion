@@ -223,10 +223,15 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   );
   await page
     .getByTestId("settings-script-model-select")
-    .selectOption("gemini-3.1-flash-lite");
+    .selectOption("claude-sonnet-5");
   await page
     .getByTestId("settings-image-model-select")
-    .selectOption("gemini-3.1-flash-image");
+    .selectOption("gpt-image-2");
+  await expect(
+    page.locator(
+      '[data-testid="settings-script-model-select"] option[value="gpt-5.6-terra"]',
+    ),
+  ).toHaveCount(1);
   await page
     .getByTestId("settings-google-key-input")
     .fill("e2e-google-api-key");
@@ -235,8 +240,28 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("settings-google-status")).toContainText(
     "保存済み",
   );
+  await page
+    .getByTestId("settings-openai-key-input")
+    .fill("e2e-openai-api-key");
+  await page.getByTestId("settings-openai-key-save").click();
+  await expect(page.getByTestId("settings-openai-status")).toContainText(
+    "保存済み",
+  );
+  await page
+    .getByTestId("settings-anthropic-key-input")
+    .fill("e2e-anthropic-api-key");
+  await page.getByTestId("settings-anthropic-key-save").click();
+  await expect(page.getByTestId("settings-anthropic-status")).toContainText(
+    "保存済み",
+  );
   await page.getByTestId("settings-diagnostics-button").click();
   await expect(page.getByTestId("settings-google-status")).toContainText(
+    "接続OK",
+  );
+  await expect(page.getByTestId("settings-openai-status")).toContainText(
+    "接続OK",
+  );
+  await expect(page.getByTestId("settings-anthropic-status")).toContainText(
     "接続OK",
   );
   await page.getByTestId("settings-width-input").fill("1280");
@@ -246,10 +271,10 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "設定を保存しました",
   );
   await expect(page.getByTestId("settings-script-model-select")).toHaveValue(
-    "gemini-3.1-flash-lite",
+    "claude-sonnet-5",
   );
   await expect(page.getByTestId("settings-image-model-select")).toHaveValue(
-    "gemini-3.1-flash-image",
+    "gpt-image-2",
   );
   await visual.capture(page, "08-settings", "設定", [
     "APIキーを値の再表示なしで登録し、接続状態を確認できる",
@@ -278,7 +303,11 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       },
       outputPreset: { width: 1920, height: 1080, fps: 30 },
     },
-    googleApiKeyConfigured: false,
+    apiKeyConfigured: {
+      google: false,
+      openai: false,
+      anthropic: false,
+    },
   };
 
   await page.route("**/api/**", async (route) => {
@@ -459,17 +488,39 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     if (url.pathname === "/api/settings/secrets" && method === "GET") {
       return fulfillJson({
         googleApiKey: {
-          configured: state.googleApiKeyConfigured,
-          source: state.googleApiKeyConfigured ? "stored" : null,
+          configured: state.apiKeyConfigured.google,
+          source: state.apiKeyConfigured.google ? "stored" : null,
+        },
+        openaiApiKey: {
+          configured: state.apiKeyConfigured.openai,
+          source: state.apiKeyConfigured.openai ? "stored" : null,
+        },
+        anthropicApiKey: {
+          configured: state.apiKeyConfigured.anthropic,
+          source: state.apiKeyConfigured.anthropic ? "stored" : null,
         },
       });
     }
 
-    if (url.pathname === "/api/settings/secrets/google" && method === "PUT") {
-      state.googleApiKeyConfigured = Boolean(body.apiKey);
+    const secretProvider = url.pathname.match(
+      /^\/api\/settings\/secrets\/(google|openai|anthropic)$/,
+    )?.[1] as "google" | "openai" | "anthropic" | undefined;
+    if (secretProvider && method === "PUT") {
+      state.apiKeyConfigured[secretProvider] = Boolean(body.apiKey);
       return fulfillJson({
         ok: true,
-        googleApiKey: { configured: true, source: "stored" },
+        googleApiKey: {
+          configured: state.apiKeyConfigured.google,
+          source: state.apiKeyConfigured.google ? "stored" : null,
+        },
+        openaiApiKey: {
+          configured: state.apiKeyConfigured.openai,
+          source: state.apiKeyConfigured.openai ? "stored" : null,
+        },
+        anthropicApiKey: {
+          configured: state.apiKeyConfigured.anthropic,
+          source: state.apiKeyConfigured.anthropic ? "stored" : null,
+        },
       });
     }
 
@@ -491,10 +542,22 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     if (url.pathname === "/api/settings/diagnostics" && method === "GET") {
       return fulfillJson({
         googleApiKey: {
-          configured: state.googleApiKeyConfigured,
-          reachable: state.googleApiKeyConfigured,
-          source: state.googleApiKeyConfigured ? "stored" : null,
-          status: state.googleApiKeyConfigured ? 200 : undefined,
+          configured: state.apiKeyConfigured.google,
+          reachable: state.apiKeyConfigured.google,
+          source: state.apiKeyConfigured.google ? "stored" : null,
+          status: state.apiKeyConfigured.google ? 200 : undefined,
+        },
+        openaiApiKey: {
+          configured: state.apiKeyConfigured.openai,
+          reachable: state.apiKeyConfigured.openai,
+          source: state.apiKeyConfigured.openai ? "stored" : null,
+          status: state.apiKeyConfigured.openai ? 200 : undefined,
+        },
+        anthropicApiKey: {
+          configured: state.apiKeyConfigured.anthropic,
+          reachable: state.apiKeyConfigured.anthropic,
+          source: state.apiKeyConfigured.anthropic ? "stored" : null,
+          status: state.apiKeyConfigured.anthropic ? 200 : undefined,
         },
         aivisSpeech: { configured: true, reachable: true, status: 200 },
       });
