@@ -206,6 +206,8 @@ export const TimelineTrackSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: TimelineTrackTypeSchema,
+  hidden: z.boolean().optional(),
+  muted: z.boolean().optional(),
   clips: z.array(TimelineClipSchema),
 });
 
@@ -221,6 +223,7 @@ export const TimelinePlaybackRangeSchema = z.object({
 });
 
 export const TimelineDataSchema = z.object({
+  editingMode: z.enum(["source", "final-video"]).optional(),
   playbackRange: TimelinePlaybackRangeSchema,
   tracks: z.array(TimelineTrackSchema),
   markers: z.array(TimelineMarkerSchema),

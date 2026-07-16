@@ -19,16 +19,22 @@ type TimelineClip = {
   assetPath: string;
   startMs: number;
   durationMs: number;
+  inMs?: number;
+  outMs?: number;
+  volume?: number;
   text?: string;
   style?: string;
 };
 
 type TimelineData = {
+  editingMode?: "source" | "final-video";
   playbackRange: { inMs: number; outMs: number };
   tracks: Array<{
     id: string;
     name: string;
     type: string;
+    hidden?: boolean;
+    muted?: boolean;
     clips: TimelineClip[];
   }>;
   markers: Array<{ id: string; timeMs: number; label: string }>;
@@ -234,6 +240,33 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
     "同じ画面からレンダリングジョブを作成できる",
   ]);
 
+  await page.getByTestId("nav-timeline").click();
+  await page.getByTestId("timeline-import-final-button").click();
+  await expect(page.getByTestId("screen-timeline")).toContainText(
+    "完成動画編集モード",
+  );
+  await expect(
+    page.getByTestId("timeline-clip-block-track-final-video-final-video-main"),
+  ).toBeVisible();
+  await page
+    .getByTestId("timeline-clip-block-track-final-video-final-video-main")
+    .click();
+  await page.getByTestId("timeline-playhead-input").fill("2000");
+  await page.getByTestId("timeline-split-button").click();
+  await expect(page.getByTestId("timeline-selected-clip")).toContainText(
+    "final-video-main-split-2",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("timeline-ripple-delete-button").click();
+  await expect(page.getByTestId("app-message")).toContainText(
+    "後続映像を前へ詰めました",
+  );
+  await visual.capture(page, "08-final-video-editor", "完成動画編集", [
+    "完成済み動画を編集専用トラックへ取り込める",
+    "プレイヘッド分割と削除して詰める操作ができる",
+    "元の字幕と音声が二重にならない無効状態を確認できる",
+  ]);
+
   await page.getByTestId("nav-settings").click();
   await expect(page.getByTestId("settings-google-status")).toContainText(
     "未設定",
@@ -293,7 +326,7 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("settings-image-model-select")).toHaveValue(
     "gpt-image-2",
   );
-  await visual.capture(page, "08-settings", "設定", [
+  await visual.capture(page, "09-settings", "設定", [
     "APIキーを値の再表示なしで登録し、接続状態を確認できる",
     "台本・画像モデルと出力プリセットを保存できる",
   ]);
@@ -456,6 +489,55 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     ) {
       state.timeline = body as TimelineData;
       return fulfillJson({ ok: true });
+    }
+
+    if (
+      url.pathname === `/api/projects/${projectId}/timeline/import-final` &&
+      method === "POST"
+    ) {
+      const current =
+        state.timeline ??
+        createTimelineFromScript(state.script ?? defaultScript());
+      state.timeline = {
+        ...current,
+        editingMode: "final-video",
+        playbackRange: { inMs: 0, outMs: 4500 },
+        tracks: [
+          {
+            id: "track-final-video",
+            name: "完成動画（再編集元）",
+            type: "video",
+            hidden: false,
+            muted: false,
+            clips: [
+              {
+                id: "final-video-main",
+                assetType: "video",
+                assetPath: "final/final.mp4",
+                startMs: 0,
+                durationMs: 4500,
+                inMs: 0,
+                outMs: 4500,
+                volume: 1,
+              },
+            ],
+          },
+          {
+            id: "track-overlay-subtitle",
+            name: "追加テロップ",
+            type: "subtitle",
+            hidden: false,
+            clips: [],
+          },
+          ...current.tracks.map((track) => ({
+            ...track,
+            ...(track.type === "audio"
+              ? { muted: true }
+              : { hidden: true }),
+          })),
+        ],
+      };
+      return fulfillJson({ timeline: state.timeline, durationMs: 4500 });
     }
 
     if (

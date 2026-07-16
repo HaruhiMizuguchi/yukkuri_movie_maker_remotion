@@ -441,6 +441,7 @@ export function createDefaultWorkflowImplementations(
       const effectiveSubtitleTracks = toEffectiveSubtitleTracks(
         timelineProps?.subtitleTracks ?? [],
         subtitleTracks,
+        timelineProps?.finalVideoEditMode ?? false,
       );
       const baseShotPlan = createShotPlan({
         script,
@@ -561,6 +562,11 @@ export function createDefaultWorkflowImplementations(
         projectRoot,
         audioTracks: timelineProps?.audioTracks ?? [],
       });
+      const remotionVideoTracks = await resolveTimelineVideoTracks({
+        outputRoot,
+        projectRoot,
+        videoTracks: timelineProps?.videoTracks ?? [],
+      });
       await writeJson(audioMixPlanPath, {
         ...audioMixPlan,
         assets: {
@@ -584,6 +590,8 @@ export function createDefaultWorkflowImplementations(
           illustrationImagePath: effectiveIllustrationPath,
           subtitleTracks: effectiveSubtitleTracks,
           audioTracks: remotionAudioTracks,
+          videoTracks: remotionVideoTracks,
+          finalVideoEditMode: timelineProps?.finalVideoEditMode ?? false,
           shotPlan,
           characterPerformance,
           subtitlePresentation,
@@ -631,6 +639,7 @@ export function createDefaultWorkflowImplementations(
         chapterCount: chapterPlan.chapters.length,
         backgroundAnimation,
         manualEditSummary: timelineProps?.manualEditSummary,
+        finalVideoEditMode: timelineProps?.finalVideoEditMode ?? false,
         timelineSynchronization,
       });
       await syncLatest(stepDir);
@@ -1369,11 +1378,22 @@ type ResolvedRemotionAudioTrack = {
   fadeOutMs: number;
 };
 
+type ResolvedRemotionVideoTrack = {
+  clipId: string;
+  filePath: string;
+  startMs: number;
+  endMs: number;
+  trimBeforeMs: number;
+  volume: number;
+};
+
 const renderWithRemotion = async ({
   workspaceRoot,
   outputPath,
   audioPath,
   audioTracks,
+  videoTracks,
+  finalVideoEditMode,
   backgroundImagePath,
   characterImagePath,
   illustrationImagePath,
@@ -1393,6 +1413,8 @@ const renderWithRemotion = async ({
   outputPath: string;
   audioPath: string;
   audioTracks: ResolvedRemotionAudioTrack[];
+  videoTracks: ResolvedRemotionVideoTrack[];
+  finalVideoEditMode: boolean;
   backgroundImagePath: string;
   characterImagePath: string;
   illustrationImagePath?: string;
@@ -1479,6 +1501,13 @@ const renderWithRemotion = async ({
       track,
     };
   });
+  const videoTrackRouteEntries = videoTracks.map((track, index) => {
+    const extension = path.extname(track.filePath) || ".mp4";
+    return {
+      routePath: `/timeline-video-${index}${extension}`,
+      track,
+    };
+  });
   const assetServer = await startAssetServer({
     assets: {
       "/audio.wav": { filePath: audioPath },
@@ -1493,6 +1522,12 @@ const renderWithRemotion = async ({
       "/transition.wav": { filePath: audioMixPlan.assets.transitionPath },
       ...Object.fromEntries(
         audioTrackRouteEntries.map((entry) => [
+          entry.routePath,
+          { filePath: entry.track.filePath },
+        ]),
+      ),
+      ...Object.fromEntries(
+        videoTrackRouteEntries.map((entry) => [
           entry.routePath,
           { filePath: entry.track.filePath },
         ]),
@@ -1541,6 +1576,15 @@ const renderWithRemotion = async ({
         fadeInMs: entry.track.fadeInMs,
         fadeOutMs: entry.track.fadeOutMs,
       })),
+      videoTracks: videoTrackRouteEntries.map((entry) => ({
+        clipId: entry.track.clipId,
+        assetPath: assetServer.urls[entry.routePath],
+        startMs: entry.track.startMs,
+        endMs: entry.track.endMs,
+        trimBeforeMs: entry.track.trimBeforeMs,
+        volume: entry.track.volume,
+      })),
+      finalVideoEditMode,
       chapterPlan,
       durationMs,
       outputPreset,
@@ -1623,8 +1667,9 @@ const createEmptyTimelineSynchronization = (
 const toEffectiveSubtitleTracks = (
   manualSubtitleTracks: TimelineRemotionProps["subtitleTracks"],
   fallbackTracks: ScriptTimestamp[],
+  finalVideoEditMode = false,
 ): ScriptTimestamp[] => {
-  if (manualSubtitleTracks.length === 0) {
+  if (manualSubtitleTracks.length === 0 && !finalVideoEditMode) {
     return fallbackTracks;
   }
   return manualSubtitleTracks.map((track, index) => ({
@@ -1659,6 +1704,30 @@ const resolveTimelineAudioTracks = async ({
       volume: track.volume,
       fadeInMs: track.fadeInMs,
       fadeOutMs: track.fadeOutMs,
+    })),
+  );
+
+const resolveTimelineVideoTracks = async ({
+  outputRoot,
+  projectRoot,
+  videoTracks,
+}: {
+  outputRoot: string;
+  projectRoot: string;
+  videoTracks: TimelineRemotionProps["videoTracks"];
+}): Promise<ResolvedRemotionVideoTrack[]> =>
+  Promise.all(
+    videoTracks.map(async (track) => ({
+      clipId: track.clipId,
+      filePath: await resolveTimelineAssetPath({
+        outputRoot,
+        projectRoot,
+        assetPath: track.assetPath,
+      }),
+      startMs: track.startMs,
+      endMs: track.endMs,
+      trimBeforeMs: track.trimBeforeMs,
+      volume: track.volume,
     })),
   );
 

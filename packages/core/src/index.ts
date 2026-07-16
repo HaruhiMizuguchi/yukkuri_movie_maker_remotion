@@ -29,6 +29,7 @@ export const MANUAL_SKIP_OUTPUT = {
 } as const;
 
 export { registerProjectFiles } from "./projectFile";
+export { parseMediaDurationMs, probeMediaDurationMs } from "./mediaProbe";
 export { createDefaultWorkflowImplementations } from "./defaultWorkflow";
 export type { DefaultWorkflowOptions } from "./defaultWorkflow";
 export { createProductionWorkflowImplementations } from "./productionWorkflow";
@@ -36,6 +37,7 @@ export type { ProductionWorkflowOptions } from "./productionWorkflow";
 export {
   addClip,
   addMarker,
+  createFinalVideoEditingTimeline,
   deleteClip,
   duplicateClip,
   moveClip,

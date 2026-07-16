@@ -8,7 +8,9 @@ import multipart from "@fastify/multipart";
 import PgBoss from "pg-boss";
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
+  createFinalVideoEditingTimeline,
   moveClip,
+  probeMediaDurationMs,
   resizeClip,
   setPlaybackRange,
   timelineToRemotionProps,
@@ -565,6 +567,47 @@ app.put("/api/projects/:projectId/timeline", async (req, reply) => {
   const timeline = TimelineDataSchema.parse(req.body ?? {});
   await saveTimeline(workspaceRoot, projectId, timeline);
   return reply.code(200).send({ ok: true });
+});
+
+app.post("/api/projects/:projectId/timeline/import-final", async (req, reply) => {
+  const { projectId } = projectIdParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
+  const script = await readProjectScript(workspaceRoot, projectId);
+  if (!script) {
+    return reply.code(404).send({ error: "script_not_found" });
+  }
+
+  const finalPath = path.join(
+    workflowOutputRoot,
+    "projects",
+    projectId,
+    "final",
+    "final.mp4",
+  );
+  try {
+    await fs.access(finalPath);
+  } catch {
+    return reply.code(404).send({ error: "final_video_not_found" });
+  }
+
+  const [current, durationMs] = await Promise.all([
+    readOrCreateTimeline(workspaceRoot, projectId, script),
+    probeMediaDurationMs(finalPath),
+  ]);
+  const timeline = createFinalVideoEditingTimeline(current, {
+    assetPath: "final/final.mp4",
+    durationMs,
+    sourceName: "完成動画（再編集元）",
+  });
+  await saveTimeline(workspaceRoot, projectId, timeline);
+  req.log.info(
+    { projectId, durationMs, sourcePath: "final/final.mp4" },
+    "final_video_imported_to_timeline",
+  );
+  return reply.code(200).send({ timeline, durationMs });
 });
 
 app.post("/api/projects/:projectId/timeline/operations", async (req, reply) => {

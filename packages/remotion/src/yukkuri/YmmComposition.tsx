@@ -27,6 +27,15 @@ export type ManualAudioTrack = {
   fadeOutMs: number;
 };
 
+export type ManualVideoTrack = {
+  clipId: string;
+  assetPath: string;
+  startMs: number;
+  endMs: number;
+  trimBeforeMs: number;
+  volume: number;
+};
+
 export type ShotPlanItem = {
   id: string;
   type: "wide" | "medium" | "close" | "insert";
@@ -138,6 +147,8 @@ export type YmmCompositionProps = Record<string, unknown> & {
     fps: number;
   };
   audioTracks?: ManualAudioTrack[];
+  videoTracks?: ManualVideoTrack[];
+  finalVideoEditMode?: boolean;
   shotPlan?: ShotPlanItem[];
   characterPerformance?: CharacterPerformancePlan;
   subtitlePresentation?: SubtitlePresentationPlan;
@@ -156,6 +167,8 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
   theme,
   subtitleTracks,
   audioTracks = [],
+  videoTracks = [],
+  finalVideoEditMode = false,
   shotPlan = [],
   characterPerformance = {
     mouthCues: [],
@@ -298,7 +311,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f172a", color: "#fff" }}>
-      {visualPlan.tracks.length > 0 ? (
+      {!finalVideoEditMode && (visualPlan.tracks.length > 0 ? (
         <>
           {visualPlan.tracks.map((track) => {
             const asset = visualAssetMap.get(track.assetId);
@@ -336,8 +349,30 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
               "linear-gradient(160deg, #0f172a 0%, #1d4ed8 40%, #22d3ee 100%)",
           }}
         />
-      )}
-      {illustrationImagePath && currentShot?.type === "insert" ? (
+      ))}
+      {videoTracks.map((track) => (
+        <Sequence
+          key={track.clipId}
+          from={Math.max(0, Math.floor((track.startMs / 1000) * fps))}
+          durationInFrames={Math.max(
+            1,
+            Math.ceil(((track.endMs - track.startMs) / 1000) * fps),
+          )}
+        >
+          <OffthreadVideo
+            src={track.assetPath}
+            trimBefore={Math.max(
+              0,
+              Math.floor((track.trimBeforeMs / 1000) * fps),
+            )}
+            volume={track.volume}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
+        </Sequence>
+      ))}
+      {!finalVideoEditMode &&
+      illustrationImagePath &&
+      currentShot?.type === "insert" ? (
         <Img
           src={illustrationImagePath}
           style={{
@@ -352,7 +387,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           }}
         />
       ) : null}
-      {currentTransition ? (
+      {!finalVideoEditMode && currentTransition ? (
         <>
           <div
             style={{
@@ -400,7 +435,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           </div>
         </>
       ) : null}
-      {characterImagePath ? (
+      {!finalVideoEditMode && characterImagePath ? (
         <div
           style={{
             position: "absolute",
@@ -475,7 +510,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           ) : null}
         </div>
       ) : null}
-      <div
+      {!finalVideoEditMode ? <div
         style={{
           position: "absolute",
           top: 50,
@@ -487,8 +522,8 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         }}
       >
         {title}
-      </div>
-      <div
+      </div> : null}
+      {!finalVideoEditMode ? <div
         style={{
           position: "absolute",
           top: 126,
@@ -498,8 +533,8 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         }}
       >
         {currentChapter ? `${theme}  /  ${currentChapter.title}` : theme}
-      </div>
-      <div
+      </div> : null}
+      {(finalVideoEditMode ? currentSubtitle : currentSubtitlePresentation ?? currentSubtitle) ? <div
         style={{
           position: "absolute",
           left: 50,
@@ -514,7 +549,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           minHeight: 120,
         }}
       >
-        {currentSubtitlePresentation ? (
+        {!finalVideoEditMode && currentSubtitlePresentation ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
             <span style={{ color: "rgba(216,255,246,0.9)", marginRight: 10 }}>
               {currentSubtitlePresentation.speaker}:
@@ -533,8 +568,8 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
         ) : (
           ""
         )}
-      </div>
-      {currentSubtitlePresentation?.keywordBadge ? (
+      </div> : null}
+      {!finalVideoEditMode && currentSubtitlePresentation?.keywordBadge ? (
         <div
           style={{
             position: "absolute",
@@ -552,7 +587,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           {currentSubtitlePresentation.keywordBadge}
         </div>
       ) : null}
-      {audioMixPlan.assets.ambientPath ? (
+      {!finalVideoEditMode && audioMixPlan.assets.ambientPath ? (
         <Audio
           src={audioMixPlan.assets.ambientPath}
           volume={(audioFrame) =>
@@ -563,7 +598,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           }
         />
       ) : null}
-      {audioMixPlan.assets.bgmPath ? (
+      {!finalVideoEditMode && audioMixPlan.assets.bgmPath ? (
         <Audio
           src={audioMixPlan.assets.bgmPath}
           volume={(audioFrame) =>
@@ -571,7 +606,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
           }
         />
       ) : null}
-      {audioMixPlan.seCues.map((cue) => {
+      {!finalVideoEditMode ? audioMixPlan.seCues.map((cue) => {
         const cuePath =
           cue.assetKey === "accent"
             ? audioMixPlan.assets.accentPath
@@ -591,7 +626,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
             <Audio src={cuePath} volume={cue.volume} />
           </Sequence>
         );
-      })}
+      }) : null}
       {hasManualAudioTracks ? (
         audioTracks.map((track) => (
           <Sequence
@@ -614,7 +649,7 @@ export const YmmComposition: React.FC<YmmCompositionProps> = ({
             />
           </Sequence>
         ))
-      ) : audioPath ? (
+      ) : !finalVideoEditMode && audioPath ? (
         <Audio src={audioPath} />
       ) : null}
     </AbsoluteFill>

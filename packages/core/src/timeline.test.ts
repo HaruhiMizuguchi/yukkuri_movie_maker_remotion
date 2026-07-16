@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addClip,
   addMarker,
+  createFinalVideoEditingTimeline,
   deleteClip,
   duplicateClip,
   moveClip,
@@ -405,6 +406,118 @@ describe("timeline operations", () => {
     });
 
     expect(synchronized.timeline).toEqual(manualTimeline);
+    expect(synchronized.summary).toEqual({
+      audioClipsAdjusted: 0,
+      subtitleClipsAdjusted: 0,
+      playbackRangeAdjusted: false,
+      audioDurationMs: 9000,
+    });
+  });
+
+  it("完成動画を二重表示・二重再生せず編集タイムラインへ取り込める", () => {
+    const imported = createFinalVideoEditingTimeline(sampleTimeline, {
+      assetPath: "final/final.mp4",
+      durationMs: 11840,
+      sourceName: "完成動画 2026-07-16",
+    });
+
+    expect(imported.editingMode).toBe("final-video");
+    expect(imported.playbackRange).toEqual({ inMs: 0, outMs: 11840 });
+    expect(imported.tracks.find((track) => track.id === "t-audio")?.muted).toBe(
+      true,
+    );
+    expect(
+      imported.tracks.find((track) => track.id === "t-sub")?.hidden,
+    ).toBe(true);
+    expect(
+      imported.tracks.find((track) => track.id === "track-final-video"),
+    ).toMatchObject({
+      name: "完成動画 2026-07-16",
+      type: "video",
+      clips: [
+        {
+          id: "final-video-main",
+          assetType: "video",
+          assetPath: "final/final.mp4",
+          startMs: 0,
+          durationMs: 11840,
+          inMs: 0,
+          outMs: 11840,
+          volume: 1,
+        },
+      ],
+    });
+    expect(
+      imported.tracks.find((track) => track.id === "track-overlay-subtitle"),
+    ).toMatchObject({ type: "subtitle", hidden: false, clips: [] });
+
+    const remotionProps = timelineToRemotionProps(imported);
+    expect(remotionProps.finalVideoEditMode).toBe(true);
+    expect(remotionProps.audioTracks).toHaveLength(0);
+    expect(remotionProps.subtitleTracks).toHaveLength(0);
+    expect(remotionProps.videoTracks).toEqual([
+      {
+        clipId: "final-video-main",
+        assetPath: "final/final.mp4",
+        startMs: 0,
+        endMs: 11840,
+        trimBeforeMs: 0,
+        volume: 1,
+      },
+    ]);
+  });
+
+  it("完成動画の分割・移動後も映像と内蔵音声の参照位置を保つ", () => {
+    const imported = createFinalVideoEditingTimeline(sampleTimeline, {
+      assetPath: "final/final.mp4",
+      durationMs: 6000,
+    });
+    const split = splitClip(imported, {
+      trackId: "track-final-video",
+      clipId: "final-video-main",
+      splitAtMs: 2000,
+    });
+    const moved = moveClip(split, {
+      trackId: "track-final-video",
+      clipId: "final-video-main-split-2",
+      newStartMs: 3500,
+    });
+
+    expect(timelineToRemotionProps(moved).videoTracks).toEqual([
+      expect.objectContaining({
+        clipId: "final-video-main",
+        startMs: 0,
+        endMs: 2000,
+        trimBeforeMs: 0,
+      }),
+      expect.objectContaining({
+        clipId: "final-video-main-split-2",
+        startMs: 3500,
+        endMs: 6000,
+        trimBeforeMs: 2000,
+      }),
+    ]);
+  });
+
+  it("完成動画編集モードではTTS再生成による自動同期を行わない", () => {
+    const imported = createFinalVideoEditingTimeline(sampleTimeline, {
+      assetPath: "final/final.mp4",
+      durationMs: 6000,
+    });
+
+    const synchronized = synchronizeGeneratedTimelineTiming(imported, {
+      audioDurationMs: 9000,
+      timestamps: [
+        {
+          speaker: "reimu",
+          text: "再生成された字幕",
+          startMs: 0,
+          endMs: 9000,
+        },
+      ],
+    });
+
+    expect(synchronized.timeline).toEqual(imported);
     expect(synchronized.summary).toEqual({
       audioClipsAdjusted: 0,
       subtitleClipsAdjusted: 0,

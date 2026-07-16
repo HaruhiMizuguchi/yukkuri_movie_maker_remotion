@@ -53,6 +53,12 @@ type UpdateClipInput = {
 
 type AddMarkerInput = TimelineMarker;
 
+type CreateFinalVideoEditingTimelineInput = {
+  assetPath: string;
+  durationMs: number;
+  sourceName?: string;
+};
+
 export type RemotionTimelineProps = {
   durationInFrames: number;
   durationMs: number;
@@ -74,12 +80,81 @@ export type RemotionTimelineProps = {
     fadeInMs: number;
     fadeOutMs: number;
   }>;
+  videoTracks: Array<{
+    clipId: string;
+    assetPath: string;
+    startMs: number;
+    endMs: number;
+    trimBeforeMs: number;
+    volume: number;
+  }>;
+  finalVideoEditMode: boolean;
   markers: TimelineMarker[];
   manualEditSummary: {
     subtitleClipCount: number;
     audioClipCount: number;
+    videoClipCount: number;
     markerCount: number;
     playbackRangeApplied: boolean;
+  };
+};
+
+/**
+ * 焼き込み済みの完成動画を、元の自動生成レイヤーと二重にならない編集状態へ変換する。
+ */
+export const createFinalVideoEditingTimeline = (
+  timeline: TimelineData,
+  input: CreateFinalVideoEditingTimelineInput,
+): TimelineData => {
+  const durationMs = Math.max(100, Math.round(input.durationMs));
+  const disabledSourceTracks = timeline.tracks
+    .filter(
+      (track) =>
+        track.id !== "track-final-video" &&
+        track.id !== "track-overlay-subtitle",
+    )
+    .map((track) => ({
+      ...track,
+      ...(track.type === "audio" || track.type === "bgm"
+        ? { muted: true }
+        : { hidden: true }),
+    }));
+
+  return {
+    ...timeline,
+    editingMode: "final-video",
+    playbackRange: { inMs: 0, outMs: durationMs },
+    tracks: [
+      {
+        id: "track-final-video",
+        name: input.sourceName?.trim() || "完成動画",
+        type: "video",
+        hidden: false,
+        muted: false,
+        clips: [
+          {
+            id: "final-video-main",
+            assetType: "video",
+            assetPath: input.assetPath,
+            startMs: 0,
+            durationMs,
+            inMs: 0,
+            outMs: durationMs,
+            volume: 1,
+            timingMode: "manual",
+          },
+        ],
+      },
+      {
+        id: "track-overlay-subtitle",
+        name: "追加テロップ",
+        type: "subtitle",
+        hidden: false,
+        clips: [],
+      },
+      ...disabledSourceTracks,
+    ],
+    markers: timeline.markers.filter((marker) => marker.timeMs <= durationMs),
   };
 };
 
@@ -331,6 +406,17 @@ export const synchronizeGeneratedTimelineTiming = (
   },
 ): { timeline: TimelineData; summary: TimelineSynchronizationSummary } => {
   const audioDurationMs = Math.max(1, Math.round(input.audioDurationMs));
+  if (timeline.editingMode === "final-video") {
+    return {
+      timeline,
+      summary: {
+        audioClipsAdjusted: 0,
+        subtitleClipsAdjusted: 0,
+        playbackRangeAdjusted: false,
+        audioDurationMs,
+      },
+    };
+  }
   const originalMaxTrackEndMs = getMaxTrackEndMs(timeline.tracks);
   const coveredWholeTimeline =
     timeline.playbackRange.inMs === 0 &&
@@ -455,6 +541,7 @@ export const timelineToRemotionProps = (
   const durationMs = Math.max(playbackRange.outMs - playbackRange.inMs, 1000);
   const subtitleTracks = collectSubtitleTracks(timeline.tracks, playbackRange);
   const audioTracks = collectAudioTracks(timeline.tracks, playbackRange);
+  const videoTracks = collectVideoTracks(timeline.tracks, playbackRange);
   const markers = collectMarkers(timeline.markers, playbackRange);
   const maxTrackEndMs = Math.max(
     0,
@@ -470,10 +557,13 @@ export const timelineToRemotionProps = (
     playbackRange,
     subtitleTracks,
     audioTracks,
+    videoTracks,
+    finalVideoEditMode: timeline.editingMode === "final-video",
     markers,
     manualEditSummary: {
       subtitleClipCount: subtitleTracks.length,
       audioClipCount: audioTracks.length,
+      videoClipCount: videoTracks.length,
       markerCount: markers.length,
       playbackRangeApplied:
         playbackRange.inMs > 0 || playbackRange.outMs < maxTrackEndMs,
@@ -492,7 +582,7 @@ const collectSubtitleTracks = (
   speaker: string;
 }> =>
   tracks
-    .filter((track) => track.type === "subtitle")
+    .filter((track) => track.type === "subtitle" && track.hidden !== true)
     .flatMap((track) =>
       track.clips
         .map((clip) => normalizeClipToPlaybackRange(clip, playbackRange))
@@ -524,7 +614,11 @@ const collectAudioTracks = (
   fadeOutMs: number;
 }> =>
   tracks
-    .filter((track) => track.type === "audio" || track.type === "bgm")
+    .filter(
+      (track) =>
+        (track.type === "audio" || track.type === "bgm") &&
+        track.muted !== true,
+    )
     .flatMap((track) =>
       track.clips
         .map((clip) => normalizeClipToPlaybackRange(clip, playbackRange))
@@ -541,6 +635,30 @@ const collectAudioTracks = (
           volume: normalized.volume ?? 1,
           fadeInMs: normalized.fadeInMs ?? 0,
           fadeOutMs: normalized.fadeOutMs ?? 0,
+        })),
+    )
+    .sort((left, right) => left.startMs - right.startMs);
+
+const collectVideoTracks = (
+  tracks: TimelineTrack[],
+  playbackRange: { inMs: number; outMs: number },
+): RemotionTimelineProps["videoTracks"] =>
+  tracks
+    .filter((track) => track.type === "video" && track.hidden !== true)
+    .flatMap((track) =>
+      track.clips
+        .map((clip) => normalizeClipToPlaybackRange(clip, playbackRange))
+        .filter(
+          (clip): clip is TimelineClip & { startMs: number; endMs: number } =>
+            clip !== null,
+        )
+        .map((normalized) => ({
+          clipId: normalized.id,
+          assetPath: normalized.assetPath,
+          startMs: normalized.startMs,
+          endMs: normalized.endMs,
+          trimBeforeMs: normalized.inMs ?? 0,
+          volume: track.muted === true ? 0 : (normalized.volume ?? 1),
         })),
     )
     .sort((left, right) => left.startMs - right.startMs);

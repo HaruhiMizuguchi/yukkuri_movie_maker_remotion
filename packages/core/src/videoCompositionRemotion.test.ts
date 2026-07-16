@@ -513,4 +513,144 @@ describe("video composition remotion", () => {
 
     await expect(implementations.video_composition?.(ctx)).rejects.toThrow();
   }, 120000);
+
+  it("完成動画を分割・トリムして内蔵音声付きで再合成できる", async () => {
+    const outputRoot = createTempRoot("final-video-editor");
+    const projectId = `project-${Date.now()}`;
+    const ctx = createContext(projectId, "完成動画編集", outputRoot);
+    const projectRoot = path.join(outputRoot, "projects", projectId);
+    await prepareMinimalInputs(projectRoot);
+    await fs.mkdir(path.join(projectRoot, "final"), { recursive: true });
+    await runCommand(
+      "ffmpeg",
+      [
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=640x360:rate=24:duration=3",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=660:sample_rate=48000:duration=3",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-shortest",
+        path.join(projectRoot, "final", "final.mp4"),
+      ],
+      process.cwd(),
+    );
+    await writeJson(path.join(projectRoot, "intermediate", "timeline.json"), {
+      editingMode: "final-video",
+      playbackRange: { inMs: 0, outMs: 2000 },
+      markers: [],
+      tracks: [
+        {
+          id: "track-final-video",
+          name: "完成動画",
+          type: "video",
+          clips: [
+            {
+              id: "video-part-1",
+              assetType: "video",
+              assetPath: "final/final.mp4",
+              startMs: 0,
+              durationMs: 1000,
+              inMs: 400,
+              outMs: 1400,
+              volume: 0.7,
+              timingMode: "manual",
+            },
+            {
+              id: "video-part-2",
+              assetType: "video",
+              assetPath: "final/final.mp4",
+              startMs: 1000,
+              durationMs: 1000,
+              inMs: 1800,
+              outMs: 2800,
+              volume: 0.7,
+              timingMode: "manual",
+            },
+          ],
+        },
+        {
+          id: "track-overlay-subtitle",
+          name: "追加テロップ",
+          type: "subtitle",
+          clips: [
+            {
+              id: "overlay-1",
+              assetType: "subtitle",
+              assetPath: "manual",
+              startMs: 250,
+              durationMs: 750,
+              text: "完成動画に追記",
+              style: "editor",
+              timingMode: "manual",
+            },
+          ],
+        },
+        {
+          id: "track-audio",
+          name: "生成音声（無効）",
+          type: "audio",
+          muted: true,
+          clips: [],
+        },
+      ],
+    });
+
+    const implementations = createDefaultWorkflowImplementations({
+      outputRoot,
+      ttsProvider: "mock",
+      outputPreset: { width: 640, height: 360, fps: 24 },
+    });
+    await implementations.video_composition?.(ctx);
+    await implementations.final_encoding?.(ctx);
+
+    const finalPath = path.join(projectRoot, "final", "final.mp4");
+    const composition = JSON.parse(
+      await fs.readFile(
+        path.join(
+          projectRoot,
+          "output",
+          "video_composition",
+          "latest",
+          "composition.json",
+        ),
+        "utf-8",
+      ),
+    ) as {
+      durationMs: number;
+      finalVideoEditMode: boolean;
+      manualEditSummary: { videoClipCount: number; audioClipCount: number };
+    };
+    const streams = await runCommand(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_type,codec_name",
+        "-of",
+        "csv=p=0",
+        finalPath,
+      ],
+      process.cwd(),
+    );
+
+    expect(composition).toMatchObject({
+      durationMs: 2000,
+      finalVideoEditMode: true,
+      manualEditSummary: { videoClipCount: 2, audioClipCount: 0 },
+    });
+    expect(streams).toContain("h264,video");
+    expect(streams).toContain("aac,audio");
+    expect((await fs.stat(finalPath)).size).toBeGreaterThan(10_000);
+  }, 120000);
 });

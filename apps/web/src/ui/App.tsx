@@ -40,6 +40,7 @@ import {
   addManualSubtitleClipLocal,
   addTimelineMarkerLocal,
   clampNonNegativeInt,
+  deleteTimelineClipAndCloseGapLocal,
   deleteTimelineClipLocal,
   duplicateTimelineClipLocal,
   findTimelineClip,
@@ -274,6 +275,10 @@ export function App() {
     latestFinalJob && finalFile
       ? `${buildJobFileUrl(latestFinalJob.id, finalFile.id)}?download=1`
       : null;
+  const finalPlaybackUrl =
+    latestFinalJob && finalFile
+      ? buildJobFileUrl(latestFinalJob.id, finalFile.id)
+      : null;
   const hasRunningJob = Boolean(
     projectDetail?.jobs.some((job) =>
       ["PENDING", "RUNNING"].includes(job.status),
@@ -460,6 +465,20 @@ export function App() {
       ),
     );
   }, [selectedTimelineClip, timelineDraft]);
+
+  useEffect(() => {
+    if (
+      activeScreen !== "timeline" ||
+      timelineDraft?.editingMode !== "final-video" ||
+      !previewVideoRef.current
+    ) {
+      return;
+    }
+    const targetSeconds = timelinePlayheadMs / 1000;
+    if (Math.abs(previewVideoRef.current.currentTime - targetSeconds) > 0.12) {
+      previewVideoRef.current.currentTime = targetSeconds;
+    }
+  }, [activeScreen, timelineDraft?.editingMode, timelinePlayheadMs]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -742,6 +761,37 @@ export function App() {
     await loadProjectDetail(selectedProjectId);
   };
 
+  const importFinalVideoToTimeline = async () => {
+    if (!selectedProjectId) return;
+    if (
+      timelineDirty &&
+      !window.confirm(
+        "未保存の編集内容を完成動画編集モードへ置き換えます。続けますか？",
+      )
+    ) {
+      return;
+    }
+    const imported = await fetchJson<{
+      timeline: TimelineData;
+      durationMs: number;
+    }>(`/api/projects/${selectedProjectId}/timeline/import-final`, {
+      method: "POST",
+    });
+    setTimelineDraft(imported.timeline);
+    setTimelinePast([]);
+    setTimelineFuture([]);
+    setTimelineDirty(false);
+    setSelectedTimelineClip({
+      trackId: "track-final-video",
+      clipId: "final-video-main",
+    });
+    setTimelinePlayheadMs(0);
+    setTimelineZoomWindowMs(Math.min(12000, imported.durationMs));
+    setMessage(
+      "完成動画を編集タイムラインへ取り込みました。分割・移動・削除後に保存して再生成できます。",
+    );
+  };
+
   const addManualSubtitle = () => {
     const text = manualSubtitleText.trim();
     if (!text) {
@@ -752,7 +802,13 @@ export function App() {
     mutateTimelineDraft((current) =>
       addManualSubtitleClipLocal(current, text, clipId),
     );
-    setSelectedTimelineClip({ trackId: "track-subtitle", clipId });
+    setSelectedTimelineClip({
+      trackId:
+        timelineDraft?.editingMode === "final-video"
+          ? "track-overlay-subtitle"
+          : "track-subtitle",
+      clipId,
+    });
     setManualSubtitleText("");
     setMessage(
       "手動テロップを追加しました。保存するとレンダリングに反映されます",
@@ -931,6 +987,39 @@ export function App() {
     );
     setSelectedTimelineClip(null);
     setMessage("選択中クリップを削除しました。保存すると反映されます");
+  };
+
+  const rippleDeleteSelectedTimelineClip = () => {
+    if (!selectedTimelineClip || selectedClipDetail?.track.type !== "video") {
+      setMessage("詰めて削除する映像クリップを選択してください");
+      return;
+    }
+    if (!window.confirm("選択中の区間を削除し、後続映像を前へ詰めますか？")) {
+      return;
+    }
+    mutateTimelineDraft((current) =>
+      deleteTimelineClipAndCloseGapLocal(
+        current,
+        selectedTimelineClip.trackId,
+        selectedTimelineClip.clipId,
+      ),
+    );
+    setSelectedTimelineClip(null);
+    setMessage("選択区間を削除し、後続映像を前へ詰めました");
+  };
+
+  const toggleTimelineTrack = (
+    trackId: string,
+    property: "hidden" | "muted",
+  ) => {
+    mutateTimelineDraft((current) => ({
+      ...current,
+      tracks: current.tracks.map((track) =>
+        track.id === trackId
+          ? { ...track, [property]: track[property] !== true }
+          : track,
+      ),
+    }));
   };
 
   const loadPreview = async () => {
@@ -2130,8 +2219,8 @@ export function App() {
               <section style={styles.panel} data-testid="screen-timeline">
                 <ScreenIntro
                   step="STEP 4"
-                  title="タイミングと見せ方を調整する"
-                  description="字幕や音声の位置を見ながら、必要なところだけ調整します。自動生成のままでよければ、保存して確認へ進んでください。"
+                  title="タイムラインで動画を編集する"
+                  description="通常の字幕・音声調整に加え、完成済み動画を取り込んでカット、分割、並べ替え、テロップ追加、音量調整ができます。"
                 />
                 {!timelineDraft ? (
                   <div>台本保存後にタイムラインを読み込めます。</div>
@@ -2139,6 +2228,23 @@ export function App() {
                 {timelineDraft ? (
                   <>
                     <div style={styles.actionBar}>
+                      {finalPlaybackUrl ? (
+                        <button
+                          style={styles.primaryButton}
+                          data-testid="timeline-import-final-button"
+                          onClick={() =>
+                            void runUiAction(importFinalVideoToTimeline)
+                          }
+                        >
+                          {timelineDraft.editingMode === "final-video"
+                            ? "完成動画を最初から取り込み直す"
+                            : "完成動画をカット編集する"}
+                        </button>
+                      ) : (
+                        <span style={styles.stepBadge}>
+                          完成動画の生成後にカット編集できます
+                        </span>
+                      )}
                       <button
                         style={styles.secondaryButton}
                         disabled={timelinePast.length === 0}
@@ -2156,12 +2262,46 @@ export function App() {
                       <span style={styles.stepBadge}>
                         {timelineDirty ? "未保存の変更あり" : "保存済み"}
                       </span>
+                      {timelineDraft.editingMode === "final-video" ? (
+                        <span style={styles.stepBadge}>
+                          完成動画編集モード
+                        </span>
+                      ) : null}
                     </div>
+                    {timelineDraft.editingMode === "final-video" &&
+                    finalPlaybackUrl ? (
+                      <div style={styles.previewCard}>
+                        <strong>編集プレビュー</strong>
+                        <small>
+                          再生位置はタイムラインのプレイヘッドと同期します。編集結果は保存後の再生成で反映されます。
+                        </small>
+                        <video
+                          data-testid="timeline-final-video"
+                          ref={previewVideoRef}
+                          style={styles.videoPlayer}
+                          src={finalPlaybackUrl}
+                          controls
+                          onLoadedMetadata={(event) => {
+                            event.currentTarget.currentTime =
+                              timelinePlayheadMs / 1000;
+                          }}
+                          onTimeUpdate={(event) =>
+                            setTimelinePlayheadMs(
+                              Math.round(event.currentTarget.currentTime * 1000),
+                            )
+                          }
+                        />
+                      </div>
+                    ) : null}
                     <div style={styles.timelineHeroGrid}>
                       <div
                         style={styles.previewCard}
                         data-testid="timeline-edit-summary"
                       >
+                        <div>
+                          映像クリップ:{" "}
+                          {summarizeTimelineDraft(timelineDraft).videoClipCount}
+                        </div>
                         <div>
                           字幕クリップ:{" "}
                           {
@@ -2363,6 +2503,31 @@ export function App() {
                               <div style={styles.timelineLaneHeader}>
                                 <strong>{track.name}</strong>
                                 <small>{track.type}</small>
+                                {track.type === "audio" ||
+                                track.type === "bgm" ||
+                                track.type === "video" ? (
+                                  <button
+                                    style={styles.compactButton}
+                                    data-testid={`timeline-track-mute-${track.id}`}
+                                    onClick={() =>
+                                      toggleTimelineTrack(track.id, "muted")
+                                    }
+                                  >
+                                    {track.muted ? "🔇 ミュート中" : "🔊 音声ON"}
+                                  </button>
+                                ) : null}
+                                {track.type !== "audio" &&
+                                track.type !== "bgm" ? (
+                                  <button
+                                    style={styles.compactButton}
+                                    data-testid={`timeline-track-visibility-${track.id}`}
+                                    onClick={() =>
+                                      toggleTimelineTrack(track.id, "hidden")
+                                    }
+                                  >
+                                    {track.hidden ? "非表示" : "表示中"}
+                                  </button>
+                                ) : null}
                               </div>
                               <div
                                 style={styles.timelineLaneCanvas}
@@ -2423,9 +2588,10 @@ export function App() {
                                         boxShadow: isSelected
                                           ? `0 0 0 2px rgba(255,255,255,0.88), 0 14px 26px ${accent.glow}`
                                           : `0 10px 22px ${accent.glow}`,
-                                        opacity:
-                                          layout.trimmedLeft ||
-                                          layout.trimmedRight
+                                        opacity: track.hidden
+                                          ? 0.32
+                                          : layout.trimmedLeft ||
+                                              layout.trimmedRight
                                             ? 0.85
                                             : 1,
                                       }}
@@ -2508,6 +2674,15 @@ export function App() {
                               >
                                 削除
                               </button>
+                              {selectedClipDetail.track.type === "video" ? (
+                                <button
+                                  style={styles.dangerButton}
+                                  data-testid="timeline-ripple-delete-button"
+                                  onClick={rippleDeleteSelectedTimelineClip}
+                                >
+                                  削除して詰める
+                                </button>
+                              ) : null}
                             </div>
                             <label style={styles.label}>開始位置</label>
                             <input
@@ -2545,6 +2720,41 @@ export function App() {
                                 )
                               }
                             />
+                            {selectedClipDetail.track.type === "video" ? (
+                              <>
+                                <label style={styles.label}>
+                                  元動画の開始位置（ms）
+                                </label>
+                                <input
+                                  style={styles.inputSmall}
+                                  data-testid="timeline-video-in-input"
+                                  type="number"
+                                  min={0}
+                                  value={selectedClipDetail.clip.inMs ?? 0}
+                                  onChange={(event) => {
+                                    const inMs = clampNonNegativeInt(
+                                      Number(event.target.value),
+                                    );
+                                    mutateTimelineDraft((current) =>
+                                      updateTimelineClipLocal(
+                                        current,
+                                        selectedClipDetail.track.id,
+                                        selectedClipDetail.clip.id,
+                                        {
+                                          inMs,
+                                          outMs:
+                                            inMs +
+                                            selectedClipDetail.clip.durationMs,
+                                        },
+                                      ),
+                                    );
+                                  }}
+                                />
+                                <small>
+                                  冒頭を詰めたいときに、元動画の読み始め位置を指定します。
+                                </small>
+                              </>
+                            ) : null}
                             {selectedClipDetail.track.type === "subtitle" ? (
                               <>
                                 <label style={styles.label}>字幕本文</label>
@@ -2585,9 +2795,14 @@ export function App() {
                               </>
                             ) : null}
                             {selectedClipDetail.track.type === "audio" ||
-                            selectedClipDetail.track.type === "bgm" ? (
+                            selectedClipDetail.track.type === "bgm" ||
+                            selectedClipDetail.track.type === "video" ? (
                               <>
-                                <label style={styles.label}>音量</label>
+                                <label style={styles.label}>
+                                  {selectedClipDetail.track.type === "video"
+                                    ? "動画内の音量"
+                                    : "音量"}
+                                </label>
                                 <input
                                   style={styles.inputSmall}
                                   type="number"
@@ -2606,7 +2821,7 @@ export function App() {
                                     )
                                   }
                                 />
-                                <div style={styles.lineRow}>
+                                {selectedClipDetail.track.type !== "video" ? <div style={styles.lineRow}>
                                   <div style={styles.compactField}>
                                     <label style={styles.labelInline}>
                                       fade in
@@ -2659,7 +2874,7 @@ export function App() {
                                       }
                                     />
                                   </div>
-                                </div>
+                                </div> : null}
                               </>
                             ) : null}
                           </>

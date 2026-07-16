@@ -24,10 +24,13 @@ export type TimelineTrack = {
   id: string;
   name: string;
   type: string;
+  hidden?: boolean;
+  muted?: boolean;
   clips: TimelineClip[];
 };
 
 export type TimelineData = {
+  editingMode?: "source" | "final-video";
   playbackRange: { inMs: number; outMs: number };
   tracks: TimelineTrack[];
   markers: TimelineMarker[];
@@ -137,6 +140,48 @@ export const deleteTimelineClipLocal = (
   ),
 });
 
+export const deleteTimelineClipAndCloseGapLocal = (
+  timeline: TimelineData,
+  trackId: string,
+  clipId: string,
+): TimelineData => {
+  const targetTrack = timeline.tracks.find((track) => track.id === trackId);
+  const source = targetTrack?.clips.find((clip) => clip.id === clipId);
+  if (!source) {
+    return timeline;
+  }
+  const deletedEndMs = source.startMs + source.durationMs;
+  return {
+    ...timeline,
+    playbackRange: {
+      ...timeline.playbackRange,
+      outMs: Math.max(
+        timeline.playbackRange.inMs + 100,
+        timeline.playbackRange.outMs - source.durationMs,
+      ),
+    },
+    tracks: timeline.tracks.map((track) => ({
+      ...track,
+      clips: track.clips
+        .filter((clip) => track.id !== trackId || clip.id !== clipId)
+        .map((clip) =>
+          clip.startMs >= deletedEndMs
+            ? {
+                ...clip,
+                startMs: Math.max(0, clip.startMs - source.durationMs),
+                timingMode: "manual" as const,
+              }
+            : clip,
+        ),
+    })),
+    markers: timeline.markers.map((marker) =>
+      marker.timeMs >= deletedEndMs
+        ? { ...marker, timeMs: marker.timeMs - source.durationMs }
+        : marker,
+    ),
+  };
+};
+
 export const addManualSubtitleClipLocal = (
   timeline: TimelineData,
   text: string,
@@ -158,21 +203,27 @@ export const addManualSubtitleClipLocal = (
     style: "manual",
     timingMode: "manual",
   };
+  const targetTrackId =
+    timeline.editingMode === "final-video"
+      ? "track-overlay-subtitle"
+      : "track-subtitle";
   const hasSubtitleTrack = timeline.tracks.some(
-    (track) => track.id === "track-subtitle",
+    (track) => track.id === targetTrackId,
   );
   const tracks = hasSubtitleTrack
     ? timeline.tracks.map((track) =>
-        track.id === "track-subtitle"
+        track.id === targetTrackId
           ? { ...track, clips: sortTimelineClips([...track.clips, nextClip]) }
           : track,
       )
     : [
         ...timeline.tracks,
         {
-          id: "track-subtitle",
-          name: "字幕",
+          id: targetTrackId,
+          name:
+            timeline.editingMode === "final-video" ? "追加テロップ" : "字幕",
           type: "subtitle",
+          hidden: false,
           clips: [nextClip],
         },
       ];
@@ -384,6 +435,9 @@ export const predictNextDuplicateClipId = (
 };
 
 export const summarizeTimelineDraft = (timeline: TimelineData) => ({
+  videoClipCount: timeline.tracks
+    .filter((track) => track.type === "video")
+    .reduce((sum, track) => sum + track.clips.length, 0),
   subtitleClipCount: timeline.tracks
     .filter((track) => track.type === "subtitle")
     .reduce((sum, track) => sum + track.clips.length, 0),

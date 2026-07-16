@@ -50,3 +50,5 @@
 - `.bat` にBOMなしUTF-8の日本語を直接書くと、Windowsの `cmd.exe` が既定コードページで誤読し、後続コマンドや引用符まで分断することがある。デスクトップ起動用BATはASCIIだけで構成し、日本語表示はUTF-8 BOM付きPowerShell側で行う。
 - 作成ウィザードでProjectレコードを保存しただけではWorker処理は始まらない。ユーザーへ「制作を開始」と案内する操作では、`POST /api/projects/:projectId/jobs` の成功と生成モニター表示までを同じ導線で保証する。
 - in-app Browserのスクリーンショットは既定でJPEGバイトを返すことがある。拡張子を決め打ちせずマジックナンバーを検証し、配布手順書では実データと拡張子を一致させる。
+- 焼き込み済みの完成動画を再編集する場合、元の字幕・TTS音声・章タイトル・自動BGMを同時に描画すると二重表示/二重再生になる。`final-video` 編集モードでは自動生成レイヤーを無効化し、映像クリップ自身の音声と追加レイヤーだけを合成する。
+- `projects/<id>/final/final.mp4` を再編集元にして同じ場所へ再出力する経路は、Remotionの一時HTTP配信をcomposition完了時に閉じてからfinal encodingで上書きすればWindowsでも安定する。分割クリップは`inMs`を`trimBefore`へ引き継ぐ。
