@@ -68,6 +68,73 @@ function Wait-HttpReady {
   throw "Timed out waiting for $Url"
 }
 
+function Invoke-LoggedNativeCommand {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments = @()
+  )
+
+  # Start-Transcriptはネイティブコマンドの出力を取りこぼすことがあるため、
+  # 一度PowerShellへ取り込み、画面とランチャーログの両方へ書き戻す。
+  $commandOutput = & $FilePath @Arguments 2>&1
+  $commandExitCode = $LASTEXITCODE
+  foreach ($line in $commandOutput) {
+    Write-Host $line
+  }
+  return [int]$commandExitCode
+}
+
+function Test-DockerReady {
+  if (-not (Get-Command "docker" -ErrorAction SilentlyContinue)) {
+    return $false
+  }
+
+  & docker info *> $null
+  return ($LASTEXITCODE -eq 0)
+}
+
+function Wait-DockerReady {
+  param(
+    [int]$TimeoutSec = 180
+  )
+
+  if (Test-DockerReady) {
+    Write-Host "Dockerエンジンは起動済みです。"
+    return
+  }
+
+  if (-not (Get-Command "docker" -ErrorAction SilentlyContinue)) {
+    throw "Docker CLIが見つかりません。Docker Desktopをインストールしてください。"
+  }
+
+  $dockerDesktopCandidates = @(
+    (Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe"),
+    (Join-Path $env:LOCALAPPDATA "Docker\Docker Desktop.exe")
+  )
+  $dockerDesktopPath = $dockerDesktopCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $dockerDesktopPath) {
+    Write-Host "Dockerエンジンの状態:" -ForegroundColor Yellow
+    $null = Invoke-LoggedNativeCommand -FilePath "docker.exe" -Arguments @("info")
+    throw "Docker Desktop.exeが見つかりません。Docker DesktopまたはローカルPostgreSQLを起動してください。"
+  }
+
+  Write-Host "Docker Desktopを起動します: $dockerDesktopPath"
+  Start-Process -FilePath $dockerDesktopPath -WindowStyle Hidden | Out-Null
+
+  $dockerStartedAt = Get-Date
+  while (((Get-Date) - $dockerStartedAt).TotalSeconds -lt $TimeoutSec) {
+    if (Test-DockerReady) {
+      Write-Host "Dockerエンジンの準備ができました。"
+      return
+    }
+    Start-Sleep -Seconds 2
+  }
+
+  Write-Host "Dockerエンジンの状態:" -ForegroundColor Yellow
+  $null = Invoke-LoggedNativeCommand -FilePath "docker.exe" -Arguments @("info")
+  throw "Docker Desktopの起動待機がタイムアウトしました。Docker Desktopの画面に表示されたエラーも確認してください。"
+}
+
 Write-Host "`n[1/5] AivisSpeech（音声合成）を確認しています..." -ForegroundColor Yellow
 if (-not $SkipAivis) {
   $aivisCandidates = @(
@@ -91,10 +158,11 @@ if (-not $SkipAivis) {
 
 Write-Host "`n[2/5] PostgreSQL（データベース）を確認しています..." -ForegroundColor Yellow
 if (-not (Test-PortOpen -HostName "localhost" -Port 5432)) {
+  Wait-DockerReady -TimeoutSec 180
   Write-Host "PostgreSQLをDocker Composeで起動します。"
-  corepack pnpm db:up
-  if ($LASTEXITCODE -ne 0) {
-    throw "PostgreSQLを自動起動できませんでした。Docker DesktopまたはローカルDBを起動してください。"
+  $dbUpExitCode = Invoke-LoggedNativeCommand -FilePath "corepack.cmd" -Arguments @("pnpm", "db:up")
+  if ($dbUpExitCode -ne 0) {
+    throw "PostgreSQLを自動起動できませんでした。直前のDocker Composeエラーとランチャーログを確認してください。"
   }
   $dbStartedAt = Get-Date
   while (-not (Test-PortOpen -HostName "localhost" -Port 5432)) {
@@ -110,8 +178,8 @@ if (-not (Test-PortOpen -HostName "localhost" -Port 5432)) {
 Write-Host "`n[3/5] データベースを最新状態にしています..." -ForegroundColor Yellow
 if (-not $SkipDbPush) {
   Write-Host "Prisma migration を反映します。"
-  corepack pnpm db:migrate:deploy
-  if ($LASTEXITCODE -ne 0) {
+  $migrationExitCode = Invoke-LoggedNativeCommand -FilePath "corepack.cmd" -Arguments @("pnpm", "db:migrate:deploy")
+  if ($migrationExitCode -ne 0) {
     throw "corepack pnpm db:migrate:deploy に失敗しました。既存DBを初めてmigration管理へ移す場合はREADMEの手順を確認してください。"
   }
   Write-Host "データベースの準備ができました。"

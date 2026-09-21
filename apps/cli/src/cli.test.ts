@@ -50,4 +50,28 @@ describe("executeCli", () => {
     expect(exitCode).toBe(1);
     expect(errors.join("\n")).toContain("database_down");
   });
+
+  it("automation collectで視聴データ収集APIを呼ぶ", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ snapshotsSaved: 3 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const output: string[] = [];
+
+    const exitCode = await executeCli(["automation", "collect"], {
+      fetch: fetchMock,
+      stdout: (line) => output.push(line),
+      stderr: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/automation/collect",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(output.join("\n")).toContain("snapshotsSaved");
+  });
 });

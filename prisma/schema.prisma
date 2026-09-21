@@ -33,7 +33,10 @@ model Project {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  jobs Job[]
+  jobs                Job[]
+  youtubePublications YoutubePublication[]
+  themeDecisions      ThemeDecision[]
+  automationRuns      AutomationRun[]
 
   @@index([ownerId])
 }
@@ -54,9 +57,11 @@ model Job {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  steps   WorkflowStep[]
-  files   ProjectFile[]
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps               WorkflowStep[]
+  files               ProjectFile[]
+  youtubePublications YoutubePublication[]
+  automationRuns      AutomationRun[]
 
   @@index([projectId])
   @@index([status])
@@ -91,5 +96,130 @@ model ProjectFile {
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@unique([jobId, relativePath])
+  @@index([jobId])
+}
+
+model YoutubePublication {
+  id             String    @id @default(uuid())
+  projectId      String
+  jobId          String
+  youtubeVideoId String?   @unique
+  idempotencyKey String    @unique
+  theme          String
+  title          String
+  status         String
+  privacyStatus  String
+  scheduledAt    DateTime?
+  uploadedAt     DateTime?
+  publishedAt    DateTime?
+  sourcePath     String
+  isMock         Boolean   @default(false)
+  failureReason  String?
+  metadataJson   Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  job             Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  metricSnapshots YoutubeMetricSnapshot[]
+  evaluations     VideoEvaluation[]
+
+  @@index([projectId])
+  @@index([jobId])
+  @@index([status, publishedAt])
+}
+
+model YoutubeMetricSnapshot {
+  id                         String    @id @default(uuid())
+  publicationId              String
+  windowHours                Int
+  status                     String
+  source                     String
+  capturedAt                 DateTime  @default(now())
+  periodStart                DateTime?
+  periodEnd                  DateTime?
+  views                      BigInt?
+  likes                      BigInt?
+  comments                   BigInt?
+  shares                     BigInt?
+  estimatedMinutesWatched    Float?
+  averageViewDurationSeconds Float?
+  averageViewPercentage      Float?
+  subscribersGained          BigInt?
+  subscribersLost            BigInt?
+  failureReason              String?
+  rawJson                    Json?
+
+  publication YoutubePublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, windowHours])
+  @@index([windowHours, status])
+}
+
+model VideoEvaluation {
+  id             String   @id @default(uuid())
+  publicationId  String
+  windowHours    Int
+  score          Float
+  componentsJson Json
+  reasonsJson    Json
+  evaluatedAt    DateTime @default(now())
+
+  publication YoutubePublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([publicationId, windowHours])
+  @@index([windowHours, score])
+}
+
+model ThemeDecision {
+  id                 String    @id @default(uuid())
+  projectId          String?
+  selectedTheme      String
+  score              Float
+  candidatesJson     Json
+  reasonsJson        Json
+  source             String
+  sourceMetricsUntil DateTime?
+  createdAt          DateTime  @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([projectId])
+}
+
+model AutomationConfig {
+  id                     String    @id @default("default")
+  enabled                Boolean   @default(false)
+  intervalHours          Int       @default(168)
+  nextRunAt              DateTime?
+  defaultPrivacyStatus   String    @default("private")
+  publishDelayMinutes    Int       @default(0)
+  dailyUploadLimit       Int       @default(1)
+  maxConcurrentRuns      Int       @default(1)
+  mockWhenApiUnavailable Boolean   @default(true)
+  channelId              String?
+  topicSeed              String    @default("ゆっくり解説")
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+model AutomationRun {
+  id          String    @id @default(uuid())
+  trigger     String
+  status      String
+  projectId   String?
+  jobId       String?
+  reason      String?
+  detailsJson Json?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  job     Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([status, startedAt])
+  @@index([projectId])
   @@index([jobId])
 }

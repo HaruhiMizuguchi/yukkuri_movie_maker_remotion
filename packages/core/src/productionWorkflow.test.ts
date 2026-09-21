@@ -30,12 +30,78 @@ const createPrismaMock = (projectId: string, theme: string) => {
         project: { id: projectId, theme },
       }),
     },
+    youtubePublication: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async (payload) => payload.create),
+    },
+    automationConfig: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
   };
 
   return { prisma, updates };
 };
 
 describe("production workflow implementations", () => {
+  it("モック投稿を同じ動画の実投稿へ昇格し架空の評価を削除する", async () => {
+    const outputRoot = await fs.mkdtemp(
+      path.join(process.cwd(), "outputs", "youtube-promote-"),
+    );
+    const projectId = "mock-promote";
+    const finalPath = path.join(
+      outputRoot,
+      "projects",
+      projectId,
+      "final",
+      "final.mp4",
+    );
+    await fs.mkdir(path.dirname(finalPath), { recursive: true });
+    await fs.writeFile(finalPath, "video-fixture");
+    const { prisma } = createPrismaMock(projectId, "昇格");
+    prisma.youtubePublication.findUnique.mockResolvedValue({
+      id: "mock-publication",
+      status: "MOCKED",
+      isMock: true,
+      youtubeVideoId: "mock-old",
+    });
+    const db = prisma as any;
+    db.youtubeMetricSnapshot = {
+      deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
+    };
+    db.videoEvaluation = {
+      deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
+    };
+    db.$transaction = vi.fn(async (callback: any) => callback(db));
+    const fetchFn = vi.fn(
+      async () => new Response(JSON.stringify({ id: "real-video" })),
+    );
+    vi.stubEnv("YOUTUBE_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("YOUTUBE_REFRESH_TOKEN", "");
+    try {
+      const steps = createProductionWorkflowImplementations({
+        outputRoot,
+        fetchFn,
+        cacheEnabled: false,
+      });
+      expect(
+        await steps.youtube_upload!({ jobId: "job-advanced", prisma: db }),
+      ).toMatchObject({ status: "uploaded", videoId: "real-video" });
+      expect(prisma.youtubePublication.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            isMock: false,
+            scheduledAt: null,
+            publishedAt: null,
+            youtubeVideoId: "real-video",
+            metricSnapshots: { deleteMany: {} },
+            evaluations: { deleteMany: {} },
+          }),
+        }),
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it("選択した画像モデルで背景を生成し、使用量を返す", async () => {
     const outputRoot = path.join(
       process.cwd(),
@@ -342,9 +408,133 @@ describe("production workflow implementations", () => {
         expect.stringContaining("/upload/youtube/v3/videos"),
         expect.objectContaining({ method: "POST" }),
       );
+      expect(prisma.youtubePublication.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            youtubeVideoId: "video-123",
+            status: "UPLOADED",
+            isMock: false,
+          }),
+        }),
+      );
     } finally {
       if (previousToken === undefined) delete process.env.YOUTUBE_ACCESS_TOKEN;
       else process.env.YOUTUBE_ACCESS_TOKEN = previousToken;
     }
+  });
+
+  it("YouTube認証がなくモック継続が有効なら投稿台帳をMOCKEDで残す", async () => {
+    const outputRoot = path.join(
+      process.cwd(),
+      "outputs",
+      "test_evidence",
+      "youtube-upload-mock",
+      `run-${Date.now()}`,
+    );
+    const projectId = `project-${Date.now()}`;
+    const finalPath = path.join(
+      outputRoot,
+      "projects",
+      projectId,
+      "final",
+      "final.mp4",
+    );
+    await fs.mkdir(path.dirname(finalPath), { recursive: true });
+    await fs.writeFile(finalPath, Buffer.from("video-bytes"));
+    const { prisma } = createPrismaMock(projectId, "API制約テスト");
+    prisma.automationConfig.findUnique.mockResolvedValue({
+      id: "default",
+      mockWhenApiUnavailable: true,
+      defaultPrivacyStatus: "private",
+      publishDelayMinutes: 0,
+    });
+    const keys = [
+      "YOUTUBE_ACCESS_TOKEN",
+      "YOUTUBE_CLIENT_ID",
+      "YOUTUBE_CLIENT_SECRET",
+      "YOUTUBE_REFRESH_TOKEN",
+    ] as const;
+    const previous = Object.fromEntries(
+      keys.map((key) => [key, process.env[key]]),
+    );
+    keys.forEach((key) => delete process.env[key]);
+    try {
+      const implementations = createProductionWorkflowImplementations({
+        outputRoot,
+        cacheEnabled: false,
+      });
+      const result = await implementations.youtube_upload?.({
+        jobId: "job-advanced",
+        prisma,
+        outputRoot,
+      } as WorkflowContext);
+
+      expect(result).toMatchObject({
+        status: "mocked",
+        mocked: true,
+        reason: "youtube_credentials_missing",
+      });
+      expect(prisma.youtubePublication.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            status: "MOCKED",
+            isMock: true,
+            youtubeVideoId: expect.stringMatching(/^mock-/),
+          }),
+        }),
+      );
+    } finally {
+      keys.forEach((key) => {
+        const value = previous[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      });
+    }
+  });
+
+  it("同じプロジェクト成果物を再実行しても重複投稿しない", async () => {
+    const outputRoot = path.join(
+      process.cwd(),
+      "outputs",
+      "test_evidence",
+      "youtube-upload-duplicate",
+      `run-${Date.now()}`,
+    );
+    const projectId = `project-${Date.now()}`;
+    const finalPath = path.join(
+      outputRoot,
+      "projects",
+      projectId,
+      "final",
+      "final.mp4",
+    );
+    await fs.mkdir(path.dirname(finalPath), { recursive: true });
+    await fs.writeFile(finalPath, Buffer.from("same-video-bytes"));
+    const { prisma } = createPrismaMock(projectId, "重複防止テスト");
+    prisma.youtubePublication.findUnique.mockResolvedValue({
+      id: "publication-existing",
+      youtubeVideoId: "video-existing",
+      status: "UPLOADED",
+    });
+    const fetchFn = vi.fn();
+    const implementations = createProductionWorkflowImplementations({
+      outputRoot,
+      fetchFn,
+      cacheEnabled: false,
+    });
+
+    const result = await implementations.youtube_upload?.({
+      jobId: "job-advanced",
+      prisma,
+      outputRoot,
+    } as WorkflowContext);
+
+    expect(result).toMatchObject({
+      skipped: true,
+      status: "duplicate",
+      videoId: "video-existing",
+      publicationId: "publication-existing",
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });

@@ -18,6 +18,14 @@ import {
 
 export type AppSettings = ApiSettings;
 
+export const createProjectSettings = async (
+  workspaceRoot: string,
+  outputPreset?: ApiSettings["outputPreset"],
+): Promise<AppSettings> => {
+  const settings = await readSettings(workspaceRoot);
+  return { ...settings, outputPreset: outputPreset ?? settings.outputPreset };
+};
+
 export type ProjectTemplate = {
   id: string;
   name: string;
@@ -275,6 +283,22 @@ export const saveProjectAsset = async (
   const assetsPath = getProjectAssetsPath(workspaceRoot, projectId);
   await fs.mkdir(path.dirname(assetsPath), { recursive: true });
   await writeJson(assetsPath, deduped);
+};
+
+export const removeProjectAsset = async (
+  workspaceRoot: string,
+  projectId: string,
+  assetId: string,
+): Promise<ProjectAsset | null> => {
+  const assets = await listProjectAssets(workspaceRoot, projectId);
+  const removed = assets.find((asset) => asset.id === assetId) ?? null;
+  if (!removed) return null;
+  const assetsPath = getProjectAssetsPath(workspaceRoot, projectId);
+  await writeJson(
+    assetsPath,
+    assets.filter((asset) => asset.id !== assetId),
+  );
+  return removed;
 };
 
 export const computeProjectInputRevision = async (

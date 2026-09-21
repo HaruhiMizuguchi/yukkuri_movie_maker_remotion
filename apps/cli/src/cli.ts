@@ -14,6 +14,17 @@ Commands:
   run --theme <テーマ> [--mode <mode>] 新規プロジェクトとジョブを作成
   job <jobId>                         ジョブ状態を確認
   config:test                         APIキー・AivisSpeechの接続診断
+  automation status                   自動運用の設定・投稿・分析状態を確認
+  automation collect                  YouTube視聴データを今すぐ収集
+  automation themes                   次回テーマ候補を今すぐ評価
+  automation run                      閉ループ自動運用を今すぐ1回実行
+  automation config [options]         自動運用設定を表示・更新
+
+Automation config options:
+  --enabled <true|false> --interval-hours <hours>
+  --next-run-at <ISO|null> --privacy <private|unlisted|public>
+  --publish-delay-minutes <minutes> --daily-upload-limit <count>
+  --mock-when-unavailable <true|false> --topic-seed <テーマ>
 
 Modes: full | scriptOnly | renderOnly | custom`;
 
@@ -69,6 +80,50 @@ export const executeCli = async (
       stdout(formatJson(result));
       return 0;
     }
+    if (command === "automation") {
+      const subcommand = args[1] ?? "status";
+      if (subcommand === "status") {
+        stdout(
+          formatJson(
+            await requestJson(fetchFn, `${apiBase}/api/automation/status`),
+          ),
+        );
+        return 0;
+      }
+      if (["collect", "themes", "run"].includes(subcommand)) {
+        const result = await requestJson(
+          fetchFn,
+          `${apiBase}/api/automation/${subcommand}`,
+          { method: "POST" },
+        );
+        stdout(formatJson(result));
+        return 0;
+      }
+      if (subcommand === "config") {
+        const current = await requestJson(
+          fetchFn,
+          `${apiBase}/api/automation/config`,
+        );
+        const hasUpdates = args.slice(2).some((arg) => arg.startsWith("--"));
+        if (!hasUpdates) {
+          stdout(formatJson(current));
+          return 0;
+        }
+        const config = updateAutomationConfigFromArgs(current, args.slice(2));
+        const updated = await requestJson(
+          fetchFn,
+          `${apiBase}/api/automation/config`,
+          {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(config),
+          },
+        );
+        stdout(formatJson(updated));
+        return 0;
+      }
+      throw new Error(`不明なautomationコマンドです: ${subcommand}`);
+    }
     throw new Error(`不明なコマンドです: ${command}\n\n${helpText}`);
   } catch (error) {
     stderr(error instanceof Error ? error.message : String(error));
@@ -103,6 +158,63 @@ const requireValue = (value: string | undefined, label: string): string => {
   if (!value || value.startsWith("--"))
     throw new Error(`${label} を指定してください。`);
   return value;
+};
+
+const updateAutomationConfigFromArgs = (
+  current: unknown,
+  args: string[],
+): Record<string, unknown> => {
+  if (!current || typeof current !== "object" || Array.isArray(current)) {
+    throw new Error("自動運用設定の取得結果が不正です。");
+  }
+  const config = { ...(current as Record<string, unknown>) };
+  delete config.id;
+  delete config.createdAt;
+  delete config.updatedAt;
+  const booleanOption = (name: string): boolean | undefined => {
+    const value = getOption(args, name);
+    if (value === undefined) return undefined;
+    if (value !== "true" && value !== "false") {
+      throw new Error(`${name} はtrueまたはfalseで指定してください。`);
+    }
+    return value === "true";
+  };
+  const numberOption = (name: string): number | undefined => {
+    const value = getOption(args, name);
+    if (value === undefined) return undefined;
+    const number = Number(value);
+    if (!Number.isInteger(number)) {
+      throw new Error(`${name} は整数で指定してください。`);
+    }
+    return number;
+  };
+  const enabled = booleanOption("--enabled");
+  const mockWhenApiUnavailable = booleanOption("--mock-when-unavailable");
+  const intervalHours = numberOption("--interval-hours");
+  const publishDelayMinutes = numberOption("--publish-delay-minutes");
+  const dailyUploadLimit = numberOption("--daily-upload-limit");
+  const nextRunAt = getOption(args, "--next-run-at");
+  const privacyStatus = getOption(args, "--privacy");
+  const topicSeed = getOption(args, "--topic-seed");
+  if (
+    privacyStatus &&
+    !["private", "unlisted", "public"].includes(privacyStatus)
+  ) {
+    throw new Error("--privacy はprivate/unlisted/publicで指定してください。");
+  }
+  return {
+    ...config,
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(mockWhenApiUnavailable !== undefined ? { mockWhenApiUnavailable } : {}),
+    ...(intervalHours !== undefined ? { intervalHours } : {}),
+    ...(publishDelayMinutes !== undefined ? { publishDelayMinutes } : {}),
+    ...(dailyUploadLimit !== undefined ? { dailyUploadLimit } : {}),
+    ...(nextRunAt !== undefined
+      ? { nextRunAt: nextRunAt === "null" ? null : nextRunAt }
+      : {}),
+    ...(privacyStatus ? { defaultPrivacyStatus: privacyStatus } : {}),
+    ...(topicSeed ? { topicSeed } : {}),
+  };
 };
 
 const formatJson = (value: unknown): string => JSON.stringify(value, null, 2);

@@ -9,10 +9,12 @@ import {
   readOrCreateTimeline,
   readProjectScript,
   readSettings,
+  removeProjectAsset,
   saveProjectAsset,
   saveProjectScript,
   saveTimeline,
   writeSettings,
+  createProjectSettings,
 } from "./storage";
 
 const createWorkspace = async () => {
@@ -28,6 +30,23 @@ const createWorkspace = async () => {
 };
 
 describe("api storage", () => {
+  it("新規プロジェクトへモデル選択を継承しテンプレートは出力だけ上書きする", async () => {
+    const workspaceRoot = await createWorkspace();
+    await writeSettings(workspaceRoot, {
+      models: { script: "gpt-5.6-luna", image: "gpt-image-2" },
+      outputPreset: { width: 1920, height: 1080, fps: 30 },
+    });
+    expect(
+      await createProjectSettings(workspaceRoot, {
+        width: 640,
+        height: 360,
+        fps: 24,
+      }),
+    ).toEqual({
+      models: { script: "gpt-5.6-luna", image: "gpt-image-2" },
+      outputPreset: { width: 640, height: 360, fps: 24 },
+    });
+  });
   it("台本・タイムライン・設定・テンプレートを保存して再読込できる", async () => {
     const workspaceRoot = await createWorkspace();
 
@@ -92,6 +111,19 @@ describe("api storage", () => {
     const assets = await listProjectAssets(workspaceRoot, "project-1");
     expect(assets).toHaveLength(1);
     expect(assets[0]?.usage).toBe("background");
+
+    const removedAsset = await removeProjectAsset(
+      workspaceRoot,
+      "project-1",
+      "asset-1",
+    );
+    expect(removedAsset?.name).toBe("bg");
+    expect(await listProjectAssets(workspaceRoot, "project-1")).toEqual([]);
+    expect(
+      await removeProjectAsset(workspaceRoot, "project-1", "missing"),
+    ).toBeNull();
+
+    await saveProjectAsset(workspaceRoot, "project-1", assets[0]!);
 
     await createTemplate(workspaceRoot, {
       id: "tpl-1",

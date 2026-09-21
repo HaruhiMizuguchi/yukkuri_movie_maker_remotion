@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
+    "@prisma/client": "6.19.3",
     "@remotion/bundler": "4.0.487",
     "@remotion/renderer": "4.0.487",
     "@ymm/shared": "workspace:*"

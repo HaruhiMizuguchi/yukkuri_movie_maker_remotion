@@ -8,7 +8,10 @@ test.afterAll(async () => {
   try {
     // 実E2Eのデータだけを識別して消し、通常のローカルプロジェクトは保持する。
     await prisma.project.deleteMany({
-      where: { theme: { startsWith: "実API E2E " } },
+      where: {
+        theme: { startsWith: "実API E2E " },
+        jobs: { none: { status: { in: ["PENDING", "RUNNING"] } } },
+      },
     });
   } finally {
     await prisma.$disconnect();
@@ -26,15 +29,28 @@ test("実API/DB/Workerで制作開始からfinal.mp4生成まで通せる", asyn
 
   await page.getByTestId("nav-wizard").click();
   await page.getByTestId("wizard-theme-input").fill(`実API E2E ${Date.now()}`);
-  await page.getByTestId("wizard-mode-select").selectOption("full");
+  await page.getByTestId("wizard-mode-select").selectOption("custom");
+  // この結合試験は制作経路を対象とし、画像課金や外部チャンネルへの投稿を行わない。
+  for (const label of ["背景生成", "背景演出", "挿絵追加", "YouTube連携"]) {
+    await page
+      .getByTestId("wizard-custom-steps")
+      .getByRole("checkbox", { name: `${label} 省略`, exact: true })
+      .check();
+  }
   await page.getByTestId("wizard-create-button").click();
 
   await expect(page.getByTestId("screen-project")).toBeVisible();
+  await expect(page.getByTestId("selected-project-id")).toHaveAttribute(
+    "data-project-id",
+    /^[0-9a-f-]{36}$/,
+  );
   const projectId = await page
     .getByTestId("selected-project-id")
     .getAttribute("data-project-id");
   if (!projectId) throw new Error("selected project id was not exposed");
   expect(projectId).toMatch(/^[0-9a-f-]{36}$/);
+  // 制作開始は既に最初のJobを投入する。初版完了後に編集して新版を生成する。
+  await waitForJobCompletion(request, await waitForJobId(page));
 
   await page.getByTestId("nav-script").click();
   await page.getByTestId("script-title-input").fill("実APIから生成するE2E動画");
@@ -55,6 +71,9 @@ test("実API/DB/Workerで制作開始からfinal.mp4生成まで通せる", asyn
   await expect(page.getByTestId("preview-summary")).toContainText(
     "durationInFrames",
   );
+  for (const reviewId of ["picture", "subtitle", "audio", "rights"]) {
+    await page.getByTestId(`delivery-review-${reviewId}`).check();
+  }
   await page.getByTestId("preview-render-button").click();
 
   const jobId = await waitForJobId(page);

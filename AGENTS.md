@@ -40,7 +40,7 @@
 - プロジェクト作成時のタイムラインはTTS前なので文字数ベースの推定尺になる。実音声生成後も推定尺を優先すると字幕と音声がずれるため、自動生成クリップはTTS実測タイムスタンプへ同期し、手動編集クリップは `timingMode: "manual"` として保持する。
 - Vitestで `test.exclude` を明示すると既定の `node_modules` 除外が置き換わる。pnpm workspaceのsymlink先まで依存パッケージのテストを拾うため、`**/node_modules/**` を必ず明示する。
 - `pnpm audit` のtransitive dependency overrideは、脆弱性表示を消せてもESLint等の利用側が要求するAPI互換性を壊すことがある。直接依存の更新を優先し、override後はauditだけでなく実際のlint/testも通す。
-- Windowsでは生成物ディレクトリのrenameがDefender等に一時的に `EPERM` / `EBUSY` で拒否されることがある。原子的latest切替は限定回数の短い指数backoffを入れると安定する。
+- Windowsでは生成物ディレクトリのrenameやビジュアル基準画像のcopyがDefender等に一時的に `EPERM` / `EBUSY` / `UNKNOWN` で拒否されることがある。原子的latest切替や証跡コピーは限定回数の短い指数backoff、または生成済み証跡を使った再試行で安定する。
 - Gemini 2.0 Flashは2026-06-01に停止されたため、このプロジェクトの既定モデルは `gemini-3.5-flash` を使う。実接続テストではモデル廃止の404とクォータ不足の429を分けて記録する。
 - Gemini 3.1画像モデルのraw RESTは、`v1` の `generationConfig.responseFormat` が環境によって未知フィールドのHTTP 400になる。`v1beta/models/{model}:generateContent` に `responseModalities` と `imageConfig` を渡す経路で実生成できた。また `inlineData.mimeType` が `image/jpeg` になる場合があるため、拡張子をPNGに固定する成果物はFFmpegで実変換してから保存する。
 - OpenAI APIキーは環境変数に値が存在しても、失効・誤設定時は `/v1/responses` と `/v1/models` がHTTP 401になる。「設定済み」と「接続OK」を分離し、実接続診断で認証状態を確認する。
@@ -52,3 +52,16 @@
 - in-app Browserのスクリーンショットは既定でJPEGバイトを返すことがある。拡張子を決め打ちせずマジックナンバーを検証し、配布手順書では実データと拡張子を一致させる。
 - 焼き込み済みの完成動画を再編集する場合、元の字幕・TTS音声・章タイトル・自動BGMを同時に描画すると二重表示/二重再生になる。`final-video` 編集モードでは自動生成レイヤーを無効化し、映像クリップ自身の音声と追加レイヤーだけを合成する。
 - `projects/<id>/final/final.mp4` を再編集元にして同じ場所へ再出力する経路は、Remotionの一時HTTP配信をcomposition完了時に閉じてからfinal encodingで上書きすればWindowsでも安定する。分割クリップは`inMs`を`trimBefore`へ引き継ぐ。
+- React画面をサーバーポーリングしながら編集する場合、未保存フラグをstateだけで判定すると非同期応答やintervalのクロージャが古い値を参照し、入力直後のドラフトを上書きし得る。入力ハンドラでrefも同期更新し、同一プロジェクトかつrefがdirtyならサーバー値で再初期化しない。回帰E2Eではジョブを実際にpendingへ戻し、ポーリング要求が発生したことまで確認する。
+- 生成ジョブのポーリングでプロジェクト詳細を再読込するときは、台本だけでなく設定フォームの編集中stateも再初期化しない。`loadProjectDetail` にポーリング専用のpreserve optionを渡し、長時間pendingを維持するE2Eで設定保存まで通すと競合を検出できる。
+- `<input type="file" accept="...">` はファイル選択ダイアログ上のヒントにすぎず、ドラッグ＆ドロップでは非対応形式も渡せる。素材アップロードUIはサーバーと同じ拡張子・MIME対応表と250MB上限をクライアントでも検証し、送信前に日本語で理由を表示する。
+- Reactのグローバル編集ショートカットをプレイヘッド等の状態更新ごとに再登録すると、矢印移動直後の分割キーなど高速な連続入力がeffect再登録の隙間で欠落することがある。window listenerは常設し、最新ハンドラをref経由で参照すると安定する。
+- in-app BrowserではローカルHTTP上の `final.mp4` 直リンクが `ERR_BLOCKED_BY_CLIENT` になる場合がある。同じHTTPサーバーから `<video src="./final.mp4">` を含む検証HTMLを配信すると、`readyState`・動画尺・解像度・デコードエラーを実ブラウザで確認できる。
+- Windows PowerShell 5の `Start-Transcript` は、`corepack` や `docker` などネイティブコマンドの標準エラーをログへ取りこぼすことがある。ランチャー診断では `2>&1` で一度PowerShellへ取り込み、`Write-Host` で画面とTranscriptへ書き戻す。
+- YouTube Analytics APIの対象動画queryでは再生・視聴時間・反応指標を即時照会できる一方、サムネイルimpression/CTRはYouTube Reporting APIの一括レポート側で取得方式が異なる。未取得CTRを0として評価せず、取得元と欠損を分離する。
+- 視聴データのモックは評価窓ごとに別seedを使うと、72時間累積値が24時間値を下回る不自然な証跡になり得る。動画IDを共通seedにして時間窓に単調増加の成長係数を掛けると回帰テストと評価ロジックが安定する。
+- Jobの入力ハッシュをDBへ保存するだけでは生成入力は固定されない。台本・素材・タイムライン・直近成果物をジョブ専用ディレクトリへコピーし、参照パスも切り替える。生成した尺補正を共有タイムラインへ戻すときは、投入後に入力が変更されていないことを確認する。
+- 実API E2Eでは画面の表示と詳細データの到着は別タイミングになる。プロジェクトID属性まで待ち、終了処理でPENDING/RUNNINGのProjectを削除しないことで、Workerとの外部キー・ロック競合を避ける。
+- WindowsのDocker Desktopが起動中にAF_UNIXソケットへアクセスできず停止する場合、`Docker/run/dockerInference` と `docker-secrets-engine/engine.sock` の古いソケットが同時に残っていることがある。停止状態で対象と内容を確認し、ランタイムフォルダーを退避して再起動すると復旧できた。データボリュームの初期化は不要だった。
+- 認証処理の成功結果を診断summaryへ丸ごと格納すると、内部用のaccessTokenまでHTTP応答・ログ・証跡・DBへ伝播する。診断用の公開型は明示的にフィールドを選び、実在しないsentinelトークンが直列化結果へ出ないことを検証する。
+- 取得失敗やNO_DATAをsnapshotとして保存する場合、既存レコードの存在だけで収集済みと判定すると復旧後の再収集が永久に止まる。評価窓の重複防止と成功状態・再試行状態を分ける。

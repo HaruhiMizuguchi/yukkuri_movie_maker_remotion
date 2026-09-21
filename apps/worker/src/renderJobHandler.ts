@@ -20,6 +20,8 @@ export type RenderJobHandlerInput = {
   prisma: PrismaClient;
   implementations: WorkflowStepImplementations;
   runWorkflowImpl?: RunWorkflowImpl;
+  prepareContext?: (jobId: string) => Promise<Partial<WorkflowContext>>;
+  publishOutputs?: (jobId: string) => Promise<void>;
 };
 
 export async function handleRenderJobPayload({
@@ -27,6 +29,8 @@ export async function handleRenderJobPayload({
   prisma,
   implementations,
   runWorkflowImpl = runWorkflow,
+  prepareContext,
+  publishOutputs,
 }: RenderJobHandlerInput): Promise<void> {
   let parsed: ReturnType<typeof parseWorkflowPayload>;
 
@@ -73,7 +77,13 @@ export async function handleRenderJobPayload({
   ]);
 
   try {
-    await runWorkflowImpl({ jobId, prisma }, implementations, runOptions);
+    const context = await prepareContext?.(jobId);
+    await runWorkflowImpl(
+      { ...context, jobId, prisma },
+      implementations,
+      runOptions,
+    );
+    await publishOutputs?.(jobId);
     await prisma.$transaction([
       prisma.job.update({
         where: { id: jobId },

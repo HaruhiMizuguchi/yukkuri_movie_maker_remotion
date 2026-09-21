@@ -9,6 +9,7 @@ export type WorkflowContext = {
   prisma: PrismaClient;
   outputRoot?: string;
   forceStep?: boolean;
+  projectRoot?: string;
 };
 
 export type WorkflowStepImplementation = (
@@ -29,11 +30,46 @@ export const MANUAL_SKIP_OUTPUT = {
 } as const;
 
 export { registerProjectFiles } from "./projectFile";
+export {
+  captureJobInputs,
+  prepareJobWorkspace,
+  publishJobOutputs,
+  withProjectInputLock,
+} from "./jobWorkspace";
 export { parseMediaDurationMs, probeMediaDurationMs } from "./mediaProbe";
 export { createDefaultWorkflowImplementations } from "./defaultWorkflow";
 export type { DefaultWorkflowOptions } from "./defaultWorkflow";
 export { createProductionWorkflowImplementations } from "./productionWorkflow";
 export type { ProductionWorkflowOptions } from "./productionWorkflow";
+export {
+  collectDueYoutubeMetrics,
+  proposeNextTheme,
+  reconcileAutomationRuns,
+  runClosedLoopCycle,
+} from "./closedLoopAutomation";
+export {
+  buildYoutubeAnalyticsUrl,
+  buildYoutubeVideoStatus,
+  chooseDueMetricWindows,
+  createMockAnalyticsSnapshot,
+  decideAutomationRun,
+  evaluateVideoPerformance,
+  fetchGoogleTrendCandidates,
+  fetchYoutubeAnalytics,
+  fetchYoutubeVideoResource,
+  parseYoutubeAnalyticsReport,
+  parseYoutubeVideoResource,
+  rankThemeCandidates,
+  resolveYoutubeAccessToken,
+} from "./youtubeAutomation";
+export type {
+  VideoPerformanceBaseline,
+  YoutubeAccessTokenResult,
+  YoutubeAnalyticsMetrics,
+  YoutubeAuthConfig,
+  YoutubePrivacyStatus,
+  YoutubeVideoResource,
+} from "./youtubeAutomation";
 export {
   addClip,
   addMarker,

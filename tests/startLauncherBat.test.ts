@@ -40,4 +40,28 @@ describe("デスクトップ用BATランチャー", () => {
     expect(browserIndex).toBeGreaterThan(-1);
     expect(waitIndex).toBeGreaterThan(browserIndex);
   });
+
+  it("Docker Desktopが停止中なら自動起動し、エンジン準備後にPostgreSQLを開始する", async () => {
+    const launcher = await readFile(resolve("start_yukkuri_movie_maker.ps1"), "utf8");
+
+    expect(launcher).toContain("function Test-DockerReady");
+    expect(launcher).toContain("function Wait-DockerReady");
+    expect(launcher).toContain("Docker Desktop.exe");
+    expect(launcher).toContain("Docker Desktopを起動します");
+    expect(launcher).toContain("Wait-DockerReady -TimeoutSec 180");
+
+    const dockerWaitIndex = launcher.indexOf("Wait-DockerReady -TimeoutSec 180");
+    const dbStartIndex = launcher.indexOf('Invoke-LoggedNativeCommand -FilePath "corepack.cmd"');
+    expect(dockerWaitIndex).toBeGreaterThan(-1);
+    expect(dbStartIndex).toBeGreaterThan(dockerWaitIndex);
+  });
+
+  it("外部コマンドの出力を起動ログへ転記し、Docker障害の詳細を残す", async () => {
+    const launcher = await readFile(resolve("start_yukkuri_movie_maker.ps1"), "utf8");
+
+    expect(launcher).toContain("function Invoke-LoggedNativeCommand");
+    expect(launcher).toContain("Dockerエンジンの状態:");
+    expect(launcher).toContain("docker info");
+    expect(launcher).toContain("Docker Desktopの起動待機がタイムアウトしました");
+  });
 });

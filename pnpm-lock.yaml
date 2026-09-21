@@ -203,6 +203,9 @@ importers:
 
   packages/core:
     dependencies:
+      "@prisma/client":
+        specifier: 6.19.3
+        version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       "@remotion/bundler":
         specifier: 4.0.487
         version: 4.0.487(postcss@8.5.16)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

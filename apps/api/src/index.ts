@@ -9,6 +9,8 @@ import PgBoss from "pg-boss";
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
   createFinalVideoEditingTimeline,
+  captureJobInputs,
+  withProjectInputLock,
   moveClip,
   probeMediaDurationMs,
   resizeClip,
@@ -39,19 +41,21 @@ import {
 } from "./apiValidation";
 import {
   createTemplate,
-  computeProjectInputRevision,
+  createProjectSettings,
   listProjectAssets,
   listTemplates,
   packageTemplateAssets,
   readOrCreateTimeline,
   readProjectScript,
   readSettings,
+  removeProjectAsset,
   saveProjectAsset,
   saveProjectScript,
   saveTimeline,
   writeSettings,
 } from "./storage";
 import { buildSettingsDiagnostics } from "./settingsDiagnostics";
+import { registerClosedLoopRoutes } from "./closedLoopRoutes";
 import {
   clearApiKey,
   getApiKeyStatuses,
@@ -73,6 +77,22 @@ const workflowOutputRoot =
   process.env.YMM_WORKFLOW_OUTPUT_ROOT ?? workspaceRoot;
 
 const app = Fastify({ logger: true });
+app.addHook("onRoute", (route) => {
+  if (
+    !route.url.includes(":projectId") ||
+    !["POST", "PUT", "DELETE"].includes(String(route.method))
+  )
+    return;
+  const handler = route.handler;
+  route.handler = async function (request, reply) {
+    const { projectId } = z
+      .object({ projectId: z.string().uuid() })
+      .parse(request.params);
+    return withProjectInputLock(prisma, projectId, async () =>
+      handler.call(this, request, reply),
+    );
+  };
+});
 await app.register(multipart, {
   limits: {
     files: 1,
@@ -112,6 +132,12 @@ app.setErrorHandler((error, req, reply) => {
     });
 });
 
+await registerClosedLoopRoutes(app, {
+  prisma,
+  boss,
+  workspaceRoot,
+});
+
 app.get("/health", async () => {
   let database = false;
   let queue = false;
@@ -144,6 +170,13 @@ app.get("/health", async () => {
 
 const projectIdParamSchema = z.object({ projectId: z.string().uuid() });
 const jobIdParamSchema = z.object({ jobId: z.string().uuid() });
+const projectAssetParamSchema = z.object({
+  projectId: z.string().uuid(),
+  assetId: z
+    .string()
+    .max(80)
+    .regex(/^[A-Za-z0-9_-]+$/),
+});
 
 const createProjectBodySchema = z.object({
   theme: z.string().optional(),
@@ -261,11 +294,10 @@ app.post("/api/projects", async (req, reply) => {
   if (body.templateId && !template) {
     return reply.code(404).send({ error: "template_not_found" });
   }
-  const defaultProjectSettings = await readSettings(workspaceRoot);
-  const projectSettings = {
-    apiKeys: {},
-    outputPreset: template?.outputPreset ?? defaultProjectSettings.outputPreset,
-  };
+  const projectSettings = await createProjectSettings(
+    workspaceRoot,
+    template?.outputPreset,
+  );
   const automationMode = template?.automationProfile?.mode ?? body.mode;
 
   const project = await prisma.project.create({
@@ -316,7 +348,7 @@ app.get("/api/projects/:projectId", async (req, reply) => {
     ? await readOrCreateTimeline(workspaceRoot, projectId, script)
     : null;
   const assets = await listProjectAssets(workspaceRoot, projectId);
-  const logs = await readWorkflowLogs(projectId);
+  const logs = await readWorkflowLogs(projectId, jobs[0]?.id);
   const usageRecordsByJob = jobs.map((job) =>
     job.steps.flatMap((step) => extractAiUsageRecords(step.outputJson)),
   );
@@ -544,6 +576,23 @@ app.post("/api/projects/:projectId/assets", async (req, reply) => {
   return reply.code(201).send({ ok: true, assetId, relativePath });
 });
 
+app.delete("/api/projects/:projectId/assets/:assetId", async (req, reply) => {
+  const { projectId, assetId } = projectAssetParamSchema.parse(req.params);
+  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+  if (!access.ok) {
+    return reply.code(access.statusCode).send({ error: access.error });
+  }
+  const removed = await removeProjectAsset(workspaceRoot, projectId, assetId);
+  if (!removed) {
+    return reply.code(404).send({ error: "not_found" });
+  }
+  req.log.info(
+    { projectId, assetId, relativePath: removed.relativePath },
+    "project_asset_removed",
+  );
+  return reply.code(200).send({ ok: true, assetId });
+});
+
 app.get("/api/projects/:projectId/timeline", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
   const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
@@ -569,46 +618,49 @@ app.put("/api/projects/:projectId/timeline", async (req, reply) => {
   return reply.code(200).send({ ok: true });
 });
 
-app.post("/api/projects/:projectId/timeline/import-final", async (req, reply) => {
-  const { projectId } = projectIdParamSchema.parse(req.params);
-  const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
-  if (!access.ok) {
-    return reply.code(access.statusCode).send({ error: access.error });
-  }
-  const script = await readProjectScript(workspaceRoot, projectId);
-  if (!script) {
-    return reply.code(404).send({ error: "script_not_found" });
-  }
+app.post(
+  "/api/projects/:projectId/timeline/import-final",
+  async (req, reply) => {
+    const { projectId } = projectIdParamSchema.parse(req.params);
+    const access = await getProjectAccess(projectId, req.headers["x-user-id"]);
+    if (!access.ok) {
+      return reply.code(access.statusCode).send({ error: access.error });
+    }
+    const script = await readProjectScript(workspaceRoot, projectId);
+    if (!script) {
+      return reply.code(404).send({ error: "script_not_found" });
+    }
 
-  const finalPath = path.join(
-    workflowOutputRoot,
-    "projects",
-    projectId,
-    "final",
-    "final.mp4",
-  );
-  try {
-    await fs.access(finalPath);
-  } catch {
-    return reply.code(404).send({ error: "final_video_not_found" });
-  }
+    const finalPath = path.join(
+      workflowOutputRoot,
+      "projects",
+      projectId,
+      "final",
+      "final.mp4",
+    );
+    try {
+      await fs.access(finalPath);
+    } catch {
+      return reply.code(404).send({ error: "final_video_not_found" });
+    }
 
-  const [current, durationMs] = await Promise.all([
-    readOrCreateTimeline(workspaceRoot, projectId, script),
-    probeMediaDurationMs(finalPath),
-  ]);
-  const timeline = createFinalVideoEditingTimeline(current, {
-    assetPath: "final/final.mp4",
-    durationMs,
-    sourceName: "完成動画（再編集元）",
-  });
-  await saveTimeline(workspaceRoot, projectId, timeline);
-  req.log.info(
-    { projectId, durationMs, sourcePath: "final/final.mp4" },
-    "final_video_imported_to_timeline",
-  );
-  return reply.code(200).send({ timeline, durationMs });
-});
+    const [current, durationMs] = await Promise.all([
+      readOrCreateTimeline(workspaceRoot, projectId, script),
+      probeMediaDurationMs(finalPath),
+    ]);
+    const timeline = createFinalVideoEditingTimeline(current, {
+      assetPath: "final/final.mp4",
+      durationMs,
+      sourceName: "完成動画（再編集元）",
+    });
+    await saveTimeline(workspaceRoot, projectId, timeline);
+    req.log.info(
+      { projectId, durationMs, sourcePath: "final/final.mp4" },
+      "final_video_imported_to_timeline",
+    );
+    return reply.code(200).send({ timeline, durationMs });
+  },
+);
 
 app.post("/api/projects/:projectId/timeline/operations", async (req, reply) => {
   const { projectId } = projectIdParamSchema.parse(req.params);
@@ -828,11 +880,6 @@ const createAndEnqueueJob = async (
   const settings = parsedSettings.success
     ? parsedSettings.data
     : await readSettings(workspaceRoot);
-  const inputRevision = await computeProjectInputRevision(
-    workspaceRoot,
-    project.id,
-    settings,
-  );
   const runMode = workflowRequest.runMode ?? "resume";
   const job = await prisma.job.create({
     data: {
@@ -846,7 +893,6 @@ const createAndEnqueueJob = async (
         ? { forceSteps: workflowRequest.forceSteps as Prisma.InputJsonValue }
         : {}),
       settingsJson: settings as Prisma.InputJsonValue,
-      inputRevision,
     },
   });
   await prisma.project.update({
@@ -858,6 +904,15 @@ const createAndEnqueueJob = async (
   });
 
   try {
+    const inputRevision = await captureJobInputs({
+      workspaceRoot,
+      outputRoot: workflowOutputRoot,
+      projectId: project.id,
+      jobId: job.id,
+      settings,
+      theme: project.theme,
+    });
+    await prisma.job.update({ where: { id: job.id }, data: { inputRevision } });
     const queueJobId = await boss.send("yukkuri.render", {
       jobId: job.id,
       runMode,
@@ -888,14 +943,24 @@ const createAndEnqueueJob = async (
   }
 };
 
-const readWorkflowLogs = async (projectId: string): Promise<string[]> => {
-  const logPath = path.join(
-    workspaceRoot,
-    "projects",
-    projectId,
-    "logs",
-    "workflow.log",
-  );
+const readWorkflowLogs = async (
+  projectId: string,
+  jobId?: string,
+): Promise<string[]> => {
+  const jobLogPath = jobId
+    ? path.join(
+        workflowOutputRoot,
+        "projects",
+        projectId,
+        "jobs",
+        jobId,
+        "work/logs/workflow.log",
+      )
+    : null;
+  const logPath =
+    jobLogPath && (await fileExists(jobLogPath))
+      ? jobLogPath
+      : path.join(workspaceRoot, "projects", projectId, "logs", "workflow.log");
   try {
     const text = await fs.readFile(logPath, "utf-8");
     return text

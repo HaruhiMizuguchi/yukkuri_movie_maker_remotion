@@ -107,7 +107,7 @@ export function createDefaultWorkflowImplementations(
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
       const details = await loadJobDetails(ctx);
-      const projectRoot = path.join(outputRoot, "projects", details.projectId);
+      const projectRoot = ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
       await appendStepLog(projectRoot, "script_generation", {
         event: "start",
@@ -195,7 +195,7 @@ export function createDefaultWorkflowImplementations(
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
       const details = await loadJobDetails(ctx);
-      const projectRoot = path.join(outputRoot, "projects", details.projectId);
+      const projectRoot = ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
       await appendStepLog(projectRoot, "tts_generation", {
         event: "start",
@@ -284,7 +284,7 @@ export function createDefaultWorkflowImplementations(
       const runId = (options.runIdFactory ?? defaultRunIdFactory)();
       const outputRoot = resolveOutputRoot(ctx, options);
       const details = await loadJobDetails(ctx);
-      const projectRoot = path.join(outputRoot, "projects", details.projectId);
+      const projectRoot = ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
       await appendStepLog(projectRoot, "subtitle_generation", {
         event: "start",
@@ -378,7 +378,7 @@ export function createDefaultWorkflowImplementations(
       const workspaceRoot = resolveWorkspaceRoot(options);
       const outputPreset = resolveOutputPreset(options.outputPreset);
       const details = await loadJobDetails(ctx);
-      const projectRoot = path.join(outputRoot, "projects", details.projectId);
+      const projectRoot = ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
       await appendStepLog(projectRoot, "video_composition", {
         event: "start",
@@ -525,7 +525,7 @@ export function createDefaultWorkflowImplementations(
       ]);
       const visualAssets = await prepareTask3VisualAssets({
         projectRoot,
-        workspaceRoot,
+        workspaceRoot: ctx.projectRoot ? path.join(ctx.projectRoot, "_workspace") : workspaceRoot,
         outputRoot,
         runDir: stepDir.runDir,
         requireCharacterAsset: options.requireCharacterAsset ?? false,
@@ -777,7 +777,7 @@ export function createDefaultWorkflowImplementations(
       const outputRoot = resolveOutputRoot(ctx, options);
       const outputPreset = resolveOutputPreset(options.outputPreset);
       const details = await loadJobDetails(ctx);
-      const projectRoot = path.join(outputRoot, "projects", details.projectId);
+      const projectRoot = ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
       await ensureProjectRoot(projectRoot);
       await appendStepLog(projectRoot, "final_encoding", {
         event: "start",

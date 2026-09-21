@@ -144,8 +144,29 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   );
   await expect(page.getByTestId("ai-usage-latest")).toContainText("直近の実行");
 
+  await page.getByText("再実行・工程・成果物の詳細").click();
+  await page.getByTestId("project-rerun-button").click();
+  await expect(page.getByTestId("app-message")).toContainText(
+    "完成動画の生成を開始しました",
+  );
   await page.getByTestId("nav-script").click();
+  await expect(page.getByTestId("script-editor-workspace")).toBeVisible();
+  await expect(page.getByTestId("script-summary")).toContainText(
+    "読み上げ目安",
+  );
+  await expect(page.getByTestId("script-dirty-status")).toContainText(
+    "保存済み",
+  );
+  const pollingRefresh = page.waitForRequest(
+    (request) =>
+      request.method() === "GET" &&
+      new URL(request.url()).pathname === `/api/projects/${projectId}`,
+  );
   await page.getByTestId("script-title-input").fill("AIニュース解説テスト");
+  await pollingRefresh;
+  await expect(page.getByTestId("script-title-input")).toHaveValue(
+    "AIニュース解説テスト",
+  );
   await page.getByTestId("script-theme-input").fill("AIニュース解説");
   await page
     .getByTestId("script-line-text-0")
@@ -153,59 +174,117 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page
     .getByTestId("script-line-text-1")
     .fill("編集と確認まで一気に進めるぜ。");
+  await expect(page.getByTestId("script-dirty-status")).toContainText("未保存");
+  await page.getByTestId("script-duplicate-line-0").click();
+  await expect(page.getByTestId("script-line-card")).toHaveCount(3);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByTestId("script-delete-line-1").click();
+  await expect(page.getByTestId("script-line-card")).toHaveCount(2);
+  await visual.capture(page, "04-script-editor", "台本編集", [
+    "行数・文字数・読み上げ時間と未保存状態が確認できる",
+    "セリフを行単位で複製・並べ替え・削除できる",
+  ]);
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByTestId("nav-assets").click();
+  await expect(page.getByTestId("screen-script")).toBeVisible();
   await page.getByTestId("script-save-button").click();
   await expect(page.getByTestId("app-message")).toContainText(
     "台本を保存しました",
   );
   await expect(page.getByTestId("screen-assets")).toBeVisible();
-  await visual.capture(page, "04-script-saved", "台本編集", [
-    "タイトル・テーマ・セリフを編集して保存できる",
-    "保存後も入力内容が画面に残る",
+  await expect(page.getByTestId("asset-upload-workspace")).toBeVisible();
+  await expect(page.getByTestId("asset-library-summary")).toContainText("0件");
+  await visual.capture(page, "04-script-saved", "素材管理の空状態", [
+    "台本保存後に素材管理へ進める",
+    "素材がなくても自動生成で次へ進めることが分かる",
   ]);
 
   await page.getByTestId("nav-assets").click();
-  await page.getByTestId("asset-usage-select").selectOption("background");
-  await page.getByTestId("asset-name-input").fill("検証背景");
   await page.getByTestId("asset-file-input").setInputFiles({
-    name: "background.png",
+    name: "unsupported.exe",
+    mimeType: "application/x-msdownload",
+    buffer: Buffer.from("not-an-asset"),
+  });
+  await expect(page.getByTestId("asset-upload-error")).toContainText(
+    "対応していない",
+  );
+  await expect(page.getByTestId("asset-add-button")).toBeDisabled();
+  await page.getByTestId("asset-file-input").setInputFiles({
+    name: "検証背景.png",
     mimeType: "image/png",
     buffer: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
       "base64",
     ),
   });
+  await expect(page.getByTestId("asset-upload-error")).toHaveCount(0);
+  await expect(page.getByTestId("asset-type-select")).toHaveValue("image");
+  await expect(page.getByTestId("asset-usage-select")).toHaveValue(
+    "background",
+  );
+  await expect(page.getByTestId("asset-name-input")).toHaveValue("検証背景");
   await page.getByTestId("asset-add-button").click();
-  await expect(page.getByTestId("asset-list")).toContainText("検証背景");
+  await expect(page.getByTestId("asset-card")).toHaveCount(1);
+  await expect(page.getByTestId("asset-library-summary")).toContainText("1件");
   await visual.capture(page, "05-assets", "素材管理", [
-    "素材名・種別・パスを登録できる",
-    "登録済み素材が一覧で確認できる",
+    "ドラッグ＆ドロップと対応形式が日本語で分かる",
+    "用途別サマリーとプレビュー付き素材カードを確認できる",
   ]);
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page
+    .getByTestId("asset-remove-button-asset-customer-journey-1")
+    .click();
+  await expect(page.getByTestId("asset-card")).toHaveCount(1);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByTestId("asset-remove-button-asset-customer-journey-1")
+    .click();
+  await expect(page.getByTestId("asset-card")).toHaveCount(0);
 
   await page.getByTestId("nav-timeline").click();
   await expect(page.getByTestId("screen-timeline")).toContainText("字幕");
+  await expect(page.getByTestId("timeline-studio-workspace")).toBeVisible();
+  await expect(page.getByTestId("timeline-preview-panel")).toContainText(
+    "編集モニター",
+  );
+  await expect(page.getByTestId("timeline-track-area")).toBeVisible();
+  await expect(page.getByTestId("timeline-inspector-panel")).toContainText(
+    "クリップ設定",
+  );
+  await expect(page.getByRole("slider", { name: "再生位置" })).toBeVisible();
+  await expect(
+    page.getByRole("slider", { name: "タイムラインの表示範囲" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("timeline-shortcut-help")).toContainText(
+    "Space",
+  );
   await page.getByTestId("timeline-out-input").fill("4500");
   await page
     .getByTestId("timeline-manual-subtitle-input")
     .fill("仕上げ用の手動テロップです。");
   await page.getByTestId("timeline-add-subtitle-button").click();
   await page.getByTestId("timeline-clip-block-track-subtitle-sub-2").click();
-  await page.getByTestId("timeline-playhead-input").fill("2600");
-  await page.getByTestId("timeline-split-button").click();
+  await page.getByTestId("timeline-playhead-input").fill("2500");
+  await page.getByTestId("timeline-shortcut-help").click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("timeline-playhead-input")).toHaveValue("2600");
+  await page.keyboard.press("s");
   await expect(page.getByTestId("timeline-selected-clip")).toContainText(
     "sub-2-split-2",
   );
   await page.getByTestId("timeline-marker-label-input").fill("見せ場");
   await page.getByTestId("timeline-marker-time-input").fill("4200");
   await page.getByTestId("timeline-add-marker-button").click();
+  await visual.capture(page, "06-timeline", "タイムライン編集", [
+    "視覚タイムラインからクリップ選択と分割ができる",
+    "手動テロップとマーカーを追加して保存できる",
+  ]);
   await page.getByTestId("timeline-save-button").click();
   await expect(page.getByTestId("app-message")).toContainText(
     "タイムラインを保存しました",
   );
   await expect(page.getByTestId("screen-preview")).toBeVisible();
-  await visual.capture(page, "06-timeline", "タイムライン編集", [
-    "視覚タイムラインからクリップ選択と分割ができる",
-    "手動テロップとマーカーを追加して保存できる",
-  ]);
+  await expect(page.getByTestId("delivery-review-workspace")).toBeVisible();
 
   await page.getByTestId("nav-preview").click();
   await page.getByTestId("preview-load-button").click();
@@ -217,6 +296,22 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   );
   await expect(page.getByTestId("preview-manual-summary")).toContainText(
     "字幕 4",
+  );
+  await expect(page.getByTestId("preview-quality-summary")).toContainText(
+    "4 / 4",
+  );
+  const reviewWarning = page.waitForEvent("dialog");
+  const reviewClick = page.getByTestId("preview-render-button").click();
+  const reviewDialog = await reviewWarning;
+  expect(reviewDialog.message()).toContain("目視確認が4項目残っています");
+  await reviewDialog.dismiss();
+  await reviewClick;
+  await expect(page.getByTestId("preview-render-button")).toBeEnabled();
+  for (const reviewId of ["picture", "subtitle", "audio", "rights"]) {
+    await page.getByTestId(`delivery-review-${reviewId}`).check();
+  }
+  await expect(page.getByTestId("manual-review-summary")).toContainText(
+    "4 / 4",
   );
   await page.getByTestId("preview-render-button").click();
   await expect(page.getByTestId("app-message")).toContainText(
@@ -234,10 +329,20 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("preview-summary")).toContainText(
     "durationInFrames",
   );
+  await expect(page.getByTestId("preview-render-button")).toBeDisabled();
+  await expect(page.getByTestId("preview-render-button")).toContainText(
+    "生成中",
+  );
+  await expect(page.getByTestId("delivery-status")).toContainText(
+    "新しい完成版を生成中",
+  );
+  await expect(page.getByTestId("delivery-download-card")).toContainText(
+    "前回版",
+  );
   await visual.capture(page, "07-preview-render", "プレビューとレンダリング", [
-    "Remotion向けプレビュー情報を確認できる",
-    "手動編集サマリーがプレビュー画面で確認できる",
-    "同じ画面からレンダリングジョブを作成できる",
+    "自動品質チェックと手動レビューを分けて確認できる",
+    "新版生成中と前回の完成動画を明確に区別できる",
+    "生成中は二重ジョブ投入が無効になる",
   ]);
 
   await page.getByTestId("nav-timeline").click();
@@ -251,10 +356,33 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page
     .getByTestId("timeline-clip-block-track-final-video-final-video-main")
     .click();
+  await expect(
+    page.getByTestId("timeline-track-header-track-final-video"),
+  ).toBeInViewport();
   await page.getByTestId("timeline-playhead-input").fill("2000");
   await page.getByTestId("timeline-split-button").click();
   await expect(page.getByTestId("timeline-selected-clip")).toContainText(
     "final-video-main-split-2",
+  );
+  // 実際のポーリングを2回通し、未保存の分割・選択・再生位置・履歴を保持する。
+  const selectedBeforePoll = await page
+    .getByTestId("timeline-selected-clip")
+    .textContent();
+  const playheadBeforePoll = await page
+    .getByTestId("timeline-playhead-input")
+    .inputValue();
+  for (let count = 0; count < 2; count++) {
+    await page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname === `/api/projects/${projectId}`,
+    );
+  }
+  await expect(page.getByTestId("timeline-selected-clip")).toHaveText(
+    selectedBeforePoll!,
+  );
+  await expect(page.getByTestId("timeline-playhead-input")).toHaveValue(
+    playheadBeforePoll,
   );
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByTestId("timeline-ripple-delete-button").click();
@@ -277,6 +405,9 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await page
     .getByTestId("settings-image-model-select")
     .selectOption("gpt-image-2");
+  await expect(page.getByTestId("settings-dirty-status")).toContainText(
+    "未保存",
+  );
   await expect(
     page.locator(
       '[data-testid="settings-script-model-select"] option[value="gpt-5.6-terra"]',
@@ -314,8 +445,18 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("settings-anthropic-status")).toContainText(
     "接続OK",
   );
-  await page.getByTestId("settings-width-input").fill("1280");
-  await page.getByTestId("settings-height-input").fill("720");
+  await page.getByTestId("settings-fps-input").fill("0");
+  await expect(page.getByTestId("settings-validation")).toContainText(
+    "FPSは1〜120",
+  );
+  await expect(page.getByTestId("settings-save-button")).toBeDisabled();
+  await page.getByTestId("settings-preset-hd").click();
+  await expect(page.getByTestId("settings-width-input")).toHaveValue("1280");
+  await expect(page.getByTestId("settings-height-input")).toHaveValue("720");
+  await expect(page.getByTestId("settings-fps-input")).toHaveValue("30");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByTestId("nav-dashboard").click();
+  await expect(page.getByTestId("screen-settings")).toBeVisible();
   await page.getByTestId("settings-save-button").click();
   await expect(page.getByTestId("app-message")).toContainText(
     "設定を保存しました",
@@ -326,9 +467,12 @@ test("制作開始からレンダリング準備までの顧客導線を可視�
   await expect(page.getByTestId("settings-image-model-select")).toHaveValue(
     "gpt-image-2",
   );
+  await expect(page.getByTestId("settings-dirty-status")).toContainText(
+    "保存済み",
+  );
   await visual.capture(page, "09-settings", "設定", [
     "APIキーを値の再表示なしで登録し、接続状態を確認できる",
-    "台本・画像モデルと出力プリセットを保存できる",
+    "未保存保護と用途別プリセットを使って安全に保存できる",
   ]);
 
   await visual.writeManifest();
@@ -358,6 +502,7 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       openai: false,
       anthropic: false,
     },
+    keepLatestJobPending: false,
   };
 
   await page.route("**/api/**", async (route) => {
@@ -416,7 +561,7 @@ const installCustomerJourneyApiMock = async (page: Page) => {
     if (url.pathname === `/api/projects/${projectId}` && method === "GET") {
       const detail = createProjectDetail(state);
       // 初回表示では受付状態を確認し、次回ポーリングから完了へ進む実運用を模擬する。
-      if (state.jobs[0]?.status === "PENDING") {
+      if (state.jobs[0]?.status === "PENDING" && !state.keepLatestJobPending) {
         state.jobs[0].status = "COMPLETED";
       }
       return fulfillJson(detail);
@@ -458,6 +603,15 @@ const installCustomerJourneyApiMock = async (page: Page) => {
         { ok: true, assetId: asset.id, relativePath: asset.relativePath },
         201,
       );
+    }
+
+    if (
+      url.pathname ===
+        `/api/projects/${projectId}/assets/asset-customer-journey-1` &&
+      method === "DELETE"
+    ) {
+      state.assets = [];
+      return fulfillJson({ ok: true });
     }
 
     if (
@@ -531,9 +685,7 @@ const installCustomerJourneyApiMock = async (page: Page) => {
           },
           ...current.tracks.map((track) => ({
             ...track,
-            ...(track.type === "audio"
-              ? { muted: true }
-              : { hidden: true }),
+            ...(track.type === "audio" ? { muted: true } : { hidden: true }),
           })),
         ],
       };
@@ -558,19 +710,26 @@ const installCustomerJourneyApiMock = async (page: Page) => {
       url.pathname === `/api/projects/${projectId}/jobs` &&
       method === "POST"
     ) {
+      const nextJobId =
+        state.jobs.length === 0
+          ? jobId
+          : `00000000-0000-4000-8000-${String(101 + state.jobs.length).padStart(12, "0")}`;
+      state.keepLatestJobPending = state.jobs.length >= 2;
       state.jobs = [
         {
-          id: jobId,
+          id: nextJobId,
           status: "PENDING",
           mode: String(body.mode ?? "full"),
           createdAt,
         },
+        ...state.jobs,
       ];
-      return fulfillJson({ projectId, jobId }, 201);
+      return fulfillJson({ projectId, jobId: nextJobId }, 201);
     }
 
     if (
-      url.pathname.startsWith(`/api/jobs/${jobId}/files/`) &&
+      url.pathname.startsWith("/api/jobs/") &&
+      url.pathname.includes("/files/") &&
       method === "GET"
     ) {
       return route.fulfill({
@@ -720,20 +879,23 @@ const createProjectDetail = (state: {
         completedAt: createdAt,
       },
     ],
-    files: [
-      {
-        id: "00000000-0000-4000-8000-000000000201",
-        relativePath: `projects/${projectId}/output/video_composition/latest/preview.mp4`,
-        fileType: "video",
-        fileCategory: "output",
-      },
-      {
-        id: "00000000-0000-4000-8000-000000000202",
-        relativePath: `projects/${projectId}/final/final.mp4`,
-        fileType: "video",
-        fileCategory: "final",
-      },
-    ],
+    files:
+      job.status === "COMPLETED"
+        ? [
+            {
+              id: `preview-${job.id}`,
+              relativePath: `projects/${projectId}/output/video_composition/latest/preview.mp4`,
+              fileType: "video",
+              fileCategory: "output",
+            },
+            {
+              id: `final-${job.id}`,
+              relativePath: `projects/${projectId}/final/final.mp4`,
+              fileType: "video",
+              fileCategory: "final",
+            },
+          ]
+        : [],
   })),
   script: state.script,
   timeline: state.timeline,

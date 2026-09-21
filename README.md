@@ -86,8 +86,12 @@ Windowsでは `start_yukkuri_movie_maker.bat` をダブルクリックすると�
 - `ANTHROPIC_API_KEY`: Claudeの台本生成を使う場合
 - `AIVIS_SPEECH_BASE_URL`: AIVIS SpeechサーバーURL
 - `STABILITY_API_KEY`: 画像生成APIキー（任意）
-- `YOUTUBE_ACCESS_TOKEN`: YouTube Data API OAuthアクセストークン（投稿時のみ）
+- `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` / `YOUTUBE_REFRESH_TOKEN`: YouTube投稿・分析の長期運用向けOAuth情報
+- `YOUTUBE_ACCESS_TOKEN`: 後方互換用の短期OAuthアクセストークン
 - `YOUTUBE_PRIVACY_STATUS`: `private` / `unlisted` / `public`（既定 `private`）
+- `YOUTUBE_PUBLISH_AT`: 予約公開するISO 8601日時。指定時はYouTube仕様によりprivateでアップロード
+- `YMM_YOUTUBE_MOCK_ON_MISSING`: YouTube認証・クォータ制約時に理由付きモックで後続を継続（既定true）
+- `YMM_AUTOMATION_POLL_INTERVAL_MS`: Workerが自動運用設定を確認する間隔（既定60000ms）
 
 ### YAML設定テンプレート
 
@@ -113,7 +117,14 @@ pnpm cli health
 pnpm cli run --theme "解説したいテーマ" --mode full
 pnpm cli job <jobId>
 pnpm cli config:test
+pnpm cli automation status
+pnpm cli automation collect
+pnpm cli automation themes
+pnpm cli automation run
+pnpm cli automation config --enabled true --interval-hours 168 --topic-seed "AI技術"
 ```
+
+YouTubeの投稿台帳、24/72/168時間後の指標収集、動画評価、テーマ改善、定期実行、安全策の詳細は [閉ループ自動運用](docs/closed_loop_automation.md) を参照してください。自動運用は安全のため初期状態では停止しています。
 
 ## 品質ゲート
 
@@ -126,6 +137,10 @@ pnpm test:real  # Gemini/AivisSpeech等を実際に呼ぶため、キー・起�
 ```
 
 通常テストと実外部接続テストは分離しています。アップロードはstreaming multipart、動画配信はHTTP Rangeに対応し、プロジェクト設定と入力revisionはJob作成時にsnapshot保存されます。
+
+Job投入時の台本・素材・タイムラインは `projects/<projectId>/jobs/<jobId>/snapshot/` に固定し、Workerはハッシュ検証後にジョブ専用の `work/` で生成します。投入後の保存は次回のJobへ反映され、生成完了時も新しい編集内容を上書きしません。旧形式のJobは初回実行時に入力を固定します。保存先の起点は `YMM_WORKFLOW_OUTPUT_ROOT`（未指定時は既定outputRoot）です。
+
+全体レビュー7件の修正と実API・実動画検証の記録は [修正報告](docs/review_fixes_20260918.md) を参照してください。
 
 開発タスクの最終確認では、モックだけで終えず完成動画を最低1本生成します。詳しい完了条件は [docs/testing_policy.md](docs/testing_policy.md) を参照してください。
 

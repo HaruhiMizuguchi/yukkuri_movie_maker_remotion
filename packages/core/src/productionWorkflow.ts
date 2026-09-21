@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
@@ -27,6 +27,11 @@ import type {
 import { registerProjectFiles } from "./projectFile";
 import { syncLatestAtomically } from "./atomicLatest";
 import { createCharacterPerformancePlan } from "./characterPerformance";
+import {
+  buildYoutubeVideoStatus,
+  resolveYoutubeAccessToken,
+  type YoutubePrivacyStatus,
+} from "./youtubeAutomation";
 import {
   computeWorkflowStepFingerprint,
   hasValidWorkflowCache,
@@ -128,7 +133,8 @@ const withReliability = (
   return async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const workflowLogPath = path.join(projectRoot, "logs", "workflow.log");
     await fs.mkdir(path.dirname(workflowLogPath), { recursive: true });
     const fingerprint = await computeWorkflowStepFingerprint({
@@ -226,7 +232,8 @@ const createThemeSelectionImplementation = (
   return async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "theme_selection");
 
     const trends = await fetchTrendCandidates(fetchFn);
@@ -265,7 +272,8 @@ const createTitleGenerationImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "title_generation");
 
     const script = await readScriptOrFallback(projectRoot, details.theme);
@@ -310,7 +318,8 @@ const createBackgroundGenerationImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(
       projectRoot,
       "background_generation",
@@ -407,7 +416,8 @@ const createCharacterSynthesisImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "character_synthesis");
 
     const timestampsPath = path.join(
@@ -463,7 +473,8 @@ const createBackgroundAnimationImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "background_animation");
     const animationPath = path.join(
       stepDir.runDir,
@@ -499,7 +510,8 @@ const createIllustrationInsertionImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(
       projectRoot,
       "illustration_insertion",
@@ -583,7 +595,8 @@ const createAudioEnhancementImplementation =
   async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "audio_enhancement");
 
     const sourceAudioPath = path.join(
@@ -633,21 +646,14 @@ const createYoutubeUploadImplementation = (
   return async (ctx) => {
     const outputRoot = resolveOutputRoot(ctx, options);
     const details = await loadJobDetails(ctx);
-    const projectRoot = path.join(outputRoot, "projects", details.projectId);
+    const projectRoot =
+      ctx.projectRoot ?? path.join(outputRoot, "projects", details.projectId);
     const stepDir = await createStepRunDir(projectRoot, "youtube_upload");
     const resultPath = path.join(stepDir.runDir, "youtube_upload.json");
     const finalPath = path.join(projectRoot, "final", "final.mp4");
-
-    const token = process.env.YOUTUBE_ACCESS_TOKEN?.trim();
     let payload: Record<string, unknown>;
 
-    if (!token) {
-      payload = {
-        skipped: true,
-        status: "skipped",
-        reason: "YOUTUBE_ACCESS_TOKEN is missing",
-      };
-    } else if (!(await fileExists(finalPath))) {
+    if (!(await fileExists(finalPath))) {
       payload = {
         skipped: true,
         status: "skipped",
@@ -655,17 +661,140 @@ const createYoutubeUploadImplementation = (
       };
     } else {
       const title = await readGeneratedTitle(projectRoot, details.theme);
+      const video = await fs.readFile(finalPath);
+      const idempotencyKey = createHash("sha256")
+        .update(details.projectId)
+        .update("\0")
+        .update(video)
+        .digest("hex");
+      const existing = await ctx.prisma.youtubePublication.findUnique({
+        where: { idempotencyKey },
+      });
+      if (
+        existing?.youtubeVideoId &&
+        !existing.isMock &&
+        ["UPLOADED", "PUBLISHED"].includes(existing.status)
+      ) {
+        payload = {
+          skipped: true,
+          status: "duplicate",
+          reason: "youtube_publication_already_exists",
+          videoId: existing.youtubeVideoId,
+          publicationId: existing.id,
+          idempotencyKey,
+        };
+        await writeYoutubeUploadArtifact({
+          ctx,
+          stepDir,
+          resultPath,
+          payload,
+          outputRoot,
+        });
+        return payload;
+      }
+
+      const automationConfig = await ctx.prisma.automationConfig.findUnique({
+        where: { id: "default" },
+      });
+      const privacyStatus = normalizeYoutubePrivacyStatus(
+        process.env.YOUTUBE_PRIVACY_STATUS ??
+          automationConfig?.defaultPrivacyStatus,
+      );
+      const configuredPublishAt = process.env.YOUTUBE_PUBLISH_AT?.trim();
+      const delayedPublishAt =
+        !configuredPublishAt &&
+        automationConfig &&
+        automationConfig.publishDelayMinutes > 0
+          ? new Date(
+              Date.now() + automationConfig.publishDelayMinutes * 60 * 1000,
+            ).toISOString()
+          : undefined;
+      const videoStatus = buildYoutubeVideoStatus({
+        privacyStatus,
+        publishAt: configuredPublishAt || delayedPublishAt,
+      });
+      const auth = await resolveYoutubeAccessToken(
+        {
+          clientId: process.env.YOUTUBE_CLIENT_ID,
+          clientSecret: process.env.YOUTUBE_CLIENT_SECRET,
+          refreshToken: process.env.YOUTUBE_REFRESH_TOKEN,
+          accessToken: process.env.YOUTUBE_ACCESS_TOKEN,
+        },
+        fetchFn,
+      );
+      const sourcePath = toRelativePath(outputRoot, finalPath);
+      if (!auth.available) {
+        const mockWhenApiUnavailable =
+          automationConfig?.mockWhenApiUnavailable ??
+          process.env.YMM_YOUTUBE_MOCK_ON_MISSING !== "false";
+        if (mockWhenApiUnavailable) {
+          const mockVideoId = `mock-${idempotencyKey.slice(0, 16)}`;
+          const publication = await ctx.prisma.youtubePublication.upsert({
+            where: { idempotencyKey },
+            create: {
+              projectId: details.projectId,
+              jobId: ctx.jobId,
+              youtubeVideoId: mockVideoId,
+              idempotencyKey,
+              theme: details.theme,
+              title,
+              status: "MOCKED",
+              privacyStatus: videoStatus.privacyStatus,
+              scheduledAt: videoStatus.publishAt
+                ? new Date(videoStatus.publishAt)
+                : null,
+              uploadedAt: new Date(),
+              publishedAt: videoStatus.publishAt
+                ? new Date(videoStatus.publishAt)
+                : new Date(),
+              sourcePath,
+              isMock: true,
+              failureReason: auth.reason,
+              metadataJson: videoStatus,
+            },
+            update: {
+              status: "MOCKED",
+              youtubeVideoId: mockVideoId,
+              isMock: true,
+              failureReason: auth.reason,
+              metadataJson: videoStatus,
+            },
+          });
+          payload = {
+            status: "mocked",
+            mocked: true,
+            reason: auth.reason,
+            videoId: mockVideoId,
+            publicationId: publication.id,
+            idempotencyKey,
+            videoPath: sourcePath,
+          };
+        } else {
+          payload = {
+            skipped: true,
+            status: "skipped",
+            reason: auth.reason,
+            idempotencyKey,
+          };
+        }
+        await writeYoutubeUploadArtifact({
+          ctx,
+          stepDir,
+          resultPath,
+          payload,
+          outputRoot,
+        });
+        return payload;
+      }
+
       const boundary = `ymm-${Date.now().toString(16)}`;
       const metadata = Buffer.from(
         JSON.stringify({
           snippet: { title, description: `${details.theme}の自動生成動画` },
-          status: {
-            privacyStatus: process.env.YOUTUBE_PRIVACY_STATUS ?? "private",
-          },
+          status: videoStatus,
         }),
         "utf-8",
       );
-      const video = await fs.readFile(finalPath);
       const multipartBody = Buffer.concat([
         Buffer.from(
           `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
@@ -684,7 +813,7 @@ const createYoutubeUploadImplementation = (
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${auth.accessToken}`,
             "Content-Type": `multipart/related; boundary=${boundary}`,
             "Content-Length": String(multipartBody.length),
           },
@@ -694,36 +823,153 @@ const createYoutubeUploadImplementation = (
       );
       const body = (await response.json()) as { id?: string; error?: unknown };
       if (!response.ok || !body.id) {
+        await ctx.prisma.youtubePublication.upsert({
+          where: { idempotencyKey },
+          create: {
+            projectId: details.projectId,
+            jobId: ctx.jobId,
+            idempotencyKey,
+            theme: details.theme,
+            title,
+            status: "FAILED",
+            privacyStatus: videoStatus.privacyStatus,
+            scheduledAt: videoStatus.publishAt
+              ? new Date(videoStatus.publishAt)
+              : null,
+            sourcePath,
+            isMock: false,
+            failureReason: `youtube_upload_http_${response.status}`,
+            metadataJson: videoStatus,
+          },
+          update: {
+            status: "FAILED",
+            failureReason: `youtube_upload_http_${response.status}`,
+            metadataJson: videoStatus,
+          },
+        });
         throw new Error(`YouTube upload failed: HTTP ${response.status}`);
       }
+      const uploadedAt = new Date();
+      const publication = await ctx.prisma.youtubePublication.upsert({
+        where: { idempotencyKey },
+        create: {
+          projectId: details.projectId,
+          jobId: ctx.jobId,
+          youtubeVideoId: body.id,
+          idempotencyKey,
+          theme: details.theme,
+          title,
+          status: "UPLOADED",
+          privacyStatus: videoStatus.privacyStatus,
+          scheduledAt: videoStatus.publishAt
+            ? new Date(videoStatus.publishAt)
+            : null,
+          uploadedAt,
+          publishedAt: videoStatus.publishAt
+            ? new Date(videoStatus.publishAt)
+            : videoStatus.privacyStatus === "public" ||
+                videoStatus.privacyStatus === "unlisted"
+              ? uploadedAt
+              : null,
+          sourcePath,
+          isMock: false,
+          metadataJson: {
+            status: videoStatus,
+            authSource: auth.source,
+          },
+        },
+        update: {
+          youtubeVideoId: body.id,
+          status: "UPLOADED",
+          uploadedAt,
+          jobId: ctx.jobId,
+          privacyStatus: videoStatus.privacyStatus,
+          scheduledAt: videoStatus.publishAt
+            ? new Date(videoStatus.publishAt)
+            : null,
+          publishedAt: videoStatus.publishAt
+            ? new Date(videoStatus.publishAt)
+            : videoStatus.privacyStatus === "public" ||
+                videoStatus.privacyStatus === "unlisted"
+              ? uploadedAt
+              : null,
+          // 投稿昇格と架空指標の削除は同じDB更新で確定させる。
+          ...(existing?.isMock || existing?.status === "MOCKED"
+            ? {
+                metricSnapshots: { deleteMany: {} },
+                evaluations: { deleteMany: {} },
+              }
+            : {}),
+          failureReason: null,
+          isMock: false,
+          metadataJson: {
+            status: videoStatus,
+            authSource: auth.source,
+          },
+        },
+      });
       payload = {
         status: "uploaded",
         videoId: body.id,
-        videoPath: toRelativePath(outputRoot, finalPath),
+        publicationId: publication.id,
+        idempotencyKey,
+        videoPath: sourcePath,
+        privacyStatus: videoStatus.privacyStatus,
+        scheduledAt: videoStatus.publishAt ?? null,
+        authSource: auth.source,
       };
     }
 
-    await writeJson(resultPath, payload);
-    await syncLatest(stepDir);
-    const stat = await fs.stat(resultPath);
-    await registerProjectFiles({
-      prisma: ctx.prisma,
-      jobId: ctx.jobId,
-      stepName: "youtube_upload",
-      artifacts: [
-        {
-          type: "metadata",
-          relativePath: toRelativePath(outputRoot, resultPath),
-          fileCategory: "output",
-          fileSizeBytes: stat.size,
-          kind: "youtube_upload",
-        },
-      ],
+    await writeYoutubeUploadArtifact({
+      ctx,
+      stepDir,
+      resultPath,
+      payload,
+      outputRoot,
     });
 
     return payload;
   };
 };
+
+const writeYoutubeUploadArtifact = async ({
+  ctx,
+  stepDir,
+  resultPath,
+  payload,
+  outputRoot,
+}: {
+  ctx: WorkflowContext;
+  stepDir: { runDir: string; latestDir: string };
+  resultPath: string;
+  payload: Record<string, unknown>;
+  outputRoot: string;
+}): Promise<void> => {
+  await writeJson(resultPath, payload);
+  await syncLatest(stepDir);
+  const stat = await fs.stat(resultPath);
+  await registerProjectFiles({
+    prisma: ctx.prisma,
+    jobId: ctx.jobId,
+    stepName: "youtube_upload",
+    artifacts: [
+      {
+        type: "metadata",
+        relativePath: toRelativePath(outputRoot, resultPath),
+        fileCategory: "output",
+        fileSizeBytes: stat.size,
+        kind: "youtube_upload",
+      },
+    ],
+  });
+};
+
+const normalizeYoutubePrivacyStatus = (
+  value: string | undefined,
+): YoutubePrivacyStatus =>
+  value === "public" || value === "unlisted" || value === "private"
+    ? value
+    : "private";
 
 const readGeneratedTitle = async (
   projectRoot: string,
